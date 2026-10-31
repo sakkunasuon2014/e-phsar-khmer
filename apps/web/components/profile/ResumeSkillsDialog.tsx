@@ -134,13 +134,13 @@ export function ResumeSkillsDialog({
               <IconArrowLeft size={20} />
             </button>
           )}
-          <DialogTitle className="text-2xl font-semibold">
+          <DialogTitle>
             {mode === "edit"
               ? t("form.titles.skillsEdit")
               : t("form.titles.skillsWizard")}
           </DialogTitle>
           {mode === "wizard" ? (
-            <span className="ml-auto text-lg font-semibold text-[#00a0e9]">
+            <span className="ml-auto type-nav text-[#00a0e9]">
               {t("form.step", { current: 5, total: 8 })}
             </span>
           ) : (
@@ -165,7 +165,7 @@ export function ResumeSkillsDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {mode === "wizard" && (
-            <p className="text-base text-muted-foreground">
+            <p className="type-body text-muted-foreground">
               {t("sections.skills.desc")}
             </p>
           )}
@@ -204,7 +204,7 @@ export function ResumeSkillsDialog({
                       type="button"
                       id="rsk-level"
                       data-invalid={levelError}
-                      className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] data-[invalid=true]:border-destructive data-[invalid=true]:ring-3 data-[invalid=true]:ring-destructive/20 md:text-sm"
+                      className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] data-[invalid=true]:border-destructive data-[invalid=true]:ring-3 data-[invalid=true]:ring-destructive/20"
                     >
                       <span className={level ? "" : "text-muted-foreground"}>
                         {level ?? ""}
@@ -266,7 +266,7 @@ export function ResumeSkillsDialog({
             <button
               type="button"
               onClick={onSkip}
-              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 text-base font-medium text-white transition-colors hover:bg-gray-600"
+              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 type-nav text-white transition-colors hover:bg-gray-600"
             >
               {t("form.skip")}
             </button>
@@ -274,7 +274,7 @@ export function ResumeSkillsDialog({
               type="button"
               onClick={handleNext}
               disabled={saving}
-              className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] type-nav text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.nextLanguages")}
             </button>
@@ -285,7 +285,7 @@ export function ResumeSkillsDialog({
               type="button"
               onClick={handleNext}
               disabled={saving}
-              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 type-nav text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.save")}
             </button>

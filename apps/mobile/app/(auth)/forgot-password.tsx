@@ -33,7 +33,7 @@ const ForgotPasswordScreen = () => {
       <View className="flex-1 px-6 pt-8">
         {/* Instructions */}
         <Text className="text-neutral-text-sub text-center text-base leading-6 mb-8">
-          Enter your phone number or email that you register on PsaNPIC and
+          Enter your phone number or email that you register on PhsarKhmer and
           we&apos;ll send the code to set the new password
         </Text>
 

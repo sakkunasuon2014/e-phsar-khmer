@@ -10,6 +10,8 @@ export interface ListingSpecsProps {
   brand?: { slug: string; name: string };
   model?: { slug: string; name: string };
   attributes?: Record<string, unknown> | null;
+  /** Km display value per attribute key (taxType, bodyType, color, …). */
+  valueLabels?: Record<string, string>;
   condition?: "new" | "used" | null;
 }
 
@@ -123,6 +125,35 @@ const LABEL_OVERRIDES: Record<string, Record<string, string>> = {
 const VALUE_SUFFIX: Record<string, string> = { size: "m²" };
 
 /**
+ * The feed query a spec value applies when clicked. The filter bar owns a few
+ * dimensions (year range, condition, tax type, engine, color, transmission),
+ * so those use their shared URL params and show as applied controls; every
+ * other attribute key uses the multi-attribute `attrs` JSON object, which is
+ * exact for every family's own key and needs no slug lookup.
+ *
+ * `value` is the STORED English value (`attributes[key]`), never the
+ * `valueLabels` display text — on `/km` the grid prints Khmer while the feed
+ * still matches the English value the post form wrote.
+ */
+function filterQueryFor(key: string, value: string): Record<string, string> {
+  switch (key) {
+    case "year":
+      // An exact year is a range whose bounds are equal.
+      return { year_min: value, year_max: value };
+    case "taxType":
+      return { tax_type: value };
+    case "engineType":
+      return { engine: value };
+    case "color":
+      return { color: value };
+    case "transmission":
+      return { transmission: value };
+    default:
+      return { attrs: JSON.stringify({ [key]: value }) };
+  }
+}
+
+/**
  * Subcategories whose reference lists Storage before Condition, so Condition
  * moves to after the spec block. Phones and Tablets only (captain, 2026-09-22);
  * the computers family declares `storage` too but keeps Condition where it is
@@ -147,6 +178,7 @@ export default function ListingSpecs({
   brand,
   model,
   attributes,
+  valueLabels,
   condition,
 }: ListingSpecsProps) {
   const t = useTranslations("Specs");
@@ -159,6 +191,18 @@ export default function ListingSpecs({
             categorySlug: cate.slug,
             subcategorySlug: subcate.slug,
           },
+        }
+      : undefined;
+  /** The same page with the value's filter applied. */
+  const browseHrefWith = (query: Record<string, string>): Href | undefined =>
+    cate && subcate
+      ? {
+          pathname: "/category/[categorySlug]/[subcategorySlug]",
+          params: {
+            categorySlug: cate.slug,
+            subcategorySlug: subcate.slug,
+          },
+          query,
         }
       : undefined;
 
@@ -253,7 +297,9 @@ export default function ListingSpecs({
     rows.push({
       label: t("condition"),
       value: tCommon(condition === "used" ? "condition.used" : "condition.new"),
-      href: browseHref,
+      href: browseHrefWith({
+        condition: condition === "used" ? "used" : "new",
+      }),
     });
     conditionInserted = true;
   };
@@ -262,10 +308,12 @@ export default function ListingSpecs({
     const value = toText(attributes?.[key]);
     if (!value) continue;
     if (!conditionPreKeys.has(key)) pushCondition();
+    const displayValue = valueLabels?.[key] ?? value;
     rows.push({
       label: t(labelOverrides?.[key] ?? labelKey),
-      value: `${value}${VALUE_SUFFIX[key] ?? ""}`,
-      href: browseHref,
+      value: `${displayValue}${VALUE_SUFFIX[key] ?? ""}`,
+      // The link uses the raw stored value, not the display text above.
+      href: browseHrefWith(filterQueryFor(key, value)),
     });
   }
   pushCondition();
@@ -276,16 +324,16 @@ export default function ListingSpecs({
     <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-5 mb-5">
       {rows.map((row) => (
         <div key={row.label}>
-          <div className="text-xs text-muted-foreground">{row.label}</div>
+          <div className="type-body-sm text-muted-foreground">{row.label}</div>
           {row.href && row.value ? (
             <Link
               href={row.href}
-              className="text-sm text-[#00a0e9] hover:underline underline-offset-2 break-words"
+              className="type-body-sm text-[#00a0e9] hover:underline underline-offset-2 break-words"
             >
               {row.value}
             </Link>
           ) : (
-            <span className="text-sm text-[#00a0e9] break-words">
+            <span className="type-body-sm text-[#00a0e9] break-words">
               {row.value}
             </span>
           )}

@@ -44,7 +44,7 @@ export function ListingContextCard({
     return (
       <div
         className={cn(
-          "w-56 max-w-full rounded-xl border border-dashed border-border bg-card/60 px-3 py-4 text-xs text-muted-foreground",
+          "w-56 max-w-full rounded-xl border border-dashed border-border bg-card/60 px-3 py-4 type-meta text-muted-foreground",
           className,
         )}
       >
@@ -89,15 +89,15 @@ export function ListingContextCard({
           )}
         </div>
         <div className="p-2.5">
-          <p className="line-clamp-2 text-xs font-medium text-foreground">
+          <p className="line-clamp-2 type-meta text-foreground">
             {listing.title}
           </p>
           <div className="mt-1 flex items-center justify-between gap-2">
-            <p className="text-sm font-bold text-[#f04d4e]">
+            <p className="type-price text-[#f04d4e]">
               {price ?? t("listing.noPrice")}
             </p>
             {inactive && (
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 type-button-sm text-muted-foreground">
                 {t(`listing.status.${listing.status}`)}
               </span>
             )}

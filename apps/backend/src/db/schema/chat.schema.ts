@@ -218,8 +218,9 @@ export type NewUserE2eOneTimePrekey = typeof userE2eOneTimePrekeys.$inferInsert;
  * identified by its identity key: re-registering the same key from the same
  * browser claims the existing row instead of creating a new device.
  *
- * "Active" = revokedAt is null AND lastSeenAt within 30 days (see
- * activeDeviceCondition in chat/e2e/e2e-devices.util.ts). Senders must
+ * "Active" = revokedAt is null AND lastSeenAt within 30 days, or — when a
+ * user has no such device — their 2 most recently seen non-revoked devices
+ * (see loadTargetDevices in chat/e2e/e2e-devices.util.ts). Senders must
  * encrypt to exactly the active set or the send is rejected with 409.
  */
 export const userE2eDevices = chatSchema.table(
@@ -397,43 +398,6 @@ export const e2eBackupSegments = chatSchema.table(
 
 export type E2eBackupSegmentRow = typeof e2eBackupSegments.$inferSelect;
 
-export const e2eHistoryRequests = chatSchema.table(
-  'e2e_history_requests',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
-    requesterDeviceId: uuid('requester_device_id')
-      .notNull()
-      .references(() => userE2eDevices.id, { onDelete: 'cascade' }),
-    // pending → approved | declined | expired; approved → consumed
-    status: varchar('status', { length: 20 }).default('pending').notNull(),
-    approverDeviceId: uuid('approver_device_id').references(
-      () => userE2eDevices.id,
-      { onDelete: 'set null' },
-    ),
-    // Set on approve: BK encrypted for the requester over the approver→
-    // requester Double Ratchet session. Cleared once consumed.
-    header: jsonb('header').$type<E2eHeader>(),
-    wrappedKey: text('wrapped_key'),
-    createdAt: timestamp('created_at', { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    respondedAt: timestamp('responded_at', { withTimezone: true }),
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  },
-  (t) => [
-    index('e2e_history_requests_user_idx').on(t.userId, t.status),
-    // At most one open request per requesting device.
-    uniqueIndex('e2e_history_requests_pending_uq')
-      .on(t.requesterDeviceId)
-      .where(sql`status = 'pending'`),
-  ],
-);
-
-export type E2eHistoryRequestRow = typeof e2eHistoryRequests.$inferSelect;
-
 /**
  * An end-to-end encrypted chat file (image or document). The object in the
  * private chat-files bucket is ciphertext; its key, MIME type, name, hash
@@ -444,7 +408,7 @@ export type E2eHistoryRequestRow = typeof e2eHistoryRequests.$inferSelect;
  * Lifecycle: pending (upload URL issued) → uploaded (object exists, size
  * checked) → attached (referenced by a message, in the send transaction).
  * Rows never attached within 24 h are removed with their objects by cleanup.
- * See tasks/plan-e2e-attachments.md.
+ * See docs/e2e-attachments.md.
  */
 export const chatAttachments = chatSchema.table(
   'attachments',

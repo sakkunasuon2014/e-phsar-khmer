@@ -31,7 +31,7 @@ export function NotificationUnreadBadge() {
   return (
     <span
       aria-label={t("unreadAria", { count: data })}
-      className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-card bg-[#f04d4e] px-1 text-[10px] font-bold leading-none text-white"
+      className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-card bg-[#f04d4e] px-1 type-photo-badge text-white"
     >
       {data > 99 ? "99+" : data}
     </span>

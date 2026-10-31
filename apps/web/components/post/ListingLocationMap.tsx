@@ -41,7 +41,7 @@ export default function ListingLocationMap({
         style={{ backgroundImage: `url('${MAP_MOCK}')` }}
         aria-hidden
       />
-      <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-sm bg-card px-3 py-2 text-xs font-medium text-muted-foreground shadow-sm">
+      <span className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center rounded-sm bg-card px-3 py-2 type-meta text-muted-foreground shadow-sm">
         <IconMapPin className="mr-1" />
         {t("show")}
       </span>

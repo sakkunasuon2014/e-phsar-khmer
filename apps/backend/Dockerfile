@@ -1,6 +1,6 @@
 # Backend image. Build from the REPO ROOT, since the pnpm lockfile and
 # workspace config live there:
-#   docker build -f apps/backend/Dockerfile -t psa-backend .
+#   docker build -f apps/backend/Dockerfile -t phsarkhmer-backend .
 #
 # Node 22 (>= 22.12) is required, not just preferred: `effect` v4 and several
 # other deps are ESM-only, and the CommonJS build loads them through Node's

@@ -97,12 +97,12 @@ export function ResumeDobCalendar({
           <button
             type="button"
             onClick={() => setView("months")}
-            className="h-10 min-w-0 flex-1 cursor-pointer rounded-md text-center text-base font-semibold text-foreground transition-colors hover:bg-muted"
+            className="h-10 min-w-0 flex-1 cursor-pointer rounded-md text-center type-nav text-foreground transition-colors hover:bg-muted"
           >
             {monthTitle}
           </button>
         ) : (
-          <span className="flex h-10 flex-1 items-center justify-center text-base font-bold text-foreground">
+          <span className="flex h-10 flex-1 items-center justify-center type-nav text-foreground">
             {format(cursor, "yyyy")}
           </span>
         )}
@@ -129,7 +129,7 @@ export function ResumeDobCalendar({
             {weekdays.map((day) => (
               <span
                 key={day}
-                className="flex h-9 items-center justify-center text-sm font-medium text-foreground"
+                className="flex h-9 items-center justify-center type-nav text-foreground"
               >
                 {day}
               </span>
@@ -147,7 +147,7 @@ export function ResumeDobCalendar({
                   disabled={outside || outOfRange}
                   onClick={() => onSelect(day)}
                   className={cn(
-                    "flex h-9 items-center justify-center rounded-md text-sm transition-colors",
+                    "flex h-9 items-center justify-center rounded-md type-body-sm transition-colors",
                     isSelected
                       ? "bg-[#00a0e9] font-medium text-white"
                       : outside || outOfRange
@@ -178,7 +178,7 @@ export function ResumeDobCalendar({
                   setView("days");
                 }}
                 className={cn(
-                  "flex h-9 cursor-pointer items-center justify-center rounded-md text-sm transition-colors",
+                  "flex h-9 cursor-pointer items-center justify-center rounded-md type-body-sm transition-colors",
                   isCursorMonth
                     ? "bg-[#00a0e9] font-medium text-white"
                     : outOfRange

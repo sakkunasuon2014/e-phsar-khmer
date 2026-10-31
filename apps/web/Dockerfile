@@ -1,6 +1,6 @@
 # Web (Next.js) image. Build from the REPO ROOT, since the pnpm lockfile and
 # workspace config live there:
-#   docker build -f apps/web/Dockerfile -t psa-web \
+#   docker build -f apps/web/Dockerfile -t phsarkhmer-web \
 #     --build-arg SUPABASE_URL=https://<project>.supabase.co \
 #     --build-arg NEXT_PUBLIC_WS_URL=wss://<backend-host> .
 #

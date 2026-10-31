@@ -168,6 +168,65 @@ describe('AccountPurgeService', () => {
     }
   });
 
+  it('leaves boot alone and sweeps within two minutes', async () => {
+    jest.useFakeTimers();
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      const db = makeDb();
+      selectReturns(db, [[]]);
+      const service = new AccountPurgeService(
+        db as never,
+        {
+          get: jest.fn((key: string) =>
+            key === 'accounts.purgeEnabled' ? true : 6 * 60 * 60 * 1000,
+          ),
+        } as never,
+        makeFiles() as never,
+      );
+
+      service.onModuleInit();
+      // A restart loop must not turn into a query loop.
+      expect(db.select).not.toHaveBeenCalled();
+
+      await jest.advanceTimersByTimeAsync(2 * 60 * 1000);
+      expect(db.select).toHaveBeenCalledTimes(1);
+
+      service.onModuleDestroy();
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      jest.useRealTimers();
+    }
+  });
+
+  it('cancels the pending first sweep on shutdown', async () => {
+    jest.useFakeTimers();
+    const originalEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'development';
+    try {
+      const db = makeDb();
+      selectReturns(db, [[]]);
+      const service = new AccountPurgeService(
+        db as never,
+        {
+          get: jest.fn((key: string) =>
+            key === 'accounts.purgeEnabled' ? true : 6 * 60 * 60 * 1000,
+          ),
+        } as never,
+        makeFiles() as never,
+      );
+
+      service.onModuleInit();
+      service.onModuleDestroy();
+      await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
+
+      expect(db.select).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = originalEnv;
+      jest.useRealTimers();
+    }
+  });
+
   it('disarms when the deployment runs purge-disabled', () => {
     const db = makeDb();
     const setIntervalSpy = jest.spyOn(global, 'setInterval');

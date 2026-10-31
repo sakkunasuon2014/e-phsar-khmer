@@ -1,5 +1,5 @@
 {
-  "name": "psa-npic",
+  "name": "phsarkhmer-monorepo",
   "private": true,
   "scripts": {
     "build": "turbo run build",

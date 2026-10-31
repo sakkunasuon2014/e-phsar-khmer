@@ -1,5 +1,5 @@
 import TeamClient from "./TeamClient";
-import { getAdminUsers } from "@/actions/admin-users";
+import { getTeamUsers } from "@/actions/admin-users";
 import { getCurrentUser } from "@/actions/user";
 import { redirect } from "next/navigation";
 
@@ -10,8 +10,6 @@ export default async function Page() {
     redirect("/wanderer/dashboard");
   }
 
-  const initialData = await getAdminUsers({ role: "super_admin" }).catch(
-    () => undefined,
-  );
+  const initialData = await getTeamUsers().catch(() => undefined);
   return <TeamClient initialData={initialData} />;
 }

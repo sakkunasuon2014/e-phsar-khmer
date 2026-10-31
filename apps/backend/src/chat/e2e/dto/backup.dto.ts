@@ -12,9 +12,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { E2eHeaderDto } from '../../dto/e2e-header.dto';
 
 export class InitBackupDto {
+  @ApiProperty({ description: 'The calling device (must be active and yours)' })
+  @IsUUID()
+  deviceId: string;
+
   @ApiProperty({ description: 'base64 HMAC(BK, "npic-backup-check")' })
   @IsString()
   @IsNotEmpty()
@@ -130,40 +133,13 @@ export class AddBackupSegmentDto {
 }
 
 export class ListBackupSegmentsDto {
+  @ApiProperty({ description: 'The calling device (must be active and yours)' })
+  @IsUUID()
+  deviceId: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(500)
   cursor?: string;
-}
-
-export class DeviceRefDto {
-  @ApiProperty()
-  @IsUUID()
-  deviceId: string;
-}
-
-export class ApproveHistoryRequestDto {
-  @ApiProperty({ description: 'The approving (old) device' })
-  @IsUUID()
-  approverDeviceId: string;
-
-  @ApiProperty({ type: E2eHeaderDto })
-  @ValidateNested()
-  @Type(() => E2eHeaderDto)
-  header: E2eHeaderDto;
-
-  @ApiProperty({
-    description: 'base64 — BK encrypted over approver→requester session',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(500)
-  wrappedKey: string;
-}
-
-export class DeclineHistoryRequestDto {
-  @ApiProperty()
-  @IsUUID()
-  approverDeviceId: string;
 }

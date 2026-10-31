@@ -16,7 +16,7 @@ export default async function PasskeySettings() {
           <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
-              <h1 className="text-xl font-medium text-foreground mb-4 mt-6 px-4">
+              <h1 className="type-page-title text-foreground mb-4 mt-6 px-4">
                 {t("title")}
               </h1>
               <div className="mt-2 px-4 space-y-4">
@@ -25,7 +25,7 @@ export default async function PasskeySettings() {
                     <UserRoundKey size={20} className="text-[#00a0e9]" />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <p className="text-[14px] leading-relaxed text-card-foreground">
+                    <p className="type-body-sm text-card-foreground">
                       {t("description")}
                     </p>
                   </div>
@@ -33,10 +33,10 @@ export default async function PasskeySettings() {
 
                 <Button className="bg-[#00a0e9]/80 hover:bg-[#00a0e9]/60 text-card rounded-sm w-full h-10 cursor-pointer">
                   <Plus size={18} className="block mr-1 text-lg" />
-                  <span className="text-sm">{t("add")}</span>
+                  <span className="type-body-sm">{t("add")}</span>
                 </Button>
 
-                <div className=" text-center text-sm text-muted-foreground pb-6">
+                <div className=" text-center type-body-sm text-muted-foreground pb-6">
                   <p>{t("note")}</p>
                 </div>
               </div>

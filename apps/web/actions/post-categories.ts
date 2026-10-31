@@ -5,13 +5,15 @@ import type { Category, Subcategory } from "@/types/post-form";
 
 /**
  * Step 1 of the post-an-ad flow ("Choose a category") reads the real category
- * tree from the backend instead of the `lib/post-ad.ts` mock.
+ * tree from the backend (the `lib/post-ad.ts` mock was deleted in the
+ * 2026-10-30 mock-data cleanup).
  *
  * The picker's local `Category`/`Subcategory` types predate the backend and
- * carry optional option lists (brands, years, colours, …) that the mock forms
- * downstream call `.map()` on unguarded — so those are normalised to empty
- * arrays here. Only name/slug/icon are real; the mock listing forms for
- * non-car subcategories stay mock until they are built.
+ * carry optional option lists (brands, years, colours, …) that the legacy
+ * `DynamicForm` fallback calls `.map()` on unguarded — so those are normalised
+ * to empty arrays here. Only name/slug/icon are real; every seeded subcategory
+ * reaches the real `ListingPostForm`, and `DynamicForm` survives only for a
+ * subcategory created through the admin UI.
  */
 const EMPTY_OPTION_LISTS = {
   brands: [],

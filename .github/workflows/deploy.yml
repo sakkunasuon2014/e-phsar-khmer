@@ -21,13 +21,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: detect affected apps
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed files
+        id: filter
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "web=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          backend=false
+          web=false
+          while IFS= read -r file; do
+            case "$file" in
+              apps/backend/*)
+                backend=true
+                ;;
+              apps/web/*)
+                web=true
+                ;;
+              packages/*|package.json|pnpm-lock.yaml|pnpm-workspace.yaml|.npmrc|turbo.json|vercel.json)
+                backend=true
+                web=true
+                ;;
+            esac
+          done < <(git diff --name-only "$BEFORE" "$SHA")
+
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+
   ci:
     if: github.ref == 'refs/heads/prod'
     uses: ./.github/workflows/ci.yml
 
   migrate:
     name: migrate database
-    needs: ci
+    if: needs.changes.outputs.backend == 'true'
+    needs: [changes, ci]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: production
@@ -54,7 +99,8 @@ jobs:
 
   deploy_backend:
     name: deploy backend to Vercel
-    needs: migrate
+    needs: [changes, migrate]
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -108,7 +154,8 @@ jobs:
 
   deploy_web:
     name: deploy web to Vercel
-    needs: deploy_backend
+    needs: [changes, ci, migrate, deploy_backend]
+    if: always() && needs.changes.outputs.web == 'true' && needs.ci.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') && (needs.deploy_backend.result == 'success' || (needs.deploy_backend.result == 'skipped' && needs.changes.outputs.backend != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:

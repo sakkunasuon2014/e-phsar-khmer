@@ -18,10 +18,10 @@ export function ListCardSell() {
   return (
     <Card className="mx-auto w-full max-w-7xl bg-gradient-to-b from-blue-500 to-blue-700 text-white  rounded-sm shadow-lg">
       <CardHeader>
-        <CardTitle className="text-start text-lg px-2">{t("title")}</CardTitle>
+        <CardTitle className="text-start px-2">{t("title")}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="whitespace-pre-line text-base opacity-90 px-2">
+        <p className="whitespace-pre-line type-body opacity-90 px-2">
           {t("des")}
         </p>
       </CardContent>
@@ -29,7 +29,7 @@ export function ListCardSell() {
         <Button
           onClick={() => router.push({ pathname: "/post" })}
           size="sm"
-          className="w-full bg-card rounded text-foreground px-18 py-4 text-base hover:bg-muted cursor-pointer"
+          className="w-full bg-card rounded text-foreground px-18 py-4 type-nav hover:bg-muted cursor-pointer"
         >
           {t("button_post_ad")}
         </Button>

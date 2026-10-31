@@ -23,11 +23,11 @@ export class UpdateCategoryDto {
   @MinLength(1)
   name?: string;
 
-  /** Khmer display name. An empty string clears an existing translation. */
+  /** Khmer display name. An empty string or null clears an existing translation. */
   @IsOptional()
   @IsString()
   @MaxLength(200)
-  nameKm?: string;
+  nameKm?: string | null;
 
   @IsOptional()
   @IsString()

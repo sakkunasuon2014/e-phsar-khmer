@@ -29,9 +29,10 @@ export class SendMessageDto {
   @MaxLength(200)
   clientMessageId?: string;
 
-  // At least one of body/imagePath is required — enforced in the service.
-  // 24000 matches messages_body_length_max: an E2E body is base64
-  // ciphertext, larger than the plaintext it encodes.
+  // Every new message carries an encrypted body. The service requires an
+  // E2E envelope and rejects the legacy plaintext imagePath below.
+  // 24000 matches messages_body_length_max: base64 ciphertext is larger than
+  // the plaintext it encodes.
   @ApiPropertyOptional({ maxLength: 24000 })
   @IsOptional()
   @IsString()
@@ -47,7 +48,8 @@ export class SendMessageDto {
   listingId?: string;
 
   @ApiPropertyOptional({
-    description: 'Storage path from POST /files/sign with scope=chat',
+    description:
+      'Legacy public-image path. New chat sends reject this; use E2E v2 attachmentIds instead.',
   })
   @IsOptional()
   @IsString()
@@ -64,7 +66,7 @@ export class SendMessageDto {
 
   @ApiPropertyOptional({
     description:
-      'Signal-protocol envelope for this message. Presence marks the message as E2E (body is ciphertext). Cannot be combined with imagePath — E2E covers text only in v1.',
+      'Signal-protocol envelope for this message. Required for new sends unless the v2 e2e payload is supplied. The body is ciphertext.',
     type: E2eHeaderDto,
   })
   @IsOptional()

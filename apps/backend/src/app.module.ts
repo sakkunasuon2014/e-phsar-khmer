@@ -24,24 +24,31 @@ import { CategoriesModule } from './categories/categories.module';
 import { LocationsModule } from './locations/locations.module';
 import { ListingsModule } from './listings/listings.module';
 import { ReactionsModule } from './reactions/reactions.module';
-import { ReportsModule } from './reports/reports.module';
+import { UserReportsModule } from './reports/reports.module';
+import { FeedbackModule } from './feedback/feedback.module';
+import { AdvertisementsModule } from './advertisements/advertisements.module';
 import { ResumeModule } from './resume/resume.module';
 import { ApplicationsModule } from './applications/applications.module';
+import { InsightsModule } from './insights/insights.module';
 import { BrandsModule } from './brands/brands.module';
 import { FilesModule } from './files/files.module';
-import { FeedbackModule } from './feedback/feedback.module';
 import { HealthModule } from './health/health.module';
 import { ActivityModule } from './activity/activity.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { InsightsModule } from './insights/insights.module';
 import { OutboxModule } from './outbox/outbox.module';
 import { AttributesModule } from './attributes/attributes.module';
+import { ProductsModule } from './products/products.module';
 import { AdminModule } from './admin/admin.module';
 import { LastSeenInterceptor } from './common/interceptors/last-seen.interceptor';
 import { BullModule } from '@nestjs/bullmq';
+import {
+  EVENTS_STREAM_MAX_LEN,
+  JOB_RETENTION,
+} from './common/queue/queue-defaults';
+import { createQueueClient } from './common/queue/queue-connection';
 import { PaymentModule } from './payment/payment.module';
-import { WebhooksModule } from './webhooks/webhooks.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -67,15 +74,21 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     BullModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('queue.host') ?? 'localhost',
-          port: configService.get<number>('queue.port') ?? 6379,
-          username: configService.get<string>('queue.username'),
-          password: configService.get<string>('queue.password'),
-          db: configService.get<number>('queue.db') ?? 0,
-          tls: configService.get<boolean>('queue.tls') ? {} : undefined,
-        },
-        prefix: configService.get<string>('queue.prefix') ?? 'psa',
+        // A client INSTANCE, not an options object: BullMQ then reuses it for
+        // every Queue and every Worker's non-blocking commands, and only opens
+        // a dedicated connection per Worker for its blocking BZPOPMIN. With an
+        // options object each Queue and Worker opened its own — 9 connections
+        // per instance for 3 queues, against the free Redis Cloud cap of 30.
+        // `maxRetriesPerRequest: null` is required for a connection a Worker
+        // uses. BullMQ never closes a shared client; process exit does.
+        connection: createQueueClient(configService),
+        prefix: configService.get<string>('queue.prefix') ?? 'phsarkhmer',
+        // Without these, every finished job and 10k events per queue stay
+        // in Redis forever — see common/queue/queue-defaults.ts. A queue that
+        // sets its own defaultJobOptions REPLACES this object (Nest merges
+        // shallowly), so it must spread JOB_RETENTION itself.
+        defaultJobOptions: JOB_RETENTION,
+        streams: { events: { maxLen: EVENTS_STREAM_MAX_LEN } },
       }),
     }),
     SupabaseModule,
@@ -86,22 +99,24 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     LocationsModule,
     ListingsModule,
     ReactionsModule,
-    ReportsModule,
+    UserReportsModule,
+    FeedbackModule,
+    AdvertisementsModule,
     ResumeModule,
     ApplicationsModule,
+    InsightsModule,
     BrandsModule,
     FilesModule,
-    FeedbackModule,
     HealthModule,
     ActivityModule,
     ChatModule,
     NotificationsModule,
-    InsightsModule,
     OutboxModule,
     AttributesModule,
+    ProductsModule,
     AdminModule,
     PaymentModule,
-    WebhooksModule,
+    SubscriptionsModule,
   ],
   controllers: [AppController],
   providers: [

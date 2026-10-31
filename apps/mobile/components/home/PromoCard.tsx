@@ -42,7 +42,8 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
                 className="text-center text-[11px] leading-4 text-white/90 font-medium"
                 numberOfLines={3}
               >
-                Make extra cash by selling on psakhmer. It&apos;s quick & easy!
+                Make extra cash by selling on PhsarKhmer. It&apos;s quick &
+                easy!
               </Text>
             </View>
 
@@ -92,7 +93,7 @@ const PromoCard = ({ viewMode = "list" }: PromoCardProps) => {
 
           <Text className="mb-4 text-xs leading-5 text-white/90 font-medium">
             Turn your unused items into fast cash by posting a free ad on
-            psakhmer in seconds.
+            PhsarKhmer in seconds.
           </Text>
 
           <TouchableOpacity

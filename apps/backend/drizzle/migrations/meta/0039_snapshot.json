@@ -1,6 +1,6 @@
 {
-  "id": "95704595-9ae6-42e7-ba9d-4efa4e54c38e",
-  "prevId": "e069428a-3b1b-4ddb-abd2-9f7800a13372",
+  "id": "4428cf03-50cd-46ea-965d-79039bc8a243",
+  "prevId": "a9c6d1d0-e6d6-497c-b02a-7e810b42b501",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -697,12 +697,6 @@
           "name": "gender",
           "type": "user_gender",
           "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "date_of_birth": {
-          "name": "date_of_birth",
-          "type": "date",
           "primaryKey": false,
           "notNull": false
         },
@@ -1621,6 +1615,13 @@
           "notNull": true,
           "default": 0
         },
+        "renew_count": {
+          "name": "renew_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "effective_price": {
           "name": "effective_price",
           "type": "numeric(14, 2)",
@@ -1639,12 +1640,6 @@
         },
         "expires_at": {
           "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "taken_down_at": {
-          "name": "taken_down_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -2490,6 +2485,194 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.free_plan_ad_limits": {
+      "name": "free_plan_ad_limits",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subcategory_id": {
+          "name": "subcategory_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ads": {
+          "name": "ads",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "free_plan_ad_limits_category_uq": {
+          "name": "free_plan_ad_limits_category_uq",
+          "columns": [
+            {
+              "expression": "category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"free_plan_ad_limits\".\"category_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "free_plan_ad_limits_subcategory_uq": {
+          "name": "free_plan_ad_limits_subcategory_uq",
+          "columns": [
+            {
+              "expression": "subcategory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"free_plan_ad_limits\".\"subcategory_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "free_plan_ad_limits_category_id_categories_id_fk": {
+          "name": "free_plan_ad_limits_category_id_categories_id_fk",
+          "tableFrom": "free_plan_ad_limits",
+          "tableTo": "categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "free_plan_ad_limits_subcategory_id_subcategories_id_fk": {
+          "name": "free_plan_ad_limits_subcategory_id_subcategories_id_fk",
+          "tableFrom": "free_plan_ad_limits",
+          "tableTo": "subcategories",
+          "columnsFrom": [
+            "subcategory_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "free_plan_ad_limits_one_scope": {
+          "name": "free_plan_ad_limits_one_scope",
+          "value": "(\"free_plan_ad_limits\".\"category_id\" is null) <> (\"free_plan_ad_limits\".\"subcategory_id\" is null)"
+        },
+        "free_plan_ad_limits_ads_nonnegative": {
+          "name": "free_plan_ad_limits_ads_nonnegative",
+          "value": "\"free_plan_ad_limits\".\"ads\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.free_plan_settings": {
+      "name": "free_plan_settings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "photos": {
+          "name": "photos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "renews": {
+          "name": "renews",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "auto_renews": {
+          "name": "auto_renews",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "videos": {
+          "name": "videos",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "other_ads": {
+          "name": "other_ads",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "free_plan_settings_singleton": {
+          "name": "free_plan_settings_singleton",
+          "value": "\"free_plan_settings\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.subscription_categories": {
       "name": "subscription_categories",
       "schema": "",
@@ -2560,6 +2743,82 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.subscription_category_subcategories": {
+      "name": "subscription_category_subcategories",
+      "schema": "",
+      "columns": {
+        "subscription_category_id": {
+          "name": "subscription_category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subcategory_id": {
+          "name": "subcategory_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "subscription_category_subcategories_subcategory_uq": {
+          "name": "subscription_category_subcategories_subcategory_uq",
+          "columns": [
+            {
+              "expression": "subcategory_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "subscription_category_subcategories_subscription_category_id_subscription_categories_id_fk": {
+          "name": "subscription_category_subcategories_subscription_category_id_subscription_categories_id_fk",
+          "tableFrom": "subscription_category_subcategories",
+          "tableTo": "subscription_categories",
+          "columnsFrom": [
+            "subscription_category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "subscription_category_subcategories_subcategory_id_subcategories_id_fk": {
+          "name": "subscription_category_subcategories_subcategory_id_subcategories_id_fk",
+          "tableFrom": "subscription_category_subcategories",
+          "tableTo": "subcategories",
+          "columnsFrom": [
+            "subcategory_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "subscription_category_subcategories_subscription_category_id_subcategory_id_pk": {
+          "name": "subscription_category_subcategories_subscription_category_id_subcategory_id_pk",
+          "columns": [
+            "subscription_category_id",
+            "subcategory_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2812,6 +3071,241 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.subscription_purchases": {
+      "name": "subscription_purchases",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "term_id": {
+          "name": "term_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payment_transaction_id": {
+          "name": "payment_transaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "subscription_purchase_kind",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'initial'"
+        },
+        "status": {
+          "name": "status",
+          "type": "subscription_purchase_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "amount_usd": {
+          "name": "amount_usd",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "credit_usd": {
+          "name": "credit_usd",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "varchar(3)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'USD'"
+        },
+        "offer_snapshot": {
+          "name": "offer_snapshot",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "replaces_subscription_id": {
+          "name": "replaces_subscription_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subscription_id": {
+          "name": "subscription_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refund_requested_at": {
+          "name": "refund_requested_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "subscription_purchases_user_idx": {
+          "name": "subscription_purchases_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "subscription_purchases_status_idx": {
+          "name": "subscription_purchases_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "subscription_purchases_user_id_users_id_fk": {
+          "name": "subscription_purchases_user_id_users_id_fk",
+          "tableFrom": "subscription_purchases",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "subscription_purchases_term_id_subscription_terms_id_fk": {
+          "name": "subscription_purchases_term_id_subscription_terms_id_fk",
+          "tableFrom": "subscription_purchases",
+          "tableTo": "subscription_terms",
+          "columnsFrom": [
+            "term_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "subscription_purchases_replaces_subscription_id_user_subscriptions_id_fk": {
+          "name": "subscription_purchases_replaces_subscription_id_user_subscriptions_id_fk",
+          "tableFrom": "subscription_purchases",
+          "tableTo": "user_subscriptions",
+          "columnsFrom": [
+            "replaces_subscription_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "subscription_purchases_subscription_id_user_subscriptions_id_fk": {
+          "name": "subscription_purchases_subscription_id_user_subscriptions_id_fk",
+          "tableFrom": "subscription_purchases",
+          "tableTo": "user_subscriptions",
+          "columnsFrom": [
+            "subscription_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "subscription_purchases_payment_transaction_id_unique": {
+          "name": "subscription_purchases_payment_transaction_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "payment_transaction_id"
+          ]
+        },
+        "subscription_purchases_idempotency_key_unique": {
+          "name": "subscription_purchases_idempotency_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "idempotency_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.subscription_terms": {
       "name": "subscription_terms",
       "schema": "",
@@ -2962,6 +3456,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "subscription_category_id": {
+          "name": "subscription_category_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "price_usd": {
           "name": "price_usd",
           "type": "numeric(10, 2)",
@@ -2987,6 +3487,18 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "superseded_at": {
+          "name": "superseded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "superseded_reason": {
+          "name": "superseded_reason",
+          "type": "varchar(40)",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -3033,6 +3545,50 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "user_subscriptions_active_idx": {
+          "name": "user_subscriptions_active_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"user_subscriptions\".\"superseded_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "user_subscriptions_one_current_per_group_uq": {
+          "name": "user_subscriptions_one_current_per_group_uq",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "subscription_category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"user_subscriptions\".\"superseded_at\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -3061,137 +3617,13 @@
           ],
           "onDelete": "set null",
           "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.banned_phones": {
-      "name": "banned_phones",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
         },
-        "phone": {
-          "name": "phone",
-          "type": "varchar(32)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "report_id": {
-          "name": "report_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "banned_by_id": {
-          "name": "banned_by_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "banned_phones_phone_uq": {
-          "name": "banned_phones_phone_uq",
-          "columns": [
-            {
-              "expression": "phone",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "banned_phones_user_id_idx": {
-          "name": "banned_phones_user_id_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "banned_phones_report_id_idx": {
-          "name": "banned_phones_report_id_idx",
-          "columns": [
-            {
-              "expression": "report_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "banned_phones_user_id_users_id_fk": {
-          "name": "banned_phones_user_id_users_id_fk",
-          "tableFrom": "banned_phones",
-          "tableTo": "users",
+        "user_subscriptions_subscription_category_id_subscription_categories_id_fk": {
+          "name": "user_subscriptions_subscription_category_id_subscription_categories_id_fk",
+          "tableFrom": "user_subscriptions",
+          "tableTo": "subscription_categories",
           "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "banned_phones_report_id_user_reports_id_fk": {
-          "name": "banned_phones_report_id_user_reports_id_fk",
-          "tableFrom": "banned_phones",
-          "tableTo": "user_reports",
-          "columnsFrom": [
-            "report_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        },
-        "banned_phones_banned_by_id_users_id_fk": {
-          "name": "banned_phones_banned_by_id_users_id_fk",
-          "tableFrom": "banned_phones",
-          "tableTo": "users",
-          "columnsFrom": [
-            "banned_by_id"
+            "subscription_category_id"
           ],
           "columnsTo": [
             "id"
@@ -3240,13 +3672,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "image_paths": {
-          "name": "image_paths",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
         },
         "status": {
           "name": "status",
@@ -5724,1428 +6149,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.resume_attachments": {
-      "name": "resume_attachments",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "object_key": {
-          "name": "object_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "file_name": {
-          "name": "file_name",
-          "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "declared_size": {
-          "name": "declared_size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actual_size": {
-          "name": "actual_size",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "uploaded_at": {
-          "name": "uploaded_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attached_at": {
-          "name": "attached_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "resume_attachments_resume_idx": {
-          "name": "resume_attachments_resume_idx",
-          "columns": [
-            {
-              "expression": "resume_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "resume_attachments_orphan_idx": {
-          "name": "resume_attachments_orphan_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "resume_id is null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "resume_attachments_user_created_idx": {
-          "name": "resume_attachments_user_created_idx",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "resume_attachments_user_id_users_id_fk": {
-          "name": "resume_attachments_user_id_users_id_fk",
-          "tableFrom": "resume_attachments",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "resume_attachments_resume_id_resumes_id_fk": {
-          "name": "resume_attachments_resume_id_resumes_id_fk",
-          "tableFrom": "resume_attachments",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.resume_educations": {
-      "name": "resume_educations",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "school": {
-          "name": "school",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "degree": {
-          "name": "degree",
-          "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "major": {
-          "name": "major",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "province_id": {
-          "name": "province_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "district_id": {
-          "name": "district_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "commune_id": {
-          "name": "commune_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "start_date": {
-          "name": "start_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "end_date": {
-          "name": "end_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_current": {
-          "name": "is_current",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "resume_educations_resume_id_idx": {
-          "name": "resume_educations_resume_id_idx",
-          "columns": [
-            {
-              "expression": "resume_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "resume_educations_resume_id_resumes_id_fk": {
-          "name": "resume_educations_resume_id_resumes_id_fk",
-          "tableFrom": "resume_educations",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "resume_educations_province_id_provinces_id_fk": {
-          "name": "resume_educations_province_id_provinces_id_fk",
-          "tableFrom": "resume_educations",
-          "tableTo": "provinces",
-          "columnsFrom": [
-            "province_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "resume_educations_district_id_districts_id_fk": {
-          "name": "resume_educations_district_id_districts_id_fk",
-          "tableFrom": "resume_educations",
-          "tableTo": "districts",
-          "columnsFrom": [
-            "district_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "resume_educations_commune_id_communes_id_fk": {
-          "name": "resume_educations_commune_id_communes_id_fk",
-          "tableFrom": "resume_educations",
-          "tableTo": "communes",
-          "columnsFrom": [
-            "commune_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "resume_educations_dates_ordered": {
-          "name": "resume_educations_dates_ordered",
-          "value": "end_date is null or end_date >= start_date"
-        },
-        "resume_educations_current_no_end": {
-          "name": "resume_educations_current_no_end",
-          "value": "not is_current or end_date is null"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.resume_experiences": {
-      "name": "resume_experiences",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "company": {
-          "name": "company",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "province_id": {
-          "name": "province_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "district_id": {
-          "name": "district_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "commune_id": {
-          "name": "commune_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "start_date": {
-          "name": "start_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "end_date": {
-          "name": "end_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_current": {
-          "name": "is_current",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "resume_experiences_resume_id_idx": {
-          "name": "resume_experiences_resume_id_idx",
-          "columns": [
-            {
-              "expression": "resume_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "resume_experiences_resume_id_resumes_id_fk": {
-          "name": "resume_experiences_resume_id_resumes_id_fk",
-          "tableFrom": "resume_experiences",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "resume_experiences_province_id_provinces_id_fk": {
-          "name": "resume_experiences_province_id_provinces_id_fk",
-          "tableFrom": "resume_experiences",
-          "tableTo": "provinces",
-          "columnsFrom": [
-            "province_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "resume_experiences_district_id_districts_id_fk": {
-          "name": "resume_experiences_district_id_districts_id_fk",
-          "tableFrom": "resume_experiences",
-          "tableTo": "districts",
-          "columnsFrom": [
-            "district_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "resume_experiences_commune_id_communes_id_fk": {
-          "name": "resume_experiences_commune_id_communes_id_fk",
-          "tableFrom": "resume_experiences",
-          "tableTo": "communes",
-          "columnsFrom": [
-            "commune_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "resume_experiences_dates_ordered": {
-          "name": "resume_experiences_dates_ordered",
-          "value": "end_date is null or end_date >= start_date"
-        },
-        "resume_experiences_current_no_end": {
-          "name": "resume_experiences_current_no_end",
-          "value": "not is_current or end_date is null"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.resume_job_preferences": {
-      "name": "resume_job_preferences",
-      "schema": "",
-      "columns": {
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "open_job": {
-          "name": "open_job",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "position": {
-          "name": "position",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "categories": {
-          "name": "categories",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "locations": {
-          "name": "locations",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "job_types": {
-          "name": "job_types",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "resume_job_preferences_resume_id_resumes_id_fk": {
-          "name": "resume_job_preferences_resume_id_resumes_id_fk",
-          "tableFrom": "resume_job_preferences",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.resume_languages": {
-      "name": "resume_languages",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "level": {
-          "name": "level",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "resume_languages_resume_id_idx": {
-          "name": "resume_languages_resume_id_idx",
-          "columns": [
-            {
-              "expression": "resume_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "resume_languages_resume_id_resumes_id_fk": {
-          "name": "resume_languages_resume_id_resumes_id_fk",
-          "tableFrom": "resume_languages",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.resume_personal": {
-      "name": "resume_personal",
-      "schema": "",
-      "columns": {
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "first_name": {
-          "name": "first_name",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "last_name": {
-          "name": "last_name",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "gender": {
-          "name": "gender",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "dob": {
-          "name": "dob",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "nationality": {
-          "name": "nationality",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email": {
-          "name": "email",
-          "type": "varchar(254)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "education_level": {
-          "name": "education_level",
-          "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "marital_status": {
-          "name": "marital_status",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "province_id": {
-          "name": "province_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "district_id": {
-          "name": "district_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "commune_id": {
-          "name": "commune_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "address": {
-          "name": "address",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "position": {
-          "name": "position",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "years_of_experience": {
-          "name": "years_of_experience",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "phones": {
-          "name": "phones",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "photo_url": {
-          "name": "photo_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "resume_personal_resume_id_resumes_id_fk": {
-          "name": "resume_personal_resume_id_resumes_id_fk",
-          "tableFrom": "resume_personal",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "resume_personal_province_id_provinces_id_fk": {
-          "name": "resume_personal_province_id_provinces_id_fk",
-          "tableFrom": "resume_personal",
-          "tableTo": "provinces",
-          "columnsFrom": [
-            "province_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "resume_personal_district_id_districts_id_fk": {
-          "name": "resume_personal_district_id_districts_id_fk",
-          "tableFrom": "resume_personal",
-          "tableTo": "districts",
-          "columnsFrom": [
-            "district_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        },
-        "resume_personal_commune_id_communes_id_fk": {
-          "name": "resume_personal_commune_id_communes_id_fk",
-          "tableFrom": "resume_personal",
-          "tableTo": "communes",
-          "columnsFrom": [
-            "commune_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "restrict",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "resume_personal_years_range": {
-          "name": "resume_personal_years_range",
-          "value": "years_of_experience is null or years_of_experience between 0 and 60"
-        },
-        "resume_personal_phones_max": {
-          "name": "resume_personal_phones_max",
-          "value": "jsonb_array_length(phones) <= 3"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.resume_references": {
-      "name": "resume_references",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "company": {
-          "name": "company",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "position": {
-          "name": "position",
-          "type": "varchar(100)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "phones": {
-          "name": "phones",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "email": {
-          "name": "email",
-          "type": "varchar(254)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "resume_references_resume_id_idx": {
-          "name": "resume_references_resume_id_idx",
-          "columns": [
-            {
-              "expression": "resume_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "resume_references_resume_id_resumes_id_fk": {
-          "name": "resume_references_resume_id_resumes_id_fk",
-          "tableFrom": "resume_references",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "resume_references_phones_max": {
-          "name": "resume_references_phones_max",
-          "value": "jsonb_array_length(phones) <= 3"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.resume_skills": {
-      "name": "resume_skills",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "resume_id": {
-          "name": "resume_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "level": {
-          "name": "level",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "resume_skills_resume_id_idx": {
-          "name": "resume_skills_resume_id_idx",
-          "columns": [
-            {
-              "expression": "resume_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "resume_skills_resume_id_resumes_id_fk": {
-          "name": "resume_skills_resume_id_resumes_id_fk",
-          "tableFrom": "resume_skills",
-          "tableTo": "resumes",
-          "columnsFrom": [
-            "resume_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.resumes": {
-      "name": "resumes",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "user_id": {
-          "name": "user_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "summary": {
-          "name": "summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "hobbies": {
-          "name": "hobbies",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "resumes_user_id_uq": {
-          "name": "resumes_user_id_uq",
-          "columns": [
-            {
-              "expression": "user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "resumes_user_id_users_id_fk": {
-          "name": "resumes_user_id_users_id_fk",
-          "tableFrom": "resumes",
-          "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.job_applications": {
-      "name": "job_applications",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "listing_id": {
-          "name": "listing_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "applicant_id": {
-          "name": "applicant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "poster_id": {
-          "name": "poster_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cover_note": {
-          "name": "cover_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "resume_snapshot": {
-          "name": "resume_snapshot",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "job_application_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "viewed_at": {
-          "name": "viewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "decided_at": {
-          "name": "decided_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "job_applications_listing_applicant_uq": {
-          "name": "job_applications_listing_applicant_uq",
-          "columns": [
-            {
-              "expression": "listing_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "applicant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "job_applications_poster_created_idx": {
-          "name": "job_applications_poster_created_idx",
-          "columns": [
-            {
-              "expression": "poster_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "job_applications_applicant_created_idx": {
-          "name": "job_applications_applicant_created_idx",
-          "columns": [
-            {
-              "expression": "applicant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "job_applications_listing_id_listings_id_fk": {
-          "name": "job_applications_listing_id_listings_id_fk",
-          "tableFrom": "job_applications",
-          "tableTo": "listings",
-          "columnsFrom": [
-            "listing_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "job_applications_applicant_id_users_id_fk": {
-          "name": "job_applications_applicant_id_users_id_fk",
-          "tableFrom": "job_applications",
-          "tableTo": "users",
-          "columnsFrom": [
-            "applicant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "job_applications_poster_id_users_id_fk": {
-          "name": "job_applications_poster_id_users_id_fk",
-          "tableFrom": "job_applications",
-          "tableTo": "users",
-          "columnsFrom": [
-            "poster_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "job_applications_not_self": {
-          "name": "job_applications_not_self",
-          "value": "applicant_id <> poster_id"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.listing_events": {
-      "name": "listing_events",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "listing_id": {
-          "name": "listing_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "owner_id": {
-          "name": "owner_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actor_id": {
-          "name": "actor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "event_type": {
-          "name": "event_type",
-          "type": "listing_event_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "listing_events_owner_type_idx": {
-          "name": "listing_events_owner_type_idx",
-          "columns": [
-            {
-              "expression": "owner_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "event_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "listing_events_listing_id_idx": {
-          "name": "listing_events_listing_id_idx",
-          "columns": [
-            {
-              "expression": "listing_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "listing_events_listing_id_listings_id_fk": {
-          "name": "listing_events_listing_id_listings_id_fk",
-          "tableFrom": "listing_events",
-          "tableTo": "listings",
-          "columnsFrom": [
-            "listing_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "listing_events_owner_id_users_id_fk": {
-          "name": "listing_events_owner_id_users_id_fk",
-          "tableFrom": "listing_events",
-          "tableTo": "users",
-          "columnsFrom": [
-            "owner_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "listing_events_actor_id_users_id_fk": {
-          "name": "listing_events_actor_id_users_id_fk",
-          "tableFrom": "listing_events",
-          "tableTo": "users",
-          "columnsFrom": [
-            "actor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "payment.payment_transactions": {
       "name": "payment_transactions",
       "schema": "payment",
@@ -7156,12 +6159,6 @@
           "primaryKey": true,
           "notNull": true,
           "default": "gen_random_uuid()"
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
         },
         "reference": {
           "name": "reference",
@@ -8447,7 +7444,8 @@
         "draft",
         "active",
         "expired",
-        "deleted"
+        "deleted",
+        "restricted"
       ]
     },
     "public.subscription_duration_unit": {
@@ -8457,6 +7455,26 @@
         "day",
         "month",
         "year"
+      ]
+    },
+    "public.subscription_purchase_kind": {
+      "name": "subscription_purchase_kind",
+      "schema": "public",
+      "values": [
+        "initial",
+        "upgrade",
+        "manual_comp"
+      ]
+    },
+    "public.subscription_purchase_status": {
+      "name": "subscription_purchase_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "paid",
+        "failed",
+        "cancelled",
+        "refunded"
       ]
     },
     "public.report_status": {
@@ -8493,28 +7511,6 @@
         "processing",
         "published",
         "failed"
-      ]
-    },
-    "public.job_application_status": {
-      "name": "job_application_status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "viewed",
-        "hired",
-        "rejected"
-      ]
-    },
-    "public.listing_event_type": {
-      "name": "listing_event_type",
-      "schema": "public",
-      "values": [
-        "impression",
-        "view",
-        "chat",
-        "call",
-        "show_contact",
-        "apply_job"
       ]
     },
     "payment.payment_transaction_status": {

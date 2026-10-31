@@ -65,7 +65,7 @@ const SignUpScreen = () => {
       login({
         name: fullName.trim(),
         phone: phoneNumber.trim(),
-        email: `${fullName.toLowerCase().replace(/\s+/g, ".")}@psakhmer.com`,
+        email: `${fullName.toLowerCase().replace(/\s+/g, ".")}@phsarkhmer.com`,
         isVerified: true,
       });
 
@@ -93,7 +93,7 @@ const SignUpScreen = () => {
           onPress: () => {
             login({
               name: "Sokha (Telegram User)",
-              email: "sokha.telegram@psakhmer.com",
+              email: "sokha.telegram@phsarkhmer.com",
               phone: "012 889 900",
               bio: "Verified seller • Registered via Telegram",
               avatar:

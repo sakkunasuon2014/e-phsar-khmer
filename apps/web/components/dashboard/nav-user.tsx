@@ -38,14 +38,14 @@ export function NavUser({ user }: { user: CurrentUser | null }) {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-48" sideOffset={12} align="end">
         <DropdownMenuLabel className="p-0 font-normal">
-          <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+          <div className="flex items-center gap-2 px-1 py-1.5 text-left type-body-sm">
             <Avatar className="h-8 w-8 rounded-lg">
               <AvatarImage src={user.profileImage} alt={user.username} />
               <AvatarFallback className="rounded-lg">CN</AvatarFallback>
             </Avatar>
-            <div className="grid flex-1 text-left text-sm leading-tight">
+            <div className="grid flex-1 text-left type-body-sm">
               <span className="truncate font-medium">{user.username}</span>
-              <span className="truncate text-xs text-muted-foreground">
+              <span className="truncate type-meta text-muted-foreground">
                 {user.email}
               </span>
             </div>

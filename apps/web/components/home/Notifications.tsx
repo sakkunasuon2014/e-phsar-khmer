@@ -153,9 +153,7 @@ export default function Notifications({
       <div className="max-w-[980px] mx-auto bg-background rounded-sm shadow-sm border border-muted relative">
         {/* Header Section */}
         <div className="flex items-center justify-between p-4 border-b border-muted sticky top-0 z-10 bg-background">
-          <h1 className="text-xl font-semibold text-foreground">
-            {t("title")}
-          </h1>
+          <h1 className="type-section-title text-foreground">{t("title")}</h1>
           <DropdownMenu>
             <DropdownMenuTrigger
               aria-label={t("options")}
@@ -181,7 +179,7 @@ export default function Notifications({
         </div>
 
         {items.length === 0 ? (
-          <p className="py-10 text-center text-sm text-gray-500">
+          <p className="py-10 text-center type-body-sm text-gray-500">
             {t("empty")}
           </p>
         ) : (
@@ -228,15 +226,15 @@ export default function Notifications({
 
                     {/* Text Content */}
                     <div className="ml-4 flex-1">
-                      <p className="text-foreground text-[17px] leading-tight">
+                      <p className="text-foreground type-body">
                         {notification.title}
                       </p>
                       {notification.body ? (
-                        <p className="text-sm text-gray-600 leading-tight mt-1">
+                        <p className="type-body-sm text-gray-600 mt-1">
                           {notification.body}
                         </p>
                       ) : null}
-                      <p className="text-xs text-gray-600 font-medium mt-1">
+                      <p className="type-meta text-gray-600 mt-1">
                         {formatDate(notification.createdAt, locale)}
                       </p>
                     </div>
@@ -282,13 +280,13 @@ export default function Notifications({
               type="button"
               onClick={loadMore}
               disabled={loadingMore}
-              className="text-sm font-medium text-sky-500 hover:underline disabled:opacity-50 cursor-pointer"
+              className="type-nav text-sky-500 hover:underline disabled:opacity-50 cursor-pointer"
             >
               {loadingMore ? tCommon("loading") : tCommon("loadMore")}
             </button>
           </div>
         ) : items.length > 0 ? (
-          <h1 className="item-center text-center text-gray-400 py-4">
+          <h1 className="item-center text-center type-meta text-gray-400 py-4">
             {t("noMore")}
           </h1>
         ) : null}

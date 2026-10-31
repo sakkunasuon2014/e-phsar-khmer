@@ -20,11 +20,11 @@ export default function SafetyTips() {
               height={32}
               unoptimized
             />
-            <h2 className="text-[#e3281b] text-lg font-bold">
+            <h2 className="type-section-title text-[#e3281b]">
               Safety Tips for Buyers
             </h2>
           </div>
-          <ol className="space-y-3 text-sm text-foreground/80 list-decimal pl-6">
+          <ol className="space-y-3 type-body text-foreground/80 list-decimal pl-6">
             <li>Do not send money before receiving the goods</li>
             <li>Check the item before you buy</li>
             <li>Payment after receiving the goods</li>

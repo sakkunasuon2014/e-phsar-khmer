@@ -53,8 +53,8 @@ export default function Footer() {
         <div className="max-w-7xl mx-auto px-4 md:px-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
-              <h3 className="font-bold mb-4 text-base">{t("follow")}</h3>
-              <div className="space-y-4 text-sm ">
+              <h3 className="type-footer-heading mb-4">{t("follow")}</h3>
+              <div className="space-y-4 type-footer-link">
                 <a
                   href="/"
                   target="_blank"
@@ -64,7 +64,9 @@ export default function Footer() {
                   <div className="flex items-center justify-center rounded-full bg-blue-500 w-7 h-7">
                     <IconBrandFacebook className="text-white scale-100" />
                   </div>
-                  <span className="text-sm  text-white">{t("facebook")}</span>
+                  <span className="type-footer-link text-white">
+                    {t("facebook")}
+                  </span>
                 </a>
                 <a
                   href="/"
@@ -75,7 +77,7 @@ export default function Footer() {
                   <div className="flex items-center justify-center rounded-sm bg-red-500 w-7 h-5">
                     <IconPlayerPlayFilled className="text-white scale-50" />
                   </div>
-                  <span className="text-sm font-medium text-white">
+                  <span className="type-footer-link text-white">
                     {t("youtube")}
                   </span>
                 </a>
@@ -84,10 +86,10 @@ export default function Footer() {
 
             {/* Customer Service */}
             <div>
-              <h3 className="font-bold mb-4 text-base">
+              <h3 className="type-footer-heading mb-4">
                 {t("customerService")}
               </h3>
-              <ul className="space-y-3 text-sm px-2">
+              <ul className="space-y-3 type-footer-link px-2">
                 <li>
                   <Link href="/contact-us" className="hover:underline">
                     {t("contactUs")}
@@ -111,10 +113,10 @@ export default function Footer() {
               </ul>
             </div>
             <div>
-              <h3 className="font-bold mb-4 text-base">
+              <h3 className="type-footer-heading mb-4">
                 {t("usefulInformation")}
               </h3>
-              <ul className="space-y-3 text-sm px-2">
+              <ul className="space-y-3 type-footer-link px-2">
                 <li>
                   <Link href="/safety-tips" className="hover:underline">
                     {t("safetyTips")}
@@ -133,7 +135,7 @@ export default function Footer() {
               </ul>
             </div>
             <div>
-              <h3 className="font-bold mb-4 text-base">{t("downloadApp")}</h3>
+              <h3 className="type-footer-heading mb-4">{t("downloadApp")}</h3>
               <div className="flex gap-3">
                 <div className="bg-white p-1 rounded-sm">
                   <Image
@@ -182,7 +184,7 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center mt-3 flex-wrap justify-end">
-            <span className="text-sm">{t("weAccept")}</span>
+            <span className="type-footer-link">{t("weAccept")}</span>
             {[
               "/icon/ABA.svg",
               "/icon/khqr.svg",

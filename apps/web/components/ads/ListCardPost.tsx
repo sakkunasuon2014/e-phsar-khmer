@@ -1,11 +1,12 @@
 "use client";
 
 import DbImage from "@/components/common/DbImage";
+import { VerifiedAccountBadge } from "@/components/common/VerifiedAccountBadge";
 import { ConditionLabel } from "@/components/common/ConditionLabel";
 import { ReportPost } from "@/components/report/ReportPost";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
 import {
   DotIcon,
@@ -40,6 +41,7 @@ import { useListingImpression } from "@/hooks/use-listing-impression";
 export function ListCardPost({ post }: { post: Post }) {
   const t = useTranslations();
   const format = useFormatter();
+  const locale = useLocale();
   // See GridCardPost — a "Negotiable" listing has no price to subtract from.
   const discountAmount =
     post.oldPrice && post.price !== null ? post.oldPrice - post.price : 0;
@@ -88,13 +90,13 @@ export function ListCardPost({ post }: { post: Post }) {
             emptyPhoto
           )}
 
-          {/* Discount badge — single pill, top-left, orange like khmer24 */}
+          {/* Discount badge — single pill, top-left, orange like PhsarKhmer */}
           {post.oldPrice && (
             <div className="absolute top-2 left-2 z-20 flex flex-col items-start gap-0.5">
-              <span className="bg-amber-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full leading-tight">
+              <span className="bg-amber-500 text-white type-discount px-2 py-0.5 rounded-full">
                 ${discountAmount.toLocaleString()}
               </span>
-              <span className="bg-amber-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full leading-tight">
+              <span className="bg-amber-500 text-white type-discount px-2 py-0.5 rounded-full">
                 {t("ListingCard.offShort")}
               </span>
             </div>
@@ -137,7 +139,7 @@ export function ListCardPost({ post }: { post: Post }) {
                     pressed={reactions.isSaved(listingId)}
                     onPressedChange={() => reactions.toggleSave(listingId)}
                     disabled={reactions.isPending(listingId)}
-                    className="flex w-full items-center justify-start gap-3 px-3 py-2 text-sm transition-colors data-[state=on]:text-blue-500 hover:bg-muted outline-none border-none rounded-sm"
+                    className="flex w-full items-center justify-start gap-3 px-3 py-2 type-nav transition-colors data-[state=on]:text-blue-500 hover:bg-muted outline-none border-none rounded-sm"
                   >
                     <BookmarkIcon
                       size={15}
@@ -182,7 +184,7 @@ export function ListCardPost({ post }: { post: Post }) {
 
           {/* Image count — bottom-right */}
           {post.images.length > 1 && (
-            <span className="absolute bottom-1.5 right-1.5 z-20 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+            <span className="absolute bottom-1.5 right-1.5 z-20 bg-black/60 text-white type-photo-badge px-1.5 py-0.5 rounded flex items-center gap-1">
               <ImageIcon size={10} />
               <span>{post.images.length - 1}</span>
             </span>
@@ -192,33 +194,42 @@ export function ListCardPost({ post }: { post: Post }) {
         {/* ── MIDDLE: Text content ── */}
         <div className="flex flex-col flex-1 min-w-0 px-4 py-3 justify-between">
           <div className="flex flex-col gap-1">
-            {/* Title — allow 2 lines like khmer24 */}
-            <p className="text-[15px] font-semibold leading-snug line-clamp-2 text-foreground">
+            {/* Title — allow 2 lines like PhsarKhmer */}
+            <p className="type-body line-clamp-2 text-foreground">
               {post.title}
             </p>
 
+            {post.sellerVerifiedAccount && (
+              <span className="w-fit">
+                <VerifiedAccountBadge />
+              </span>
+            )}
+
             {/* Time · Location */}
-            <div className="flex items-center gap-0.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-0.5 type-meta text-muted-foreground">
               <span className="shrink-0">
                 {format.dateTime(new Date(post.createdat), {
                   hour: "2-digit",
                   minute: "2-digit",
+                  hour12: locale !== "km",
                 })}
               </span>
-              <DotIcon className="shrink-0 w-3 h-3" />
-              <span className="truncate">
-                {post.location ?? `${post.proId},${post.disId}`}
-              </span>
+              {post.location && (
+                <>
+                  <DotIcon className="shrink-0 w-3 h-3" />
+                  <span className="truncate">{post.location}</span>
+                </>
+              )}
             </div>
 
             {/* Condition · Year · etc */}
-            <p className="text-xs text-muted-foreground">
+            <p className="type-meta text-muted-foreground">
               <ConditionLabel value={post.condition} />
             </p>
 
-            {/* Free delivery — styled like khmer24: icon + text, muted blue */}
+            {/* Free delivery — styled like PhsarKhmer: icon + text, muted blue */}
             {post.freeDelivery && (
-              <span className="inline-flex items-center gap-1 text-xs text-sky-600 w-fit mt-0.5">
+              <span className="inline-flex items-center gap-1 type-meta text-sky-600 w-fit mt-0.5">
                 <TruckIcon size={12} />
                 <span>{t("Common.freeDelivery")}</span>
               </span>
@@ -227,13 +238,13 @@ export function ListCardPost({ post }: { post: Post }) {
 
           {/* Price row */}
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-red-500 font-bold text-lg leading-none">
+            <span className="text-red-500 type-price">
               {post.price === null
                 ? t("Common.negotiable")
                 : `$${post.price.toLocaleString()}`}
             </span>
             {post.oldPrice && (
-              <span className="text-sm text-zinc-400 line-through">
+              <span className="type-body-sm text-zinc-400 line-through">
                 ${post.oldPrice.toLocaleString()}
               </span>
             )}
@@ -250,7 +261,7 @@ export function ListCardPost({ post }: { post: Post }) {
               reactions.toggleLike(listingId);
             }}
             disabled={reactions.isPending(listingId)}
-            className="group/heart p-1.5 rounded-full hover:bg-gray-500 transition-colors outline-none cursor-pointer"
+            className="group/heart h-11 w-11 shrink-0 flex items-center justify-center rounded-full hover:bg-gray-500 transition-colors outline-none cursor-pointer"
           >
             <HeartIcon
               className={`h-5 w-5 transition-transform ${

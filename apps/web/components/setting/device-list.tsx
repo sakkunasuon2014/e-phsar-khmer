@@ -126,7 +126,7 @@ export function DeviceList({
 
   if (loadError) {
     return (
-      <div className="bg-card border border-border rounded-sm p-6 text-sm text-muted-foreground">
+      <div className="bg-card border border-border rounded-sm p-6 type-body-sm text-muted-foreground">
         {t("loadFailed")}
       </div>
     );
@@ -135,7 +135,7 @@ export function DeviceList({
   return (
     <>
       <section className="space-y-3">
-        <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+        <h2 className="type-meta text-muted-foreground uppercase tracking-wider">
           {t("thisDevice")}
         </h2>
         <div className="bg-card border border-border rounded-sm overflow-hidden">
@@ -148,28 +148,28 @@ export function DeviceList({
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-bold text-foreground">
+              <h3 className="type-body-sm text-foreground">
                 {current
                   ? deviceTitle(current, t("unknown"))
                   : t("unknownDevice")}
               </h3>
               {current && clientLine(current, t("app"), t("browser")) && (
-                <p className="text-xs text-muted-foreground">
+                <p className="type-meta text-muted-foreground">
                   {clientLine(current, t("app"), t("browser"))}
                 </p>
               )}
               {current ? (
                 <div className="flex gap-2 mt-1">
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="type-meta text-muted-foreground">
                     {t("created", { date: current.createdLabel })}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">•</span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="type-meta text-muted-foreground">•</span>
+                  <span className="type-meta text-muted-foreground">
                     {t("lastUsed", { date: current.lastSeenLabel })}
                   </span>
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="type-meta text-muted-foreground mt-1">
                   {t("couldNotIdentify")}
                 </p>
               )}
@@ -181,7 +181,7 @@ export function DeviceList({
               <DialogTrigger asChild>
                 <button
                   type="button"
-                  className="w-full py-3 px-4 flex items-center gap-2 border-t border-border hover:bg-muted/50 transition-colors text-red-500 text-sm font-medium"
+                  className="w-full py-3 px-4 flex items-center gap-2 border-t border-border hover:bg-muted/50 transition-colors text-red-500 type-nav"
                 >
                   <LogOut size={16} />
                   {t("logOutOthers")}
@@ -189,10 +189,8 @@ export function DeviceList({
               </DialogTrigger>
               <DialogContent className="sm:max-w-[480px] rounded-sm">
                 <DialogHeader>
-                  <DialogTitle className="text-lg font-semibold">
-                    {t("logOutOthersTitle")}
-                  </DialogTitle>
-                  <DialogDescription className="mt-2 text-base text-muted-foreground">
+                  <DialogTitle>{t("logOutOthersTitle")}</DialogTitle>
+                  <DialogDescription className="mt-2 text-muted-foreground">
                     {t("logOutOthersDescription")}
                   </DialogDescription>
                 </DialogHeader>
@@ -218,16 +216,16 @@ export function DeviceList({
             </Dialog>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground">{t("logsOutAll")}</p>
+        <p className="type-meta text-muted-foreground">{t("logsOutAll")}</p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+        <h2 className="type-meta text-muted-foreground uppercase tracking-wider">
           {t("otherLogins")}
         </h2>
         <div className="bg-card border border-border rounded-sm divide-y divide-border">
           {others.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">
+            <p className="p-4 type-body-sm text-muted-foreground">
               {t("onlyThisDevice")}
             </p>
           ) : (
@@ -241,15 +239,15 @@ export function DeviceList({
                     <DeviceIcon device={device} size={20} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-foreground">
+                    <h3 className="type-body-sm text-foreground">
                       {deviceTitle(device, t("unknown"))}
                     </h3>
                     {clientLine(device, t("app"), t("browser")) && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="type-meta text-muted-foreground">
                         {clientLine(device, t("app"), t("browser"))}
                       </p>
                     )}
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="type-meta text-muted-foreground">
                       {t("lastActive", { date: device.lastSeenLabel })}
                     </p>
                   </div>

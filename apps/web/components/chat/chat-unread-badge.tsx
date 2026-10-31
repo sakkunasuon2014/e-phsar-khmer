@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { fetchUnreadCount } from "@/actions/chat";
 import { chatKeys, unwrap } from "@/lib/chat/queries";
 import { CHAT_POLL } from "@/hooks/use-chat-polling";
+import { useTabAttending } from "@/hooks/use-tab-attention";
 import { useChatRealtimeEvents } from "@/hooks/use-chat-ws";
 import { cn } from "@/lib/utils";
 
@@ -28,10 +29,14 @@ export function ChatUnreadBadge({ className }: { className?: string }) {
       void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
     },
   });
+  // An abandoned tab has no socket either, so without `attending` the fallback
+  // below would poll from a tab nobody is looking at.
+  const attending = useTabAttending();
   const { data } = useQuery({
     queryKey: chatKeys.unread(),
     queryFn: async () => unwrap(await fetchUnreadCount()),
-    refetchInterval: isConnected ? false : CHAT_POLL.unreadBadgeMs,
+    refetchInterval:
+      isConnected || !attending ? false : CHAT_POLL.unreadBadgeMs,
     refetchIntervalInBackground: false,
     retry: false,
     staleTime: 30 * 1000,
@@ -43,7 +48,7 @@ export function ChatUnreadBadge({ className }: { className?: string }) {
     <span
       aria-label={t("inbox.unreadCount", { count: data })}
       className={cn(
-        "absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-card bg-[#f04d4e] px-1 text-[10px] font-bold leading-none text-white",
+        "absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-card bg-[#f04d4e] px-1 type-photo-badge  text-white",
         className,
       )}
     >

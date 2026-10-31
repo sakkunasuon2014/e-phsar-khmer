@@ -52,7 +52,7 @@ export default async function DeviceSettings() {
           <SettingSidebar me={me} />
 
           <main className="flex-1 space-y-6">
-            <h1 className="text-xl font-bold text-foreground">{t("title")}</h1>
+            <h1 className="type-page-title text-foreground">{t("title")}</h1>
             <DeviceList devices={devices} loadError={loadError} />
           </main>
         </div>

@@ -308,7 +308,7 @@ export default function EditProfile({
           <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
-              <h1 className="text-2xl font-medium text-foreground mb-4 mt-4 px-4">
+              <h1 className="type-page-title text-foreground mb-4 mt-4 px-4">
                 {t("title")}
               </h1>
               <div className="mt-2 px-4 space-y-4">

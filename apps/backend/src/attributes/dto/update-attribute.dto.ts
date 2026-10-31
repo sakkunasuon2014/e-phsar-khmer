@@ -21,7 +21,7 @@ export class UpdateAttributeDto {
   @IsOptional()
   @IsString()
   @MaxLength(160)
-  nameKm?: string;
+  nameKm?: string | null;
 
   @IsOptional()
   @IsString()
@@ -32,7 +32,7 @@ export class UpdateAttributeDto {
 
   @IsOptional()
   @IsString()
-  image?: string;
+  image?: string | null;
 
   @IsOptional()
   @IsUUID()

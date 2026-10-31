@@ -15,6 +15,7 @@ import {
   DEVICE_ID_COOKIE,
   DEVICE_ID_MAX_AGE,
   DEVICE_ID_PATTERN,
+  LEGACY_DEVICE_ID_COOKIE,
 } from "./device-id";
 
 export interface DeviceIdentity {
@@ -22,7 +23,8 @@ export interface DeviceIdentity {
   name: string;
 }
 
-const STORAGE_KEY = "psa_device_id";
+const STORAGE_KEY = "phsarkhmer_device_id";
+const LEGACY_STORAGE_KEY = "psa_device_id";
 
 function randomId(): string | null {
   if (typeof crypto === "undefined") return null;
@@ -43,9 +45,9 @@ function randomId(): string | null {
   return null;
 }
 
-function readCookie(): string | null {
+function readCookieValue(name: string): string | null {
   try {
-    const prefix = `${DEVICE_ID_COOKIE}=`;
+    const prefix = `${name}=`;
     for (const part of document.cookie.split("; ")) {
       if (part.startsWith(prefix)) {
         return decodeURIComponent(part.slice(prefix.length));
@@ -57,18 +59,28 @@ function readCookie(): string | null {
   return null;
 }
 
+/** Current cookie first, then the pre-rename one. */
+function readCookie(): string | null {
+  return (
+    readCookieValue(DEVICE_ID_COOKIE) ||
+    readCookieValue(LEGACY_DEVICE_ID_COOKIE)
+  );
+}
+
 function writeCookie(id: string): void {
   try {
     const secure = window.location.protocol === "https:" ? "; Secure" : "";
     document.cookie = `${DEVICE_ID_COOKIE}=${encodeURIComponent(
       id,
     )}; Path=/; Max-Age=${DEVICE_ID_MAX_AGE}; SameSite=Lax${secure}`;
+    // Drop the pre-rename cookie once the current one is written.
+    document.cookie = `${LEGACY_DEVICE_ID_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
   } catch {
     /* blocked cookies */
   }
 }
 
-/** localStorage first, then the mirrored cookie, then a fresh id. */
+/** New localStorage → legacy localStorage → mirrored cookie → a fresh id. */
 function resolveId(): string | null {
   let id: string | null = null;
 
@@ -77,6 +89,15 @@ function resolveId(): string | null {
     if (stored && DEVICE_ID_PATTERN.test(stored)) id = stored;
   } catch {
     /* blocked storage */
+  }
+
+  if (!id) {
+    try {
+      const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy && DEVICE_ID_PATTERN.test(legacy)) id = legacy;
+    } catch {
+      /* blocked storage */
+    }
   }
 
   if (!id) {
@@ -89,6 +110,7 @@ function resolveId(): string | null {
 
   try {
     window.localStorage.setItem(STORAGE_KEY, id);
+    window.localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch {
     /* blocked storage — the cookie still carries it */
   }

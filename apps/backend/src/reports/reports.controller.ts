@@ -1,32 +1,49 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
-import { CreateReportDto } from './dto/create-report.dto';
-import { ListReportReasonsDto } from './dto/list-report-reasons.dto';
-import { ReportSubmissionService } from './reports.service';
+import { UserReportsService } from './reports.service';
+import {
+  CreateListingReportDto,
+  CreateUserReportDto,
+  ListReasonsQueryDto,
+} from './dto/create-report.dto';
+
+const REPORT_LIMIT = { default: { limit: 10, ttl: 60_000 } };
 
 @ApiTags('reports')
-@ApiBearerAuth()
 @Controller('reports')
-export class ReportSubmissionsController {
-  constructor(private readonly service: ReportSubmissionService) {}
+export class UserReportsController {
+  constructor(private readonly service: UserReportsService) {}
 
-  // Public: the dialogs render the picklist before a session exists; the
-  // submit itself is what requires a login.
   @Get('reasons')
   @Public()
-  @ApiOperation({ summary: 'List active report reasons for a target type' })
-  listReasons(@Query() query: ListReportReasonsDto) {
+  @ApiOperation({ summary: 'Active report reasons for a target type' })
+  reasons(@Query() query: ListReasonsQueryDto) {
     return this.service.listReasons(query.targetType);
   }
 
-  @Post()
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
-  @ApiOperation({ summary: 'Report a listing or a user' })
-  create(@CurrentUser() user: RequestUser, @Body() dto: CreateReportDto) {
-    return this.service.create(user.id, dto);
+  @Post('listings')
+  @ApiBearerAuth()
+  @Throttle(REPORT_LIMIT)
+  @ApiOperation({ summary: 'Report a listing (one open report per listing)' })
+  reportListing(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateListingReportDto,
+  ) {
+    return this.service.reportListing(user.id, dto);
+  }
+
+  @Post('users')
+  @ApiBearerAuth()
+  @Throttle(REPORT_LIMIT)
+  @ApiOperation({ summary: 'Report an account (one open report per account)' })
+  reportUser(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateUserReportDto,
+  ) {
+    return this.service.reportUser(user.id, dto);
   }
 }

@@ -2,7 +2,7 @@ import { base64ToBytes, bytesToBase64 } from "../crypto/base64";
 
 /**
  * E2E_FILE_V1 — the frozen on-storage format of an encrypted attachment
- * (tasks/plan-e2e-attachments.md §4):
+ * (docs/e2e-attachments.md §4):
  *
  *   ┌──────────────────┬──────────┬──────────────────────────────┐
  *   │ "NPF" + 0x01 (4B)│ IV (12B) │ ciphertext + GCM tag (N+16B) │

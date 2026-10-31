@@ -1,9 +1,9 @@
 /**
  * Job names and payloads for the `payments` BullMQ queue. Three distinct
  * lifecycle steps share one queue: dispatching a payment_attempt against a
- * provider, processing an already-received payment_provider_event, and
- * (for a provider with no webhook at all — see
- * `../providers/bakong/README.md`) re-checking one that's still pending.
+ * provider, processing an already-received payment_provider_event, and the
+ * retired `poll-attempt` job (kept only so one queued before the switch to
+ * `PaymentReconciler` completes cleanly — see `PaymentProcessor`).
  * Consumed by `PaymentProcessor` (`../processors/payment.processor.ts`).
  */
 
@@ -35,16 +35,20 @@ export interface ProcessProviderEventJobData {
 }
 
 /**
- * One round of "ask the gateway again". Carries `intervalMs`/`expiresAt`
- * rather than re-deriving them from `payment_transaction_details` each
- * round — they came from the original `ChargeResult.poll` and never change
- * for the life of one attempt, so there's nothing to re-read.
+ * Legacy payload of the retired poll chain. Nothing produces it any more;
+ * the type remains for `PaymentPollOutboxHandler` and the `poll-attempt` job
+ * branch, which only drain rows and jobs written before the switch.
  */
 export interface PollAttemptJobData {
   paymentTransactionId: string;
   paymentAttemptId: string;
+  /** The provider's base interval; the back-off schedule is derived from it. */
   intervalMs: number;
   expiresAt: number;
+  /** Rounds already run. Absent on the first round and on older queued payloads. */
+  round?: number;
+  /** Delay for THIS round when it differs from `intervalMs` (back-off). */
+  delayMs?: number;
 }
 
 export type PaymentJobData =

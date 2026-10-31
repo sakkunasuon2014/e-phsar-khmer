@@ -17,8 +17,8 @@ export default function AccountDeletion() {
         <div className="pt-2 pb-32">
           <div className="max-w-4xl mx-auto px-6 md:px-8 lg:px-1">
             <div className="bg-card rounded-sm border border-border p-4">
-              <h2 className="text-2xl font-medium mb-6 mt-2 text-center">
-                How do I delete my PSA-NPIC account?
+              <h2 className="type-section-title mb-6 mt-2 text-center">
+                How do I delete my PhsarKhmer account?
               </h2>
               <div className="mb-3 px-3">
                 <h3 className="font-semibold mb-2">
@@ -26,12 +26,12 @@ export default function AccountDeletion() {
                 </h3>
                 <p className="text-foreground leading-relaxed mb-3">
                   The following Facebook account disconnection steps are
-                  available in the PSA-NPIC app and website. To disconnect your
-                  Facebook account, follow these steps:
+                  available in the PhsarKhmer app and website. To disconnect
+                  your Facebook account, follow these steps:
                 </p>
                 <ol className="list-decimal pl-6 space-y-1">
                   <li>
-                    Log in to PSA-NPIC using the account you will like to
+                    Log in to PhsarKhmer using the account you will like to
                     disconnect
                   </li>
                   <li>Go to your profile</li>
@@ -46,12 +46,12 @@ export default function AccountDeletion() {
                 </h3>
                 <p className="text-foreground leading-relaxed mb-3">
                   The following Google account disconnection steps are available
-                  in the PSA-NPIC app and website. To disconnect your Google
+                  in the PhsarKhmer app and website. To disconnect your Google
                   account, follow these steps:
                 </p>
                 <ol className="list-decimal pl-6 space-y-1">
                   <li>
-                    Log in to PSA-NPIC using the account you will like to
+                    Log in to PhsarKhmer using the account you will like to
                     disconnect
                   </li>
                   <li>Go to your profile</li>
@@ -62,16 +62,17 @@ export default function AccountDeletion() {
               </div>
               <div className="mb-4 px-3">
                 <h3 className="font-semibold mb-2">
-                  If you are sure you want to delete PSA-NPIC Account
+                  If you are sure you want to delete PhsarKhmer Account
                 </h3>
                 <p className="text-foreground leading-relaxed mb-3">
                   The following account deletion steps are available in the
-                  PSA-NPIC app and website. To delete your account, follow these
-                  steps:
+                  PhsarKhmer app and website. To delete your account, follow
+                  these steps:
                 </p>
                 <ol className="list-decimal pl-6 space-y-1">
                   <li>
-                    Log in to PSA-NPIC using the account you will like to delete
+                    Log in to PhsarKhmer using the account you will like to
+                    delete
                   </li>
                   <li>Go to your profile</li>
                   <li>Click on the settings icon</li>

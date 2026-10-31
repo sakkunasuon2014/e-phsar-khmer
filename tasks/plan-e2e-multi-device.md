@@ -1,12 +1,14 @@
 # Plan: E2E Multi-Device (per-device identity + envelope fan-out)
 
-**Supersedes:** decision #2 of `tasks/spec-e2e-encryption.md` (single device per identity).
+**Supersedes:** decision #2 of `docs/e2e-encryption.md` (single device per identity).
 **Goal:** a user logged in on N browsers/devices reads every message sent **after** each device registered, on every device, including rapid login/logout/device switching. Old chats (plaintext + v1 E2E) keep rendering exactly as today.
 **Non-goal (separate phase):** reading history from **before** a device existed (device linking / backup — Phase 4/5).
 
 ---
 
-## Implementation status (2026-09-24)
+## Implementation status (2026-09-24, re-verified 2026-10-24)
+
+**2026-10-24:** shipped in `603aa33` (2026-09-29). The migrations named below were renumbered on the main merge: `0027` (devices + envelopes), `0028` (backup) and `0029` (`key_proof_hash`). All three are applied on the dev DB. **Phase 3 cutover is still not started.** The server still accepts v1 `e2eHeader` sends, the v1 bundle endpoint and `user_e2e_identities` remain, and `components/setting/Devices.tsx` is still a hardcoded mock. Recorded in `CHANGELOG.md` (2026-09-27 → 2026-09-30).
 
 Phases 0–2 and 4/5 (history backup, below) implemented; Phase 3 (cutover) not started. Migrations `0023`–`0025` generated but **not applied** — run `pnpm --filter backend db:migrate`.
 

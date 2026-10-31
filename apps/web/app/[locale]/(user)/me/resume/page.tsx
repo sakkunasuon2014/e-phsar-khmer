@@ -3,7 +3,7 @@ import Resume from "@/components/profile/Resume";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Resume (CV) - Psakhmer",
+  title: "Resume (CV)",
   description: "Resume (CV)",
 };
 

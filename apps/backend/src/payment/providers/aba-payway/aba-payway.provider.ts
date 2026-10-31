@@ -21,6 +21,7 @@ import {
 import {
   ABA_PAYWAY_API_OK,
   toPaymentAttemptOutcome,
+  webhookStatusToOutcome,
 } from './aba-payway.status';
 import { createAbaPaywayTransaction } from './handlers/create-transaction.handler';
 import { checkAbaPaywayTransaction } from './handlers/check-transaction.handler';
@@ -31,40 +32,30 @@ import type {
 } from './aba-payway.types';
 import { Effect } from 'effect';
 
-// Node/NestJS lowercase incoming header names regardless of how ABA sends
-// `X-PayWay-Hmac-Sha512` on the wire.
+// Node lowercases incoming header names.
 const SIGNATURE_HEADER = 'x-payway-hmac-sha512';
 
 /**
- * ABA PayWay's implementation of the gateway seam — the only place that
- * knows PayWay's wire format.
+ * ABA PayWay gateway — the only place that knows PayWay's wire format.
  *
- * `tran_id` sent to ABA is a freshly generated short opaque id, not
- * `payment_transactions.id`/`payment_attempts.id` (both UUIDs exceed ABA's
- * limit). ABA echoes it back on every subsequent call; that's what
- * `charge()` returns as `ChargeResult.providerAttemptId` and what
- * `payment_attempts.provider_attempt_id` correlates a webhook/reconcile
- * back to. Our own `payment_transactions.id` still travels as
- * `custom_fields`, for manual lookups only.
- *
- * `return_url` (always `webhookUrl()`, never caller-supplied — it's the
- * server-to-server payment-result target, not a browser redirect) is
- * distinct from `continue_success_url`/`cancel_url` (the actual browser
- * redirects, from `ChargeRequest`). Only `return_url` is base64-encoded —
- * see `aba-payway.encoding.ts`.
+ * The `tran_id` sent to ABA is a short random id, not one of our UUIDs (ABA
+ * rejects more than ~25 chars). ABA echoes it back everywhere, and it is
+ * stored as `payment_attempts.provider_attempt_id` to correlate webhooks and
+ * reconciles to an attempt. See `README.md`.
  */
 @Injectable()
 export class AbaPaywayProvider implements PaymentGatewayProvider {
   readonly name = 'aba_payway';
+  readonly displayName = 'ABA PayWay';
+  /** The callback is HMAC-signed, so it is settled on directly (no polling). */
+  readonly trustsVerifiedWebhook = true;
   private readonly apiClient: ApiClient;
 
   constructor(private readonly configService: ConfigService) {
     this.apiClient = createApiClient({
       baseUrl: this.baseUrl(),
-      // Confirmed live (2026-09-16): without Accept: application/json,
-      // ABA's purchase endpoint returns a rendered HTML checkout page
-      // (200 OK) instead of the documented JSON body. Content-Type must
-      // also be explicit to ensure ABA treats this as a JSON API call.
+      // Without `Accept: application/json` ABA answers purchase with an HTML
+      // checkout page instead of JSON.
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
@@ -72,14 +63,7 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     });
   }
 
-  /**
-   * A short opaque id for ABA's `tran_id` — see `CreatePurchaseRequest
-   * .tran_id`'s own doc comment for why this can't be one of our own UUID
-   * columns. 15 random bytes as base64url is exactly 20 characters (no
-   * padding, since 15 is divisible by 3) with ~120 bits of entropy —
-   * collision-safe at any realistic volume, same order of magnitude as a
-   * UUID's own randomness.
-   */
+  /** 15 random bytes as base64url = exactly 20 chars. */
   private generateTranId(): string {
     return randomBytes(15).toString('base64url');
   }
@@ -100,26 +84,19 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     const tranId = this.generateTranId();
     const amount = Number(request.amount);
     const currency = request.currency;
+    // ABA rejects payment after this; without it the QR lives for 30 days.
+    const lifetime = this.lifetimeMinutes();
+    const expiresAt = Date.now() + lifetime * 60_000;
 
-    // Server-to-server payment-result callback — fixed server config,
-    // never derived from caller input (see webhookUrl()'s guard above and
-    // this class's own doc comment on `return_url`). Only this field gets
-    // base64-encoded; see the class doc comment for why the other two
-    // don't.
+    // `return_url` is ABA's server-to-server callback target: always our own
+    // config, never caller input, and the only base64-encoded URL.
     const returnUrl = base64EncodeAbaPaywayUrl(webhookUrl);
-    // `request.returnUrl`/`.cancelUrl` are the generic browser-redirect
-    // concepts from ChargeRequest — map to ABA's *browser* redirect
-    // fields, different fields from `return_url` above despite the
-    // similar name. Sent plain (no base64) — see the class doc comment.
+    // The payer's browser redirects, sent plain.
     const continueSuccessUrl = request.returnUrl;
     const cancelUrl = request.cancelUrl;
 
-    // signAbaPaywayPurchase's template has 23 fixed positions; this
-    // codebase's ChargeRequest only ever populates a handful of them
-    // (below) — every other position (items, shipping, firstname, email,
-    // payout, ...) has no equivalent field anywhere in this module and
-    // stays empty, per the algorithm itself, not because of anything this
-    // request happens to send.
+    // Sign exactly what is sent below. Unset positions sign as '' (see
+    // `signAbaPaywayPurchase`).
     const hash = signAbaPaywayPurchase(
       {
         reqTime,
@@ -131,6 +108,7 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
         continueSuccessUrl: continueSuccessUrl ?? undefined,
         currency,
         customFields: request.transactionId,
+        lifetime,
       },
       this.apiKey(),
     );
@@ -142,18 +120,14 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
       amount,
       currency,
       return_url: returnUrl,
-      // ABA signs missing optional fields as empty string. Sending null
-      // would cause the hash to include "null" (the literal string) while
-      // ABA verifies with "", producing a signature mismatch (error code 2
-      // "Invalid Transaction ID"). Omit the fields entirely when not set.
+      // Omit unset fields: sending `null` would not match the '' we signed.
       ...(continueSuccessUrl
         ? { continue_success_url: continueSuccessUrl }
         : {}),
       ...(cancelUrl ? { cancel_url: cancelUrl } : {}),
-      // Our own internal id, for manual lookups against ABA's own
-      // tooling only — see the class doc comment. Never read back out of
-      // a response by this codebase.
+      // Our transaction id, for manual lookups in ABA's tooling only.
       custom_fields: request.transactionId,
+      lifetime,
       hash,
     };
 
@@ -172,25 +146,16 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
       };
     }
 
-    // "00" means a checkout was created, not that money has moved yet — the
-    // payer still has to scan/confirm. The attempt stays `pending` until a
-    // webhook or reconcile() call reports a payment outcome.
-    //
-    // redirectUrl maps to `abapay_deeplink` — the one field in the real
-    // response that's an actual URI (`abamobilebank://...`, confirmed
-    // live 2026-09-16). There is no `checkout_qr_url` field in ABA's real
-    // response (spec.md's documented name for it doesn't exist); the KHQR
-    // itself is `qrString` (raw KHQR payload, for rendering your own code)
-    // and `qrImage` (a ready-to-display `data:image/png` URI) — both
-    // travel through `rawResponse` below, same pattern
-    // `../bakong/bakong.provider.ts` uses for its own QR payload, since
-    // `ChargeResult` has no dedicated QR field.
+    // "00" = checkout created, not paid: stays `pending` until the webhook
+    // arrives or the checkout expires. The KHQR (`qrString`/`qrImage`) travels
+    // in `rawResponse` (with `expiresAt`, for the checkout countdown).
     return {
       status: 'pending',
       providerAttemptId: response.status.tran_id,
       providerTransactionId: response.status.tran_id,
       redirectUrl: response.abapay_deeplink,
-      rawResponse: response,
+      expiresAt,
+      rawResponse: { ...response, expiresAt },
     };
   }
 
@@ -199,29 +164,24 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     const reqTime = formatAbaPaywayReqTime(new Date());
     const merchantId = this.merchantId();
 
-    const hash = signAbaPayway(
-      [reqTime, merchantId, providerTransactionId],
-      this.apiKey(),
-    );
-
     const request: CheckTransactionRequest = {
       req_time: reqTime,
       merchant_id: merchantId,
       tran_id: providerTransactionId,
-      hash,
+      hash: signAbaPayway(
+        [reqTime, merchantId, providerTransactionId],
+        this.apiKey(),
+      ),
     };
 
-    // A network failure (ApiClientError) rejects here, same contract
-    // Bakong's reconcile() has — the use-case layer wraps it into
-    // PaymentGatewayCallError and asks BullMQ to retry.
+    // A network failure rejects; the use-case layer turns it into a retry.
     const response = await Effect.runPromise(
       checkAbaPaywayTransaction(this.apiClient, request),
     );
 
-    // A non-"00" status here means ABA has no record of this tran_id yet —
-    // inconclusive, not a rejection. `pending` lets the caller decide
-    // whether to keep waiting rather than treating this as a hard failure.
-    if (response.data?.status?.code !== ABA_PAYWAY_API_OK) {
+    // A non-"00" status means ABA doesn't know the tran_id (yet):
+    // inconclusive, not a rejection.
+    if (response.status?.code !== ABA_PAYWAY_API_OK || !response.data) {
       return { status: 'pending', rawResponse: response };
     }
 
@@ -233,7 +193,7 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
 
     return {
       status,
-      providerTransactionId: data.status?.tran_id ?? providerTransactionId,
+      providerTransactionId: response.status.tran_id ?? providerTransactionId,
       failureCode:
         status === 'failed' ? String(data.payment_status_code) : undefined,
       failureMessage:
@@ -242,24 +202,16 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     };
   }
 
-  /**
-   * Looks up the `X-PayWay-Hmac-Sha512` header and JSON-parses the body —
-   * the actual HMAC algorithm lives in `signAbaPaywayCallback`/
-   * `verifyAbaPaywayCallbackSignature` (`aba-payway.signing.ts`).
-   */
   verifyWebhookSignature(
     rawBody: Buffer | string,
     headers: Record<string, string>,
   ): WebhookVerification {
-    // Fail closed rather than verifying against an empty-string HMAC key —
-    // charge()/reconcile() refuse to run unconfigured via ensureConfigured(),
-    // and an unconfigured webhook path must refuse the same way instead of
-    // silently accepting any signature computed with key `''`.
+    // Fail closed: with no key, a signature made with key '' would pass.
     if (!this.isConfigured()) {
       return {
         valid: false,
         reason:
-          'ABA PayWay is not configured — set ABA_PAYWAY_API_KEY and ABA_PAYWAY_MERCHANT_ID',
+          'ABA PayWay is not configured — set ABA_PAYWAY_API_KEY, ABA_PAYWAY_MERCHANT_ID and ABA_PAYWAY_WEBHOOK_URL',
       };
     }
 
@@ -272,17 +224,21 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
     try {
       const text =
         typeof rawBody === 'string' ? rawBody : rawBody.toString('utf-8');
-      payload = JSON.parse(text) as Record<string, unknown>;
+      const parsed: unknown = JSON.parse(text);
+      // Valid JSON but never a callback; `Object.keys(null)` would throw.
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
+        return { valid: false, reason: 'Malformed JSON body' };
+      }
+      payload = parsed as Record<string, unknown>;
     } catch {
       return { valid: false, reason: 'Malformed JSON body' };
     }
 
-    const valid = verifyAbaPaywayCallbackSignature(
-      payload,
-      this.apiKey(),
-      received,
-    );
-    return valid
+    return verifyAbaPaywayCallbackSignature(payload, this.apiKey(), received)
       ? { valid: true }
       : { valid: false, reason: 'Signature mismatch' };
   }
@@ -290,50 +246,36 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
   parseWebhookEvent(rawBody: Buffer | string): ParsedProviderEvent {
     const text =
       typeof rawBody === 'string' ? rawBody : rawBody.toString('utf-8');
-    const body = JSON.parse(text) as AbaPaywayWebhookPayload;
+    const body = JSON.parse(text) as AbaPaywayWebhookPayload | null;
 
-    // `status` is a string code ("0" = approved, per the same convention
-    // as check-transaction's `payment_status_code`) — ABA's callback docs
-    // don't enumerate the non-zero values, so anything else falls through
-    // toPaymentAttemptOutcome's "non-zero numeric code = failed" rule.
-    const statusCode = Number(body.status);
-    const status = toPaymentAttemptOutcome(
-      Number.isNaN(statusCode) ? null : statusCode,
-      null,
-    );
+    // No tran_id = nothing to correlate, and a shared `undefined:0` dedupe key.
+    if (
+      !body ||
+      typeof body.tran_id !== 'string' ||
+      body.tran_id.trim() === ''
+    ) {
+      throw new Error('ABA PayWay callback has no tran_id');
+    }
+
+    const status = webhookStatusToOutcome(body.status);
 
     return {
-      // A retried delivery of the same outcome dedupes; a genuinely
-      // different status for the same tran_id is a new event.
-      providerEventId: `${body.tran_id}:${body.status}`,
+      // A retry of the same outcome dedupes; a different status is a new event.
+      providerEventId: `${body.tran_id}:${body.status ?? ''}`,
       eventType: 'payment.notify',
-      // Echoes charge()'s own tran_id — see the class doc comment. This is
-      // what correlates the event back to a payment_attempts row via its
-      // (provider, providerAttemptId) index.
       providerAttemptId: body.tran_id,
       status,
-      failureCode: status === 'failed' ? body.status : undefined,
-      // ABA's callback carries no failure text of its own — reconcile()
-      // (check-transaction) is what fills in a fuller picture downstream,
-      // not this payload.
+      failureCode: status === 'failed' ? String(body.status).trim() : undefined,
+      // The callback has no failure text; reconcile() supplies it.
       failureMessage: undefined,
       payload: body,
     };
   }
 
-  /**
-   * No PAN, bank account, or auth-token field appears in any of the
-   * documented ABA PayWay response shapes (see spec.md) — `payer_account`
-   * is already a masked summary as ABA returns it. Identity is correct
-   * here, not merely unimplemented.
-   */
+  /** ABA's responses carry no PAN or token (`payer_account` is pre-masked). */
   redact(payload: unknown): unknown {
     return payload;
   }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
 
   private apiKey(): string {
     return this.configService.get<string>('abaPayway.apiKey') ?? '';
@@ -350,28 +292,26 @@ export class AbaPaywayProvider implements PaymentGatewayProvider {
   private baseUrl(): string {
     return (
       this.configService.get<string>('abaPayway.baseUrl') ??
-      // Confirmed against ABA's own developer docs
-      // (developer.payway.com.kh) — the previous default
-      // (checkout-sandbox.abapayway.com) was never a real ABA domain and
-      // would have failed DNS resolution on any live call.
       'https://checkout-sandbox.payway.com.kh'
     );
   }
 
+  private lifetimeMinutes(): number {
+    return this.configService.get<number>('abaPayway.lifetimeMinutes') ?? 15;
+  }
+
   /**
-   * Public so `processProviderEvent` can check this before calling
-   * `reconcile()` — a missing key would otherwise only surface as a thrown
-   * Error inside a BullMQ job, retried opaquely until the job's attempts
-   * are exhausted (see that use-case's own doc comment).
+   * Needs the webhook URL too: ABA is webhook-only, so without one a payment
+   * could never confirm. Unconfigured, the checkout picker hides ABA.
    */
   isConfigured(): boolean {
-    return Boolean(this.apiKey() && this.merchantId());
+    return Boolean(this.apiKey() && this.merchantId() && this.webhookUrl());
   }
 
   private ensureConfigured(): void {
     if (!this.isConfigured()) {
       throw new Error(
-        'ABA PayWay is not configured — set ABA_PAYWAY_API_KEY and ABA_PAYWAY_MERCHANT_ID',
+        'ABA PayWay is not configured — set ABA_PAYWAY_API_KEY, ABA_PAYWAY_MERCHANT_ID and ABA_PAYWAY_WEBHOOK_URL',
       );
     }
   }

@@ -12,6 +12,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+
+// Multer buffers uploads in memory: without a limit it reads the whole body
+// before the service's 5 MB check ever runs. Over the limit → 413.
+const IMAGE_UPLOAD_OPTIONS = {
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+};
 import {
   ApiBearerAuth,
   ApiConsumes,
@@ -32,17 +38,33 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { RequestPhoneChangeDto } from './dto/request-phone-change.dto';
 import { VerifyPhoneChangeDto } from './dto/verify-phone-change.dto';
+import {
+  CreateBillingAddressDto,
+  UpdateBillingAddressDto,
+} from './dto/billing-address.dto';
+import { BillingAddressesService } from './billing-addresses.service';
 
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly billingAddressesService: BillingAddressesService,
+  ) {}
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user profile' })
-  getMe(@CurrentUser() user: RequestUser) {
-    return this.usersService.findById(user.id);
+  getMe(
+    @CurrentUser() user: RequestUser,
+    @Query('includeAuthProviders') includeAuthProviders?: string,
+  ) {
+    // Express can hand back an array for a repeated query key — only a
+    // literal "1"/"true" opts in.
+    const include =
+      typeof includeAuthProviders === 'string' &&
+      (includeAuthProviders === '1' || includeAuthProviders === 'true');
+    return this.usersService.findById(user.id, include);
   }
 
   @Patch('me')
@@ -143,7 +165,7 @@ export class UsersController {
   @Post('me/avatar')
   @ApiOperation({ summary: 'Upload profile photo' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', IMAGE_UPLOAD_OPTIONS))
   setAvatar(
     @CurrentUser() user: RequestUser,
     @UploadedFile() file: Express.Multer.File,
@@ -154,7 +176,7 @@ export class UsersController {
   @Post('me/cover')
   @ApiOperation({ summary: 'Upload cover photo' })
   @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', IMAGE_UPLOAD_OPTIONS))
   setCover(
     @CurrentUser() user: RequestUser,
     @UploadedFile() file: Express.Multer.File,
@@ -187,6 +209,40 @@ export class UsersController {
   @ApiOperation({ summary: 'Get current user follow counts' })
   getFollowCounts(@CurrentUser() user: RequestUser) {
     return this.usersService.getFollowCounts(user.id);
+  }
+
+  @Get('me/billing-addresses')
+  @ApiOperation({ summary: 'List saved billing addresses (default first)' })
+  listBillingAddresses(@CurrentUser() user: RequestUser) {
+    return this.billingAddressesService.list(user.id);
+  }
+
+  @Post('me/billing-addresses')
+  @ApiOperation({ summary: 'Save a billing address' })
+  createBillingAddress(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateBillingAddressDto,
+  ) {
+    return this.billingAddressesService.create(user.id, dto);
+  }
+
+  @Patch('me/billing-addresses/:id')
+  @ApiOperation({ summary: 'Update a billing address' })
+  updateBillingAddress(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateBillingAddressDto,
+  ) {
+    return this.billingAddressesService.update(user.id, id, dto);
+  }
+
+  @Delete('me/billing-addresses/:id')
+  @ApiOperation({ summary: 'Delete a billing address' })
+  deleteBillingAddress(
+    @CurrentUser() user: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.billingAddressesService.remove(user.id, id);
   }
 
   @Get('by-username/:username')

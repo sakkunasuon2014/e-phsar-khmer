@@ -67,21 +67,46 @@ export function formatPrice(
  * decrypt cache or a completed decrypt). When it's missing, the preview is
  * left blank rather than showing ciphertext or a "Encrypted message" badge —
  * personal chat should read like any other message list.
+ *
+ * `labels.voice` / `labels.location` are optional so existing callers keep
+ * compiling; they fall back to the image and listing labels respectively.
+ * `structured` is the decrypted content kind when the plaintext is structured
+ * JSON (a shared location or a listing-only card) — that content has no human
+ * text, so the preview shows a label instead of the raw JSON.
  */
 export function previewOf(
   message: ChatMessage | null,
-  labels: { image: string; listing: string; none: string },
+  labels: {
+    image: string;
+    listing: string;
+    none: string;
+    voice?: string;
+    location?: string;
+  },
   decryptedPlaintext?: string | null,
+  structured?: { kind: "location" } | { kind: "listing" } | null,
 ): string {
   if (!message) return labels.none;
   // Encrypted files: the label is known from the server's `attachments`
   // alone; the caption (if any) needs the decrypted JSON.
   if (message.attachments?.length) {
-    const caption = decryptedPlaintext
-      ? parseAttachmentContent(decryptedPlaintext)?.text
-      : undefined;
+    const content = decryptedPlaintext
+      ? parseAttachmentContent(decryptedPlaintext)
+      : null;
+    const caption = content?.text;
+    // A voice note is a single encrypted audio file whose purpose lives only
+    // inside the decrypted body — the server only sees `kind: "file"`.
+    const first = content?.attachments[0];
+    if (first?.purpose === "voice-note") {
+      const voice = labels.voice ?? labels.image;
+      return caption ? `${voice} · ${caption}` : voice;
+    }
     return caption ? `${labels.image} · ${caption}` : labels.image;
   }
+  // Structured content has no human-readable text; like ciphertext, its raw
+  // JSON must never reach the inbox.
+  if (structured?.kind === "location") return labels.location ?? labels.listing;
+  if (structured?.kind === "listing") return labels.listing;
   if (message.isE2e) {
     if (decryptedPlaintext) return decryptedPlaintext;
     // Still decrypting (or failed): never surface base64 ciphertext.

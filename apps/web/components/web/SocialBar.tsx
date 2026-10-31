@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import Image from "next/image";
+import UserAvatar from "@/components/common/UserAvatar";
 import {
   IconBellFilled,
   IconMessageFilled,
@@ -53,16 +53,13 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
     user.username ||
     t("myAccount");
   const handle = user.username ? `@${user.username}` : "";
-  const avatarUrl =
-    user.profilePhotoUrl ??
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=00a0e9&color=fff`;
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       {/* Notifications */}
       <Button
         variant={"ghost"}
         onClick={() => router.push("/notifications")}
-        className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
+        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconBellFilled className="scale-150 " />
         <NotificationUnreadBadge />
@@ -71,7 +68,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       <Button
         variant={"ghost"}
         onClick={() => router.push("/chats")}
-        className="relative bg-card rounded-full h-10 w-10 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
+        className="relative bg-card rounded-full h-11 w-11 border border-muted-foreground/50 text-muted-foreground hover:text-gray-700 transition-colors cursor-pointer"
       >
         <IconMessageFilled className="scale-150" />
         <ChatUnreadBadge />
@@ -79,16 +76,12 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       {/* User Dropdown */}
       <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
         <DropdownMenuTrigger className="outline-none ml-2">
-          <div className="relative h-10 w-10 cursor-pointer">
-            <div className="h-10 w-10 rounded-full overflow-hidden border border-muted-foreground/50">
-              <Image
-                src={avatarUrl}
-                width={36}
-                height={36}
-                alt={displayName}
-                className="w-full h-full object-cover"
-              />
-            </div>
+          <div className="relative h-11 w-11 cursor-pointer">
+            <UserAvatar
+              src={user.profilePhotoUrl}
+              name={displayName}
+              className="h-11 w-11 border border-muted-foreground/50 text-sm"
+            />
             {/* Dropdown affordance: small chevron badge on the avatar corner */}
             <div className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-card border border-muted-foreground/30 shadow-sm">
               <ChevronDown className="h-3 w-3 text-muted-foreground" />
@@ -105,20 +98,15 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
               className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
             >
               <div className="flex items-center gap-3 rounded-t-md">
-                <div className="h-12 w-12 rounded-full overflow-hidden border border-[#00a0e9] flex-shrink-0">
-                  <Image
-                    src={avatarUrl}
-                    width={50}
-                    height={50}
-                    alt={displayName}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
+                <UserAvatar
+                  src={user.profilePhotoUrl}
+                  name={displayName}
+                  size={48}
+                  className="border border-[#00a0e9] text-base"
+                />
                 <div className="flex flex-col">
-                  <span className="text-base font-medium text-[#00a0e9]">
-                    {displayName}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="type-nav text-[#00a0e9]">{displayName}</span>
+                  <span className="type-meta text-muted-foreground">
                     {handle}
                   </span>
                 </div>
@@ -135,9 +123,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm text-foreground font-medium">
-                  {t("myAds")}
-                </span>
+                <span className="type-nav text-foreground">{t("myAds")}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild className={ITEM}>
@@ -146,9 +132,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm text-foreground font-medium">
-                  {t("likes")}
-                </span>
+                <span className="type-nav text-foreground">{t("likes")}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild className={ITEM}>
@@ -157,9 +141,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm text-foreground font-medium">
-                  {t("saved")}
-                </span>
+                <span className="type-nav text-foreground">{t("saved")}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -169,7 +151,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm text-foreground font-medium">
+                <span className="type-nav text-foreground">
                   {t("appliedJobs")}
                 </span>
               </Link>
@@ -180,7 +162,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm text-foreground font-medium">
+                <span className="type-nav text-foreground">
                   {t("jobApplications")}
                 </span>
               </Link>
@@ -191,9 +173,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm text-foreground font-medium">
-                  {t("resume")}
-                </span>
+                <span className="type-nav text-foreground">{t("resume")}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -203,7 +183,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-sm text-foreground font-medium">
+                <span className="type-nav text-foreground">
                   {t("subscriptions")}
                 </span>
               </Link>
@@ -215,9 +195,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-[14px] text-foreground font-medium">
-                  {t("insight")}
-                </span>
+                <span className="type-nav text-foreground">{t("insight")}</span>
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -227,7 +205,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                   className="scale-150 text-muted-foreground"
                   strokeWidth={1.5}
                 />
-                <span className="text-[14px] text-foreground font-medium">
+                <span className="type-nav text-foreground">
                   {t("settings")}
                 </span>
               </Link>
@@ -247,9 +225,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
                 className="scale-150 text-muted-foreground"
                 strokeWidth={1.5}
               />
-              <span className="text-sm text-foreground font-medium">
-                {t("signOut")}
-              </span>
+              <span className="type-nav text-foreground">{t("signOut")}</span>
             </DropdownMenuItem>
           </div>
         </DropdownMenuContent>
@@ -257,7 +233,7 @@ export function SocialBar({ user }: { user: SocialBarUser }) {
       <Button
         asChild
         variant="ghost"
-        className="h-[42px] bg-[#f68b1e] text-white px-6 text-base font-medium rounded transition-colors hover:bg-[#f68b1e]/80 hover:text-white"
+        className="h-[42px] bg-[#f68b1e] text-white px-6 type-nav rounded transition-colors hover:bg-[#f68b1e]/80 hover:text-white"
       >
         <Link href={`/post`}>
           <FaCamera className="scale-120" strokeWidth={2.5} />

@@ -63,13 +63,16 @@ export class ReportsController {
   }
 
   @Patch('users/:id')
-  @ApiOperation({ summary: 'Update a user report status (approve/reject)' })
+  @ApiOperation({
+    summary:
+      'Update a user report status. Approving suspends the reported account.',
+  })
   updateUserReportStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateReportStatusDto,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.service.updateUserReportStatus(id, dto, user.id);
+    return this.service.updateUserReportStatus(id, dto, user);
   }
 
   @Delete('users/:id')
@@ -85,13 +88,16 @@ export class ReportsController {
   }
 
   @Patch('listings/:id')
-  @ApiOperation({ summary: 'Update a listing report status (approve/reject)' })
+  @ApiOperation({
+    summary:
+      'Update a listing report status. Approving takes the listing down.',
+  })
   updateListingReportStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateReportStatusDto,
     @CurrentUser() user: RequestUser,
   ) {
-    return this.service.updateListingReportStatus(id, dto, user.id);
+    return this.service.updateListingReportStatus(id, dto, user);
   }
 
   @Delete('listings/:id')

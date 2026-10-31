@@ -1,19 +1,36 @@
 import {
   ArrayMaxSize,
   IsArray,
-  IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
 } from 'class-validator';
 
-export class CreateReportDto {
-  @IsEnum(['user', 'listing'])
+export const REPORT_MAX_IMAGES = 6;
+
+export class ListReasonsQueryDto {
+  @IsIn(['user', 'listing'])
   targetType: 'user' | 'listing';
+}
+
+export class CreateListingReportDto {
+  @IsUUID()
+  listingId: string;
 
   @IsUUID()
-  targetId: string;
+  reasonId: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
+}
+
+export class CreateUserReportDto {
+  @IsUUID()
+  targetUserId: string;
 
   @IsUUID()
   reasonId: string;
@@ -23,11 +40,11 @@ export class CreateReportDto {
   @MaxLength(2000)
   description?: string;
 
-  /** Storage paths returned by `POST /files/sign` with the `report` scope. */
+  /** Storage paths from `/files/sign` with scope `report` (the caller's own). */
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(24)
+  @ArrayMaxSize(REPORT_MAX_IMAGES)
   @IsString({ each: true })
-  @MaxLength(512, { each: true })
+  @MaxLength(300, { each: true })
   imagePaths?: string[];
 }

@@ -16,18 +16,7 @@ import { useRouter } from "@/i18n/routing";
 import { Button } from "../ui/button";
 import { JobApplicationRow } from "./JobApplicationRow";
 import { loadMyAppliedJobs } from "@/actions/applications";
-import type { AppliedJob, JobApplicationStatus } from "@/types/applications";
-
-const STATUS_FILTERS: {
-  value: "all" | JobApplicationStatus;
-  labelKey: string;
-}[] = [
-  { value: "all", labelKey: "statusAll" },
-  { value: "pending", labelKey: "statusPending" },
-  { value: "viewed", labelKey: "statusViewed" },
-  { value: "hired", labelKey: "statusHired" },
-  { value: "rejected", labelKey: "statusRejected" },
-];
+import type { AppliedJob } from "@/types/applications";
 
 /**
  * `/me/applied-jobs` — the jobs this account applied to, fetched in the
@@ -42,9 +31,6 @@ export default function AppliedJobs() {
   const t = useTranslations("Me.jobsPage");
   const tCommon = useTranslations("Common");
   const router = useRouter();
-  const [status, setStatus] = React.useState<"all" | JobApplicationStatus>(
-    "all",
-  );
   const [sort, setSort] = React.useState<"newest" | "oldest">("newest");
   const [items, setItems] = React.useState<AppliedJob[] | null>(null);
   const [page, setPage] = React.useState(1);
@@ -56,10 +42,7 @@ export default function AppliedJobs() {
     let cancelled = false;
     void (async () => {
       setItems(null);
-      const result = await loadMyAppliedJobs({
-        page: 1,
-        status: status === "all" ? undefined : status,
-      });
+      const result = await loadMyAppliedJobs({ page: 1 });
       if (cancelled) return;
       setItems(result.items);
       setHasMore(result.hasMore);
@@ -68,17 +51,14 @@ export default function AppliedJobs() {
     return () => {
       cancelled = true;
     };
-  }, [status]);
+  }, []);
 
   const loadMore = () => {
     if (loadingMore) return;
     setLoadingMore(true);
     void (async () => {
       const next = page + 1;
-      const result = await loadMyAppliedJobs({
-        page: next,
-        status: status === "all" ? undefined : status,
-      });
+      const result = await loadMyAppliedJobs({ page: next });
       setLoadingMore(false);
       if (result.error) {
         setError(result.error);
@@ -108,9 +88,7 @@ export default function AppliedJobs() {
   return (
     <div className="min-w-full bg-muted pb-50 pt-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-2xl font-medium text-foreground mb-6">
-          {t("title")}
-        </h1>
+        <h1 className="type-page-title text-foreground mb-6">{t("title")}</h1>
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div className="flex items-center">
             <Tabs defaultValue="applied">
@@ -130,30 +108,6 @@ export default function AppliedJobs() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Select
-              value={status}
-              onValueChange={(value) =>
-                setStatus(value as "all" | JobApplicationStatus)
-              }
-            >
-              <SelectTrigger className="w-[180px] bg-card">
-                <SelectValue placeholder={t("statusAll")} />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_FILTERS.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className="cursor-pointer"
-                  >
-                    {option.value === "all"
-                      ? t("statusAll")
-                      : t("statusPrefix", { status: t(option.labelKey) })}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Select
               value={sort}
               onValueChange={(value) => setSort(value as "newest" | "oldest")}
@@ -176,10 +130,10 @@ export default function AppliedJobs() {
         {error ? (
           <main className="max-w-2xl mx-auto mt-4">
             <div className="bg-card rounded-sm shadow-sm min-h-[240px] flex flex-col items-center justify-center p-8 text-center">
-              <h2 className="text-lg font-medium text-foreground mb-2">
+              <h2 className="type-section-title text-foreground mb-2">
                 {t("loadFailed")}
               </h2>
-              <p className="text-muted-foreground text-sm">{error}</p>
+              <p className="text-muted-foreground type-body-sm">{error}</p>
             </div>
           </main>
         ) : items === null ? (
@@ -199,10 +153,10 @@ export default function AppliedJobs() {
               </div>
 
               <div className="text-center">
-                <h2 className="text-xl font-medium text-foreground mb-2">
+                <h2 className="type-section-title text-foreground mb-2">
                   {t("noResult")}
                 </h2>
-                <p className="text-muted-foreground text-sm mb-8">
+                <p className="text-muted-foreground type-body-sm mb-8">
                   {t("noApplied")}
                 </p>
                 <Button
@@ -228,7 +182,6 @@ export default function AppliedJobs() {
                     key={row.id}
                     view="applied"
                     listing={row.listing}
-                    status={row.status}
                     createdAt={row.createdAt}
                     title={row.listing.title || t("thisJob")}
                     subtitle={

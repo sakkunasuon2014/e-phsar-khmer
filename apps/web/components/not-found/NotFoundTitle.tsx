@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 /**
- * Keeps the browser tab reading `404 Not found - Psakhmer`.
+ * Keeps the browser tab reading `404 Not found - PhsarKhmer`.
  *
  * The two `not-found.tsx` boundaries already export `metadata = { title: … }`,
  * and that IS what the server puts in the initial `<head>` — verified against a
@@ -19,12 +19,12 @@ import { useEffect } from "react";
  * — would have to repeat each page's backend fetch just to learn it is going to
  * 404, since those fetch with `cache: "no-store"` and are not deduped.
  *
- * The ` - Psakhmer` suffix is the template in `app/[locale]/layout.tsx`, spelled
+ * The ` - PhsarKhmer` suffix is the template in `app/[locale]/layout.tsx`, spelled
  * out because the template is not readable from here. Change it in both places.
  */
 export default function NotFoundTitle() {
   useEffect(() => {
-    document.title = "404 Not found - Psakhmer";
+    document.title = "404 Not found - PhsarKhmer";
   }, []);
 
   return null;

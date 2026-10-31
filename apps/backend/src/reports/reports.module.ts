@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ReportSubmissionsController } from './reports.controller';
-import { ReportSubmissionService } from './reports.service';
+import { FilesModule } from '../files/files.module';
+import { UserReportsController } from './reports.controller';
+import { UserReportsService } from './reports.service';
 
-// DbModule is @Global — deliberately not imported (repo convention).
 @Module({
-  controllers: [ReportSubmissionsController],
-  providers: [ReportSubmissionService],
+  imports: [FilesModule],
+  controllers: [UserReportsController],
+  providers: [UserReportsService],
 })
-export class ReportsModule {}
+export class UserReportsModule {}

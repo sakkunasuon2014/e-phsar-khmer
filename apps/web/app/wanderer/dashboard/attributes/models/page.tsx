@@ -1,24 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-  MoreHorizontal,
-  Loader2,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -28,25 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+import { SelectItem } from "@/components/ui/select";
 import { modelSchema } from "@/schemas/model";
 import { useAppForm } from "@/components/form/hooks";
 import {
@@ -70,6 +36,17 @@ import {
 import { getAdminBrands } from "@/actions/admin-brands";
 import { getAdminModels } from "@/actions/admin-models";
 import { SubcategoryCheckboxes } from "@/components/dashboard/subcategory-checkboxes";
+import { AdminPage } from "@/components/dashboard/admin-page";
+import {
+  AdminFilter,
+  AdminSearch,
+  AdminTable,
+  ChipList,
+  DateCell,
+  PrimaryCell,
+  RowActions,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 import type { Brand } from "@/types/brand";
 import z from "zod";
 import { Model } from "@/types/model";
@@ -77,16 +54,44 @@ import { Model } from "@/types/model";
 type ModelFormData = z.infer<typeof modelSchema>;
 
 /** Brands that can carry a model in any of the selected subcategories. */
-function getBrandsForCategoryAndSubcategories(
+function getBrandsForSelectedSubcategories(
   brands: Brand[],
-  categoryId: string,
   subcategoryIds: string[],
 ) {
   if (subcategoryIds.length === 0) return [];
-  return brands.filter((brand) => {
-    if (brand.categoryId !== categoryId) return false;
-    return subcategoryIds.some((id) => brand.subcategories.includes(id));
-  });
+  // The overlap alone is the test. A brand's `categoryId` is only the first
+  // category among its links, so checking it hides legitimate brands whose
+  // first link sits in another category (Apple carries phones AND computers).
+  return brands.filter((brand) =>
+    subcategoryIds.some((id) => brand.subcategories.includes(id)),
+  );
+}
+
+/** A model's categories come from its own subcategory rows, never from the brand. */
+function modelCategoryNames(
+  model: Model,
+  subcategoryById: Map<string, AdminSubcategory>,
+  categoryById: Map<string, AdminCategory>,
+): string[] {
+  return [
+    ...new Set(
+      model.subcategories
+        .map((id) => subcategoryById.get(id))
+        .filter((sub): sub is AdminSubcategory => sub !== undefined)
+        .map((sub) => sub.categoryId),
+    ),
+  ]
+    .map((id) => categoryById.get(id)?.name)
+    .filter((name): name is string => Boolean(name));
+}
+
+function modelSubcategoryNames(
+  model: Model,
+  subcategoryById: Map<string, AdminSubcategory>,
+): string[] {
+  return model.subcategories
+    .map((id) => subcategoryById.get(id)?.name)
+    .filter((name): name is string => Boolean(name));
 }
 
 function AddModelForm({
@@ -108,12 +113,8 @@ function AddModelForm({
   >([]);
 
   const filteredBrands =
-    selectedCategoryId && selectedSubcategoryIds.length > 0
-      ? getBrandsForCategoryAndSubcategories(
-          brands,
-          selectedCategoryId,
-          selectedSubcategoryIds,
-        )
+    selectedSubcategoryIds.length > 0
+      ? getBrandsForSelectedSubcategories(brands, selectedSubcategoryIds)
       : [];
 
   const form = useAppForm({
@@ -239,7 +240,7 @@ function AddModelForm({
             )}
           </form.AppField>
         ) : selectedCategoryId ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a subcategory to see brands.
           </p>
         ) : null}
@@ -249,7 +250,7 @@ function AddModelForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -288,12 +289,8 @@ function EditModelForm({
   >(model.subcategories);
 
   const filteredBrands =
-    selectedCategoryId && selectedSubcategoryIds.length > 0
-      ? getBrandsForCategoryAndSubcategories(
-          brands,
-          selectedCategoryId,
-          selectedSubcategoryIds,
-        )
+    selectedSubcategoryIds.length > 0
+      ? getBrandsForSelectedSubcategories(brands, selectedSubcategoryIds)
       : [];
 
   const form = useAppForm({
@@ -387,7 +384,7 @@ function EditModelForm({
             )}
           </form.AppField>
         ) : (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category to see subcategories.
           </p>
         )}
@@ -412,7 +409,7 @@ function EditModelForm({
             )}
           </form.AppField>
         ) : selectedCategoryId ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a subcategory to see brands.
           </p>
         ) : null}
@@ -422,7 +419,7 @@ function EditModelForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -470,7 +467,7 @@ function DeleteModelForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Delete Brand</DialogTitle>
+        <DialogTitle>Delete Model</DialogTitle>
         <DialogDescription>
           Are you sure you want to delete &quot;{model.name}&quot;? This action
           cannot be undone.
@@ -481,7 +478,7 @@ function DeleteModelForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
           disabled={isDeleting}
         >
@@ -503,7 +500,7 @@ function DeleteModelForm({
 
 export default function ModelsPage() {
   const queryClient = useQueryClient();
-  const { data: modelList = [] } = useQuery({
+  const { data: modelList = [], isLoading } = useQuery({
     queryKey: ["admin", "models"],
     queryFn: getAdminModels,
   });
@@ -523,6 +520,8 @@ export default function ModelsPage() {
     queryClient.invalidateQueries({ queryKey: ["admin", "models"] });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
 
   // Dialog States
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -530,20 +529,59 @@ export default function ModelsPage() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState<Model | null>(null);
 
-  const filteredModels = modelList.filter(
-    (model) =>
-      model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      model.slug.toLowerCase().includes(searchQuery.toLowerCase()),
+  const brandById = useMemo(
+    () => new Map(allBrands.map((brand) => [brand.brandId, brand])),
+    [allBrands],
+  );
+  const subcategoryById = useMemo(
+    () => new Map(allSubcategories.map((sub) => [sub.subId, sub])),
+    [allSubcategories],
+  );
+  const categoryById = useMemo(
+    () => new Map(allCategories.map((category) => [category.cateId, category])),
+    [allCategories],
   );
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(100);
-  const totalPages = Math.ceil(filteredModels.length / rowsPerPage);
-  const paginatedModels = filteredModels.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage,
-  );
+  const filteredModels = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return modelList.filter((model) => {
+      const matchesCategory =
+        categoryFilter === "all" ||
+        model.subcategories.some(
+          (id) => subcategoryById.get(id)?.categoryId === categoryFilter,
+        );
+      if (!matchesCategory) return false;
+      if (brandFilter !== "all" && model.brandId !== brandFilter) return false;
+      if (!query) return true;
+      return [
+        model.name,
+        model.slug,
+        brandById.get(model.brandId)?.name ?? "",
+        ...modelSubcategoryNames(model, subcategoryById),
+        ...modelCategoryNames(model, subcategoryById, categoryById),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [
+    modelList,
+    searchQuery,
+    categoryFilter,
+    brandFilter,
+    brandById,
+    subcategoryById,
+    categoryById,
+  ]);
+
+  const categoryOptions = allCategories.map((category) => ({
+    value: category.cateId,
+    label: category.name,
+  }));
+  const brandOptions = allBrands.map((brand) => ({
+    value: brand.brandId,
+    label: brand.name,
+  }));
 
   const handleAdd = (data: ModelFormData) => {
     refreshModels();
@@ -577,242 +615,144 @@ export default function ModelsPage() {
     setSelectedModel(model);
     setIsDeleteDialogOpen(true);
   };
-  // ... UI JSX goes here
+
+  const columns = useMemo<AdminColumn<Model>[]>(
+    () => [
+      {
+        key: "model",
+        header: "Model",
+        sortValue: (model) => model.name,
+        cell: (model) => (
+          <PrimaryCell
+            image={brandById.get(model.brandId)?.image}
+            alt={brandById.get(model.brandId)?.name ?? model.name}
+            title={model.name}
+            subtitle={brandById.get(model.brandId)?.name ?? "—"}
+          />
+        ),
+      },
+      {
+        key: "category",
+        header: "Category",
+        sortValue: (model) =>
+          modelCategoryNames(model, subcategoryById, categoryById).join(", "),
+        cell: (model) => (
+          <ChipList
+            items={modelCategoryNames(model, subcategoryById, categoryById)}
+            tone="category"
+          />
+        ),
+      },
+      {
+        key: "subcategories",
+        header: "Sub Categories",
+        sortValue: (model) =>
+          modelSubcategoryNames(model, subcategoryById).join(", "),
+        cell: (model) => (
+          <ChipList items={modelSubcategoryNames(model, subcategoryById)} />
+        ),
+      },
+      {
+        key: "updated",
+        header: "Updated",
+        sortValue: (model) => model.updatedAt,
+        cell: (model) => <DateCell value={model.updatedAt} />,
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (model) => (
+          <RowActions
+            id={model.modelId}
+            actions={[
+              {
+                label: "Edit",
+                icon: <Pencil className="mr-2 size-4" />,
+                tone: "warning",
+                onSelect: () => openEditDialog(model),
+              },
+              {
+                label: "Delete",
+                icon: <Trash2 className="mr-2 size-4" />,
+                tone: "danger",
+                onSelect: () => openDeleteDialog(model),
+              },
+            ]}
+          />
+        ),
+      },
+    ],
+    [brandById, subcategoryById, categoryById],
+  );
+
   return (
     <>
-      <main className="flex-1 overflow-auto p-6 min-w-0">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
-                Models
-              </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Manage product Models Here.
-              </p>
-            </div>
-
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
-                  <Plus className="mr-2 size-4" />
-                  Add Model
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Model</DialogTitle>
-                  <DialogDescription>
-                    Create a new Model for your products.
-                  </DialogDescription>
-                </DialogHeader>
-                {isAddDialogOpen && (
-                  <AddModelForm
-                    categories={allCategories}
-                    subcategories={allSubcategories}
-                    brands={allBrands}
-                    onSuccess={handleAdd}
-                    onCancel={() => setIsAddDialogOpen(false)}
-                  />
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
+      <AdminPage
+        title="Models"
+        description="Manage product models here."
+        action={
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
+                <Plus className="mr-2 size-4" />
+                Add Model
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Model</DialogTitle>
+                <DialogDescription>
+                  Create a new Model for your products.
+                </DialogDescription>
+              </DialogHeader>
+              {isAddDialogOpen && (
+                <AddModelForm
+                  categories={allCategories}
+                  subcategories={allSubcategories}
+                  brands={allBrands}
+                  onSuccess={handleAdd}
+                  onCancel={() => setIsAddDialogOpen(false)}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        }
+        toolbar={
+          <>
+            <AdminSearch
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              onChange={setSearchQuery}
+              placeholder="Search model, brand, category..."
             />
-          </div>
-          <div className="rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center">ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>Brand</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Sub Category</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedModels.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Search className="size-8" />
-                        <p>No model found</p>
-                        {searchQuery && (
-                          <p className="text-sm">
-                            No results for &quot;{searchQuery}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-                {paginatedModels.map((model) => (
-                  <TableRow key={model.modelId}>
-                    <TableCell className="text-center font-medium">
-                      {model.modelId}
-                    </TableCell>
-                    <TableCell>{model.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {model.slug}
-                    </TableCell>
-                    <TableCell>
-                      {allBrands.find((b) => b.brandId === model.brandId)?.name}
-                    </TableCell>
-                    <TableCell>
-                      {allCategories.find(
-                        (c) => c.cateId === model.categoryId,
-                      ) ? (
-                        <span className="rounded bg-sky-200 px-2 py-1 text-sm text-black">
-                          {
-                            allCategories.find(
-                              (c) => c.cateId === model.categoryId,
-                            )?.name
-                          }
-                        </span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {model.subcategories.map((id) => {
-                          const sub = allSubcategories.find(
-                            (s) => s.subId === id,
-                          );
-
-                          return (
-                            <span
-                              key={id}
-                              className="rounded bg-sky-100 px-2 py-1 text-sm text-black"
-                            >
-                              {sub?.name}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {model.createdAt}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {model.updatedAt}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="rounded-full cursor-pointer"
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center">
-                          {/* Changed from category to brand here */}
-                          <DropdownMenuItem
-                            className="text-orange-500 cursor-pointer"
-                            onClick={() => openEditDialog(model)}
-                          >
-                            <Pencil className="mr-2 size-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive cursor-pointer"
-                            onClick={() => openDeleteDialog(model)}
-                          >
-                            <Trash2 className="mr-2 size-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {/* Pagination */}
-            <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                Rows per page
-                <Select
-                  value={rowsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setRowsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[80px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronsLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+            <AdminFilter
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              allLabel="All Categories"
+              options={categoryOptions}
+            />
+            <AdminFilter
+              value={brandFilter}
+              onChange={setBrandFilter}
+              allLabel="All Brands"
+              options={brandOptions}
+            />
+          </>
+        }
+      >
+        <AdminTable
+          columns={columns}
+          rows={filteredModels}
+          rowKey={(model) => model.modelId}
+          isLoading={isLoading}
+          pageSize={20}
+          resetKey={`${searchQuery}:${categoryFilter}:${brandFilter}`}
+          emptyTitle="No model found"
+          emptyHint={
+            searchQuery ? `No results for "${searchQuery}"` : undefined
+          }
+        />
+      </AdminPage>
       {/* Edit Dialog Block */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>

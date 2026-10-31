@@ -13,7 +13,6 @@ type EnqueuePaymentSettledEventError = PaymentQueueError;
 export interface PaymentSettledEventPayload {
   paymentTransactionId: string;
   ledgerTransactionId: string;
-  tenantId: string;
   orderId: string | null;
   customerId: string | null;
   amount: string;
@@ -41,7 +40,6 @@ export const enqueuePaymentSettledEvent = Effect.fn(
   const payload: PaymentSettledEventPayload = {
     paymentTransactionId: transaction.id,
     ledgerTransactionId: ledgerTransaction.id,
-    tenantId: transaction.tenantId,
     orderId: transaction.orderId,
     customerId: transaction.customerId,
     amount: transaction.amount,

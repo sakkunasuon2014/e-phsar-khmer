@@ -87,10 +87,10 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
           <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm ">
-              <h1 className="text-2xl font-medium text-foreground  mb-4 mt-12 text-center ">
+              <h1 className="type-page-title text-foreground mb-4 mt-12 text-center">
                 {t("title")}
               </h1>
-              <p className="text-center text-base w-full max-w-lg mx-auto mt-6 px-4">
+              <p className="text-center type-body w-full max-w-lg mx-auto mt-6 px-4">
                 {step === "phone"
                   ? t("description")
                   : t("codeDescription", {
@@ -102,7 +102,7 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
               {step === "phone" ? (
                 <>
                   <Field className="w-full max-w-md mx-auto mt-6">
-                    <FieldLabel className="text-sm text-foreground tracking-tight">
+                    <FieldLabel className="text-foreground tracking-tight">
                       {t("phoneNumber")}{" "}
                       <span className="text-destructive">*</span>
                     </FieldLabel>
@@ -158,7 +158,7 @@ export default function ChangePhone({ me }: { me?: SettingsUser | null }) {
                     {busy ? t("verifying") : t("verify")}
                   </Button>
 
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-4 type-body-sm">
                     <button
                       type="button"
                       className="text-muted-foreground hover:underline cursor-pointer"

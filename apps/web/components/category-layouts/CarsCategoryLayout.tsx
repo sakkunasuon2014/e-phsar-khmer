@@ -24,7 +24,7 @@ export default function CarsCategoryLayout({
     <>
       {/* HEADER */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
-        <h1 className="font-semibold text-lg md:text-lg">
+        <h1 className="type-page-title">
           {t("Common.inCambodia", { name: category.name })}
         </h1>
       </div>

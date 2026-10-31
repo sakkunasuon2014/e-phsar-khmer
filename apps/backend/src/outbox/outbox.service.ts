@@ -120,6 +120,39 @@ export class OutboxService {
     return row;
   }
 
+  /**
+   * Milliseconds (by the database's clock) until the earliest row becomes
+   * claimable: a pending row's `available_at`, or a stale lease's expiry.
+   * `0` means something is due now; `null` means nothing is waiting at all.
+   *
+   * One aggregate query over the (usually tiny) set of unfinished rows. This
+   * is what lets the worker sleep until work exists instead of polling a
+   * fixed interval: idle cost is one of these per heartbeat, not a claim
+   * attempt every couple of seconds.
+   */
+  async msUntilNextDue(): Promise<number | null> {
+    const leaseSeconds =
+      this.configService.get<number>('outbox.leaseTimeoutSeconds') ?? 60;
+
+    const [row] = await this.db
+      .select({
+        ms: sql<string | number | null>`floor(extract(epoch from (
+          min(
+            case
+              when ${outboxEvents.status} = 'pending' then ${outboxEvents.availableAt}
+              else ${outboxEvents.lockedAt} + make_interval(secs => ${leaseSeconds})
+            end
+          ) - now()
+        )) * 1000)`,
+      })
+      .from(outboxEvents)
+      .where(sql`${outboxEvents.status} in ('pending', 'processing')`);
+
+    // numeric comes back from postgres.js as a string.
+    const ms = row?.ms == null ? Number.NaN : Number(row.ms);
+    return Number.isFinite(ms) ? Math.max(0, ms) : null;
+  }
+
   async markPublished(
     eventId: string,
     redactedPayload?: unknown,

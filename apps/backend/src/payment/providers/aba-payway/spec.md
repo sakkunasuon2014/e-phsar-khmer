@@ -1,329 +1,69 @@
-# Payment Service Specification
+# ABA PayWay API — what we use
 
-## Context
+Full docs: <https://developer.payway.com.kh>. Types live in `aba-payway.types.ts`;
+hashes in `aba-payway.signing.ts`. Shapes below are what the sandbox actually
+returns, which differs from ABA's written docs in places.
 
-We need to build a payment processor for the ABA payway, to handle the payments when picking the aba_payway option.
+All calls are `POST` JSON to `ABA_PAYWAY_BASE_URL` with `Accept: application/json`.
 
-## Create purchase
+## Purchase — `/api/payment-gateway/v1/payments/purchase`
 
-_**Endpoint:**_ `POST /api/payment-gateway/v1/payments/purchase`
-_**Request Body (format in TypeScript effect):**_
+Request (we send): `req_time`, `merchant_id`, `tran_id`, `amount`, `currency`,
+`return_url` (base64), `continue_success_url`, `cancel_url`, `custom_fields`,
+`lifetime`, `hash`. Unset optional fields are omitted, never `null`.
 
-```ts
-export const CreatePurchaseSchema = Schema.struct({
-  additional_params: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  amount: Schema.number,
-  cancel_url: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  continue_success_url: Schema.optional(
-    Schema.union(Schema.null, Schema.string),
-  ),
-  currency: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  custom_fields: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  email: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  firstname: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  google_pay_token: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  hash: Schema.string,
-  items: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  lastname: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  lifetime: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  merchant_id: Schema.string,
-  payment_gate: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  payment_option: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payout: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  phone: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  req_time: Schema.string,
-  return_deeplink: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  return_params: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  return_url: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  shipping: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  skip_success_page: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  tran_id: Schema.string,
-  type: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  view_type: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type CreatePurchase = Schema.From<typeof CreatePurchaseSchema>;
+`lifetime` is minutes (min 3). If omitted the QR stays payable for 30 days; after
+it elapses ABA rejects a KHQR payment and reverses the funds. It is the 21st
+field in the hash.
+
+Response:
+
+```jsonc
+{
+  "status": { "code": "00", "message": "Success!", "tran_id": "…" },
+  "qrString": "…", // raw KHQR payload
+  "qrImage": "data:image/png;base64,…", // ready to display
+  "abapay_deeplink": "abamobilebank://…",
+}
 ```
 
-_**Response Body (format in TypeScript effect):**_
+`"00"` means the checkout was created, not paid. (There is no `checkout_qr_url`,
+and `qr_string` is camelCase.)
 
-```ts
-export const StatusSchema = Schema.struct({
-  code: Schema.string,
-  message: Schema.string,
-  tran_id: Schema.string,
-});
-export type Status = Schema.From<typeof StatusSchema>;
+## Check transaction — `/api/payment-gateway/v1/payments/check-transaction-2`
 
-export const CreatePurchaseResponseSchema = Schema.struct({
-  abapay_deeplink: Schema.string,
-  checkout_qr_url: Schema.string,
-  qr_string: Schema.string,
-  status: Schema.lazy(() => StatusSchema),
-});
-export type CreatePurchaseResponse = Schema.From<
-  typeof CreatePurchaseResponseSchema
->;
+Request: `req_time`, `merchant_id`, `tran_id`, `hash`.
+
+Response (`status` is a sibling of `data`):
+
+```jsonc
+{
+  "status": { "code": "00", "message": "…", "tran_id": "…" },
+  "data": {
+    "payment_status_code": 0,
+    "payment_status": "APPROVED",
+    "payment_amount": 0.01,
+    "…": "…",
+  },
+}
 ```
 
-## Check transaction
+`status.code != "00"` means ABA doesn't know the `tran_id` yet. `payment_status_code`
+`0` = approved; any other number = rejected.
 
-_**Endpoint:**_ `POST /api/payment-gateway/v1/payments/check-transaction-2`
-_**Request Body (format in TypeScript effect):**_
+## Callback — POSTed to `return_url`
 
-```ts
-export const CheckTransactionSchema = Schema.struct({
-  hash: Schema.string,
-  merchant_id: Schema.string,
-  req_time: Schema.string,
-  tran_id: Schema.string,
-});
-export type CheckTransaction = Schema.From<typeof CheckTransactionSchema>;
+Header `X-PayWay-Hmac-Sha512` (see signing in the README). The sandbox sends
+only:
+
+```json
+{ "tran_id": "…", "apv": "…", "status": 0 }
 ```
 
-_**Response Body (format in TypeScript effect):**_
+ABA's docs list 20 fields (amounts, currency, payer…); don't rely on them
+arriving. Reply `{ "code": 0 }`.
 
-```ts
-export const StatusSchema = Schema.struct({
-  code: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  message: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  tran_id: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type Status = Schema.From<typeof StatusSchema>;
+## Not implemented
 
-export const DataSchema = Schema.struct({
-  apv: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  discount_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  original_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  payment_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  payment_currency: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_status: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_status_code: Schema.optional(
-    Schema.union(Schema.number, Schema.null),
-  ),
-  refund_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  status: Schema.optional(
-    Schema.union(
-      Schema.lazy(() => StatusSchema),
-      Schema.null,
-    ),
-  ),
-  total_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  transaction_date: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type Data = Schema.From<typeof DataSchema>;
-
-export const CheckTransactionResponseSchema = Schema.struct({
-  data: Schema.optional(
-    Schema.union(
-      Schema.lazy(() => DataSchema),
-      Schema.null,
-    ),
-  ),
-});
-export type CheckTransactionResponse = Schema.From<
-  typeof CheckTransactionResponseSchema
->;
-```
-
-## Get transaction details
-
-_**Endpoint:**_ `POST /api/payment-gateway/v1/payments/transaction-detail`
-_**Request Body (format in TypeScript effect):**_
-
-```ts
-export const GetTransactionDetailSchema = Schema.struct({
-  hash: Schema.string,
-  merchant_id: Schema.string,
-  req_time: Schema.string,
-  tran_id: Schema.string,
-});
-export type GetTransactionDetail = Schema.From<
-  typeof GetTransactionDetailSchema
->;
-```
-
-_**Response Body (format in TypeScript effect):**_
-
-```ts
-export const TransactionOperationSchema = Schema.struct({
-  amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  bank_ref: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  status: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  transaction_date: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type TransactionOperation = Schema.From<
-  typeof TransactionOperationSchema
->;
-
-export const StatusSchema = Schema.struct({
-  code: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  message: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  tran_id: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type Status = Schema.From<typeof StatusSchema>;
-
-export const DataSchema = Schema.struct({
-  apv: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  bank_name: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  bank_ref: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  card_source: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  discount_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  email: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  first_name: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  last_name: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  original_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  original_currency: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payer_account: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  payment_currency: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_status: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_status_code: Schema.optional(
-    Schema.union(Schema.number, Schema.null),
-  ),
-  payment_type: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  phone: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  refund_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  status: Schema.optional(
-    Schema.union(
-      Schema.lazy(() => StatusSchema),
-      Schema.null,
-    ),
-  ),
-  total_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  transaction_date: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  transaction_id: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  transaction_operations: Schema.optional(
-    Schema.union(
-      Schema.array(Schema.lazy(() => TransactionOperationSchema)),
-      Schema.null,
-    ),
-  ),
-});
-export type Data = Schema.From<typeof DataSchema>;
-
-export const GetTransactionDetailResponseSchema = Schema.struct({
-  data: Schema.optional(
-    Schema.union(
-      Schema.lazy(() => DataSchema),
-      Schema.null,
-    ),
-  ),
-});
-export type GetTransactionDetailResponse = Schema.From<
-  typeof GetTransactionDetailResponseSchema
->;
-```
-
-## Close transaction
-
-_**Endpoint:**_ `POST /api/payment-gateway/v1/payments/close-transaction`
-_**Request Body (format in TypeScript effect):**_
-
-```ts
-export const CloseTransactionSchema = Schema.struct({
-  hash: Schema.string,
-  merchant_id: Schema.string,
-  req_time: Schema.string,
-  tran_id: Schema.string,
-});
-export type CloseTransaction = Schema.From<typeof CloseTransactionSchema>;
-```
-
-_**Response Body (format in TypeScript effect):**_
-
-```ts
-export const StatusSchema = Schema.struct({
-  code: Schema.string,
-  message: Schema.string,
-  tran_id: Schema.string,
-});
-export type Status = Schema.From<typeof StatusSchema>;
-
-export const CloseTransactionResponseSchema = Schema.struct({
-  status: Schema.lazy(() => StatusSchema),
-});
-export type CloseTransactionResponse = Schema.From<
-  typeof CloseTransactionResponseSchema
->;
-```
-
-## Get transaction list
-
-_**Endpoint:**_ `POST /api/payment-gateway/v1/payments/transaction-list-2`
-_**Request Body (format in TypeScript effect):**_
-
-```ts
-export const GetTransactionListSchema = Schema.struct({
-  from_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  from_date: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  hash: Schema.string,
-  merchant_id: Schema.string,
-  page: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  pagination: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  req_time: Schema.string,
-  status: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  to_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  to_date: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type GetTransactionList = Schema.From<typeof GetTransactionListSchema>;
-```
-
-_**Response Body (format in TypeScript effect):**_
-
-```ts
-export const StatusSchema = Schema.struct({
-  code: Schema.optional(
-    Schema.union(Schema.number, Schema.null, Schema.string),
-  ),
-  message: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  tran_id: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type Status = Schema.From<typeof StatusSchema>;
-
-export const DatumSchema = Schema.struct({
-  apv: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  bank_name: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  bank_ref: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  card_source: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  discount_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  email: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  first_name: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  last_name: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  original_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  original_currency: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payer_account: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  payment_currency: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_status: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  payment_status_code: Schema.optional(
-    Schema.union(Schema.number, Schema.null),
-  ),
-  payment_type: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  phone: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  refund_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  total_amount: Schema.optional(Schema.union(Schema.number, Schema.null)),
-  transaction_date: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  transaction_id: Schema.optional(Schema.union(Schema.null, Schema.string)),
-});
-export type Datum = Schema.From<typeof DatumSchema>;
-
-export const GetTransactionDetailResponseSchema = Schema.struct({
-  data: Schema.optional(
-    Schema.union(Schema.array(Schema.lazy(() => DatumSchema)), Schema.null),
-  ),
-  page: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  pagination: Schema.optional(Schema.union(Schema.null, Schema.string)),
-  status: Schema.optional(
-    Schema.union(
-      Schema.lazy(() => StatusSchema),
-      Schema.null,
-    ),
-  ),
-});
-export type GetTransactionDetailResponse = Schema.From<
-  typeof GetTransactionDetailResponseSchema
->;
-```
-
-_**Notice:**_ the naming is not needing to be entirely consistent with the given names, let's make sure the class/record can be reused if required fields are the same.
-also making sure the `hash` field is using the encoding method as specified in the ABA payway documentation, which is typically a SHA256 hash of the concatenated string of required parameters and a secret key.
+`transaction-detail`, `close-transaction`, `transaction-list-2`. The first two
+take the same body as check-transaction; nothing here needs them yet.

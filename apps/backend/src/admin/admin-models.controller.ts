@@ -18,7 +18,7 @@ import { UpdateModelDto } from './dto/update-model.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/models')
 export class AdminModelsController {

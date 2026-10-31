@@ -40,18 +40,18 @@ const PrivacyRow = ({ title, settingKey, initialState }: PrivacyRowProps) => {
   return (
     <div className="flex items-center justify-between p-4 bg-muted rounded-sm transition-all">
       <div className="space-y-1">
-        <p className="text-sm text-card-foreground/80 font-medium">{title}</p>
+        <p className="type-body-sm text-card-foreground/80">{title}</p>
 
         <div className="flex items-center gap-1.5">
           {isPublic ? (
             <>
               <Globe size={16} className="text-[#00a0e9]" />
-              <span className="text-sm text-[#00a0e9]">{t("public")}</span>
+              <span className="type-body-sm text-[#00a0e9]">{t("public")}</span>
             </>
           ) : (
             <>
               <Lock size={16} className="text-[#00a0e9]" />
-              <span className="text-sm text-[#00a0e9]">{t("onlyMe")}</span>
+              <span className="type-body-sm text-[#00a0e9]">{t("onlyMe")}</span>
             </>
           )}
         </div>
@@ -77,7 +77,7 @@ export default function AccountPrivacy({ me }: { me: SettingsUser }) {
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
               <div>
-                <h2 className="text-2xl font-medium text-foreground mb-4 mt-6 px-6">
+                <h2 className="type-section-title text-foreground mb-4 mt-6 px-6">
                   {t("title")}
                 </h2>
 

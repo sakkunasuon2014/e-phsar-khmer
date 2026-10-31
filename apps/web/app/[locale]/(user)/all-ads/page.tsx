@@ -1,6 +1,4 @@
-import { Link } from "@/i18n/routing";
-import Image from "next/image";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
+import AdvertisementCarousel from "@/components/ads/AdvertisementCarousel";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import { getLocale, getTranslations } from "next-intl/server";
 import AllAdsCategories from "@/components/all-ads/AllAdsCategories";
@@ -11,6 +9,7 @@ import {
   toCardPost,
   type BackendPlace,
 } from "@/lib/api/categories";
+import { getAdvertisements } from "@/lib/api/advertisements";
 import { ALL_ADS_PAGE_SIZE, parseAllAdsFilters } from "@/lib/all-ads";
 
 export default async function AllAdsPage({
@@ -25,13 +24,14 @@ export default async function AllAdsPage({
   // A province-scoped visit shows the province in the heading. The name comes
   // from the same DB list the homepage links from; an unknown slug falls back
   // to the generic heading (the feed is empty either way).
-  const [tAll, tSearch, feed, provinces] = await Promise.all([
+  const [tAll, tSearch, feed, provinces, banners] = await Promise.all([
     getTranslations("AllAds"),
     getTranslations("Search"),
     getListingsFeed({ ...filters, limit: ALL_ADS_PAGE_SIZE }, locale),
     filters.provinceSlug
       ? getProvinces()
       : Promise.resolve([] as BackendPlace[]),
+    getAdvertisements("all_ads"),
   ]);
   const province = filters.provinceSlug
     ? (provinces.find((p) => p.slug === filters.provinceSlug) ?? null)
@@ -47,29 +47,17 @@ export default async function AllAdsPage({
 
   // The whole active catalogue, first screen only — AllAdsFeed appends the
   // rest from the feed's own cursor as the visitor reaches the bottom. There
-  // are no highlight/top-ad blocks here: nothing in the data model backs one,
-  // and the mock `AdsPhoto`/`HighLightAds` strips map every mock post, so they
-  // can never sit in a real branch.
+  // are no highlight/top-ad blocks here: Trending is the home page's strip,
+  // and this page stays the plain active catalogue.
   return (
     <main className="min-h-screen flex flex-col bg-muted">
-      <div className="w-full flex justify-center py-6">
-        <div className="w-full max-w-4xl">
-          <Link href="/" target="_blank">
-            <AspectRatio
-              ratio={4}
-              className="bg-background rounded-none cursor-pointer"
-            >
-              <Image
-                src="/ads/flag-animation.gif"
-                alt="Photo"
-                fill
-                priority
-                className="object-cover rounded-none"
-              />
-            </AspectRatio>
-          </Link>
+      {banners.length > 0 && (
+        <div className="w-full flex justify-center py-6">
+          <div className="w-full max-w-4xl">
+            <AdvertisementCarousel banners={banners} priority />
+          </div>
         </div>
-      </div>
+      )}
       <div className="px-4 py-2">
         <div className="max-w-7xl mx-auto w-full pb-2">
           <Breadcrumbs

@@ -126,7 +126,7 @@ export function ResumeLocationDialog({
               <ChevronLeft className="h-5 w-5" />
             </button>
           )}
-          <DialogTitle className="text-lg font-medium">{title}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
           <DialogClose asChild>
             <button
               type="button"
@@ -143,11 +143,11 @@ export function ResumeLocationDialog({
 
         <div className="min-h-0 flex-1 divide-y overflow-y-auto">
           {current.isLoading && rows.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-muted-foreground">
+            <p className="px-5 py-4 type-body-sm text-muted-foreground">
               {t("form.loading")}
             </p>
           ) : rows.length === 0 ? (
-            <p className="px-5 py-4 text-sm text-muted-foreground">
+            <p className="px-5 py-4 type-body-sm text-muted-foreground">
               {t("form.nothingHere")}
             </p>
           ) : (
@@ -156,7 +156,7 @@ export function ResumeLocationDialog({
                 key={row.id}
                 type="button"
                 onClick={() => pick(row)}
-                className="flex w-full cursor-pointer items-center justify-between px-5 py-4 text-left text-[15px] transition-colors hover:bg-muted/50"
+                className="flex w-full cursor-pointer items-center justify-between px-5 py-4 text-left type-body-sm transition-colors hover:bg-muted/50"
               >
                 <span>{row.name}</span>
                 {selected?.id === row.id && (

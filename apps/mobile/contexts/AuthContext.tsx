@@ -33,7 +33,7 @@ const DEFAULT_USER: UserProfile = {
   telegram: "bansreypov",
   accountType: "Normal account",
   location: "Phnom Penh, Cambodia",
-  bio: "Marketplace seller & buyer on PsaKhmer",
+  bio: "Marketplace seller & buyer on PhsarKhmer",
   joinDate: "Jan 2024",
   isVerified: false,
   stats: {

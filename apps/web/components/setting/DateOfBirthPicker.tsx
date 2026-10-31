@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 const NAV_BUTTON =
   "flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-600 transition-colors hover:bg-muted disabled:pointer-events-none disabled:text-gray-300";
 const GRID_CELL =
-  "flex h-9 cursor-pointer items-center justify-center rounded-md text-sm transition-colors";
+  "flex h-9 cursor-pointer items-center justify-center rounded-md type-body-sm transition-colors";
 const GRID_CELL_MUTED = "cursor-default text-gray-300";
 
 export function DateOfBirthPicker({
@@ -107,7 +107,7 @@ export function DateOfBirthPicker({
           <button
             type="button"
             id={id}
-            className="flex h-9 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base transition-colors outline-none focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
+            className="flex h-9 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body transition-colors outline-none focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9]"
           >
             {value ? (
               `${monthLabels[value.getMonth()]} ${String(
@@ -144,14 +144,14 @@ export function DateOfBirthPicker({
                   <button
                     type="button"
                     onClick={() => setView("months")}
-                    className="h-9 cursor-pointer rounded-md px-3 text-base font-semibold text-foreground transition-colors hover:bg-muted"
+                    className="h-9 cursor-pointer rounded-md px-3 type-nav text-foreground transition-colors hover:bg-muted"
                   >
                     {monthLabels[cursor.getMonth()]}
                   </button>
                   <button
                     type="button"
                     onClick={() => setView("years")}
-                    className="h-9 cursor-pointer rounded-md px-3 text-base font-semibold text-foreground transition-colors hover:bg-muted"
+                    className="h-9 cursor-pointer rounded-md px-3 type-nav text-foreground transition-colors hover:bg-muted"
                   >
                     {year}
                   </button>
@@ -171,7 +171,7 @@ export function DateOfBirthPicker({
                 {weekdayLabels.map((day) => (
                   <span
                     key={day}
-                    className="flex h-8 items-center justify-center text-sm font-bold text-foreground"
+                    className="flex h-8 items-center justify-center type-meta text-foreground"
                   >
                     {day}
                   </span>
@@ -220,7 +220,7 @@ export function DateOfBirthPicker({
                         setView("days");
                       }}
                       className={cn(
-                        "flex h-10 cursor-pointer items-center justify-center rounded-md text-sm transition-colors",
+                        "flex h-10 cursor-pointer items-center justify-center rounded-md type-body-sm transition-colors",
                         isCursorMonth
                           ? "bg-[#00a0e9] font-medium text-white"
                           : "text-foreground hover:bg-muted",
@@ -249,7 +249,7 @@ export function DateOfBirthPicker({
                         setView("months");
                       }}
                       className={cn(
-                        "flex h-10 cursor-pointer items-center justify-center rounded-md text-sm transition-colors",
+                        "flex h-10 cursor-pointer items-center justify-center rounded-md type-body-sm transition-colors",
                         y === year
                           ? "bg-[#00a0e9] font-medium text-white"
                           : "text-foreground hover:bg-muted",
@@ -268,7 +268,7 @@ export function DateOfBirthPicker({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="h-9 cursor-pointer rounded-md bg-muted px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted/70"
+              className="h-9 cursor-pointer rounded-md bg-muted px-5 type-nav text-foreground transition-colors hover:bg-muted/70"
             >
               {t("close")}
             </button>
@@ -279,7 +279,7 @@ export function DateOfBirthPicker({
                 if (staged) onChange(staged);
                 setOpen(false);
               }}
-              className="h-9 cursor-pointer rounded-md bg-[#00a0e9] px-5 text-sm font-medium text-white transition-colors hover:bg-[#0090d0] disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-9 cursor-pointer rounded-md bg-[#00a0e9] px-5 type-nav text-white transition-colors hover:bg-[#0090d0] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {t("save")}
             </button>

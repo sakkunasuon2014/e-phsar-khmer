@@ -1,7 +1,7 @@
 {
   "HomePage": {
     "welcome": {
-      "title": "Welcome to psakhmer, the biggest online market in Cambodia."
+      "title": "Welcome to PhsarKhmer, the biggest online market in Cambodia."
     },
     "BrowseByCategory": {
       "title": "Browse By Category",
@@ -18,7 +18,7 @@
       "Pets": "Pets",
       "Foods": "Foods"
     },
-    "topads": "Top Ads",
+    "trending": "Trending",
     "latestads": "Latest Ads",
     "viewall": "View All",
     "BrowseByLocation": {
@@ -52,12 +52,12 @@
   },
   "Card": {
     "title": "Want to see your ads here?",
-    "des": "Make some extra cash by selling this\nin Psakhmer. Go on, it's quick and\neasy.",
+    "des": "Make some extra cash by selling this\nin PhsarKhmer. Go on, it's quick and\neasy.",
     "button_post_ad": "Sell"
   },
   "Chat": {
     "unknownUser": "Unknown user",
-    "messageSeller": "Message seller",
+    "messageSeller": "Chat",
     "auth": {
       "requiredTitle": "Sign in to view your messages",
       "requiredDescription": "You need an account to chat with sellers.",
@@ -73,7 +73,6 @@
       "previewListing": "Listing",
       "unreadCount": "{count, plural, =0 {No unread messages} one {# unread message} other {# unread messages}}",
       "actionsLabel": "Conversation actions",
-      "archive": "Archive",
       "delete": "Delete",
       "deleteConfirmTitle": "Delete this conversation?",
       "deleteConfirmDescription": "It will be removed from your inbox. {name} can still see their side of the conversation.",
@@ -87,14 +86,27 @@
     "thread": {
       "back": "Back",
       "selectPrompt": "Select a conversation to start reading",
-      "emptyTitle": "Start a conversation with {name}",
       "loadOlder": "Load earlier messages",
-      "attachingListing": "About this listing",
       "removeListing": "Remove listing",
       "blocked": "You can no longer message this user.",
       "blockedByMe": "You blocked this user.",
       "notFoundTitle": "Conversation not found",
-      "notFoundDescription": "This conversation doesn't exist or you don't have access to it."
+      "notFoundDescription": "This conversation doesn't exist or you don't have access to it.",
+      "lastActive": "Last active {time}",
+      "viewProfile": "View profile",
+      "locationShared": "Shared location",
+      "viewOnMap": "View on map",
+      "voiceNote": "Voice note",
+      "quickReplies": {
+        "label": "Quick replies",
+        "hide": "Hide quick replies",
+        "hi": "Hi!",
+        "available": "Yes, it's still for sale",
+        "offer": "What's your offer?",
+        "sold": "Sorry! the product has been sold!",
+        "negotiable": "Yes, it's negotiable",
+        "notNegotiable": "No, it's not negotiable"
+      }
     },
     "message": {
       "imageAlt": "Sent photo",
@@ -104,12 +116,18 @@
       "retry": "Retry",
       "decrypting": "Decrypting…",
       "decryptFailed": "Couldn't decrypt this message.",
-      "notOnThisDevice": "Sent before this device was set up — open it on your other device.",
+      "heldWaiting": "Waiting for {name} to join secure chat. It will send automatically.",
+      "heldExpired": "Not sent: {name} didn't join secure chat in time.",
+      "heldCancel": "Cancel",
+      "heldRemove": "Remove",
+      "unavailableReady": "{count, plural, one {Isn't in your backup: it was sent before this device joined and none of your devices had opened it.} other {# messages aren't in your backup: they were sent before this device joined and none of your devices had opened them.}}",
+      "unavailableLockedWithPasscode": "{count, plural, one {Enter your backup passcode to see this message.} other {Enter your backup passcode to see these # messages.}}",
+      "unavailableLockedNoPasscode": "{count, plural, one {Set a passcode on the device that has your history to see this message.} other {Set a passcode on the device that has your history to see these # messages.}}",
       "download": "Download",
       "downloadFailed": "Couldn’t save the file"
     },
     "composer": {
-      "placeholder": "Write a message…",
+      "placeholder": "Type your message here…",
       "send": "Send",
       "attachImage": "Attach image",
       "removeImage": "Remove image",
@@ -121,7 +139,37 @@
       "uploadFailed": "Image upload failed.",
       "imageSizeError": "Image is too large.",
       "imageTypeError": "Unsupported image type.",
-      "imageLimitError": "Maximum {max} images allowed."
+      "imageLimitError": "Maximum {max} images allowed.",
+      "shareLocation": "Share location",
+      "locationLocating": "Getting your location…",
+      "locationUnsupported": "Location sharing is not supported by this browser.",
+      "locationDenied": "Location access is blocked. Change the site's location permission to use this.",
+      "locationTimeout": "Getting your location took too long. Try again, or drop the pin by hand.",
+      "locationUnavailable": "Couldn't get your location. Try again, or drop the pin by hand.",
+      "cancelLocation": "Cancel location",
+      "locationPickerTitle": "Share location",
+      "useCurrentLocation": "Use current location",
+      "sendLocation": "Send location",
+      "recordVoice": "Record a voice note",
+      "stopRecording": "Stop recording",
+      "recording": "Recording…",
+      "voiceUnsupported": "Voice notes are not supported by this browser.",
+      "voicePermissionError": "Microphone access was denied.",
+      "voiceTooLong": "Voice notes can be up to {seconds} seconds.",
+      "voiceReady": "Voice note ready",
+      "cancelVoice": "Cancel voice note",
+      "cancelRecording": "Cancel",
+      "attachMenu": "Add attachment",
+      "attachMenuClose": "Close attachments",
+      "tilePhoto": "Photo",
+      "tileVoice": "Voice note",
+      "tileLocation": "Location",
+      "tileAd": "My ads",
+      "adPickerTitle": "Share one of your ads",
+      "adPickerLoading": "Loading your ads…",
+      "adPickerEmpty": "You don't have any active ads yet.",
+      "adPickerError": "Couldn't load your ads.",
+      "removeAd": "Remove ad"
     },
     "listing": {
       "noPrice": "Price on request",
@@ -143,29 +191,20 @@
       "loadFailedTitle": "Something went wrong",
       "sendFailed": "Message not sent.",
       "rateLimited": "You're sending messages too quickly. Please wait a moment.",
-      "e2eNoKeys": "This person hasn't set up encrypted messaging yet. Ask them to open Messages once.",
+      "e2eNoKeys": "Couldn't reach this person's encrypted chat right now. Please try again later.",
       "e2eUnavailable": "Encrypted messaging isn't ready. Please try again.",
       "deleteFailed": "Couldn't delete the conversation."
     },
     "backup": {
       "lockedTitle": "Older messages are locked on this device",
-      "lockedDescription": "Enter your backup passcode, or approve this device from another device you are signed in on.",
-      "lockedNoPasscode": "No backup passcode is set. Approve this device from another device you are signed in on.",
-      "waitingApproval": "Waiting for approval on your other device…",
-      "declined": "The request was declined on your other device.",
-      "expired": "The request expired. Ask again.",
+      "lockedDescription": "Enter your backup passcode to read the older messages on this device.",
+      "lockedNoPasscode": "This account has no backup passcode, so this device cannot restore the chat history. Open the device that has your history and set one there.",
+      "checkingBackup": "Checking the backup on this device…",
+      "readyTitle": "This device already has your backup",
+      "readyDescription": "The older message isn't in this device's copy of the backup yet. Enter the passcode to download the history again.",
       "genericError": "Something went wrong. Please try again.",
       "enterPasscode": "Enter backup passcode",
-      "askOtherDevice": "Ask my other device",
       "restored": "{count, plural, =0 {Chat history is up to date} one {Restored # message} other {Restored # messages}}",
-      "setNudge": "Set a backup passcode so you can read your chats on a new device.",
-      "setPasscode": "Set passcode",
-      "notNow": "Not now",
-      "approveTitle": "Allow a new device?",
-      "approveDescription": "{device} is asking to read your chat history. Only allow it if this is your own device.",
-      "unknownDevice": "An unknown device",
-      "decline": "Decline",
-      "allow": "Allow",
       "wrongPasscode": "{count, plural, =0 {Wrong passcode.} one {Wrong passcode. # attempt left.} other {Wrong passcode. # attempts left.}}",
       "lockedOut": "Too many wrong attempts. Try again after {time}.",
       "enterTitle": "Enter backup passcode",
@@ -178,7 +217,20 @@
       "mismatch": "Passcodes don't match.",
       "setTitle": "Set a backup passcode",
       "setDescription": "At least {count} characters. You will need it to read your chats on a new device. We cannot recover it for you.",
-      "save": "Save passcode"
+      "save": "Save passcode",
+      "notNow": "Not now"
+    },
+    "voice": {
+      "play": "Play voice note",
+      "pause": "Pause voice note",
+      "seek": "Seek voice note",
+      "speed": "Playback speed {rate}×"
+    },
+    "e2eSetup": {
+      "title": "Secure chat isn't available in this browser",
+      "storage": "This browser is blocking the storage that encrypted chat needs (for example a private window, or site data turned off). Open Messages in a normal window, or allow site data for this site.",
+      "generic": "We couldn't set up encrypted messaging on this browser yet. We'll keep trying; check your connection or reload the page.",
+      "dismiss": "Dismiss"
     }
   },
   "Search": {
@@ -190,6 +242,8 @@
     "allAds": "All ads",
     "resultCount": "{count, plural, =0 {No ads} one {# ad} other {# ads}}",
     "categories": "Categories",
+    "products": "Product specs",
+    "viewSpecs": "View specs",
     "allCategories": "All categories",
     "removeFilter": "Remove {name}",
     "loadMore": "Load more",
@@ -205,6 +259,7 @@
     "fuzzyNotice": "No exact matches for “{q}” — showing similar ads."
   },
   "Common": {
+    "verifiedAccount": "Verified Account",
     "breadcrumb": "Breadcrumb",
     "inCambodia": "{name} in Cambodia",
     "showMore": "Show More",
@@ -271,6 +326,7 @@
     "price": {
       "label": "Price",
       "salary": "Salary",
+      "salePrice": "Sale Price",
       "min": "Minimum $",
       "max": "Maximum $",
       "chipRange": "{label} :{min}-{max}",
@@ -299,21 +355,35 @@
       "selectCommune": "Select commune...",
       "selectDistrictFirst": "Select district first",
       "any": "Any",
-      "freeDeliveryOnly": "Free delivery only"
+      "freeDeliveryOnly": "Free delivery only",
+      "freeDelivery": "Free Delivery",
+      "discount": "Discount",
+      "all": "All",
+      "clear": "Clear",
+      "selectBrandFirst": "Select brand first"
     },
     "year": {
       "label": "Year",
       "all": "All Years",
       "older": "{year} & Older",
-      "from": "{year}+"
+      "from": "{year}+",
+      "min": "Minimum",
+      "max": "Maximum",
+      "remove": "Remove year filter",
+      "chipRange": "{label} :{min}-{max}",
+      "chipSingle": "{label} :{year}",
+      "chipFrom": "{label} :{min}+",
+      "chipUpTo": "{label} :{max} & Older"
     },
     "condition": {
       "label": "Condition",
-      "all": "All Conditions"
+      "all": "All Conditions",
+      "activeChip": "Condition :{label}"
     },
     "engine": {
       "label": "Engine Type",
-      "all": "All Engine Types"
+      "all": "All Engine Types",
+      "activeChip": "Engine Type :{label}"
     }
   },
   "ListingCard": {
@@ -386,12 +456,15 @@
   "Post": {
     "description": "Description",
     "relatedPosts": "Related posts",
-    "contactHint": "Please click on phone number to show and don't forget to mention that you found this ad on PsaKhmer.com.",
+    "contactHint": "Please click on phone number to show and don't forget to mention that you found this ad on PhsarKhmer.com.",
     "contactPhones": "Contact Phones",
     "showPhone": "Show Phone Number",
     "showEmail": "Show Email Address",
     "membersSince": "Members Since {date}",
-    "ownAdNote": "This is your own ad — buyers will see Message Seller here",
+    "ownAdNote": "This is your own ads - buyers will see 'Chat' here",
+    "expiredNotice": "This ad has expired and is no longer available in the marketplace.",
+    "expiredContact": "Contact is unavailable because this ad has expired.",
+    "viewFullSpecs": "View full specs",
     "safetyTips": {
       "title": "Safety Tips for Buyers",
       "noMoney": "Do not send money before receiving the goods",
@@ -422,17 +495,30 @@
       "messageLabel": "Message to the employer",
       "optional": "(optional)",
       "placeholder": "Introduce yourself and say why you're a good fit.",
-      "resumeWillBeSent": "Your résumé will be sent",
+      "resumeWillBeSent": "Your resume will be sent",
       "cvFile": "CV: {file}",
-      "noCvFile": "No CV file attached — you can add one on your résumé page.",
-      "noResumeTitle": "You haven't built a résumé yet",
+      "noCvFile": "No CV file attached — you can add one on your resume page.",
+      "noResumeTitle": "You haven't built a resume yet",
       "noResumeHint": "You can still apply — but employers see more when you send one.",
-      "reviewResume": "Review your résumé",
-      "buildResume": "Build your résumé",
+      "reviewResume": "Review your resume",
+      "buildResume": "Build your resume",
       "send": "Send Application",
       "alreadyApplied": "You already applied to this job",
-      "sent": "Application sent"
+      "sent": "Application sent",
+      "secureChatUnavailable": "Secure messaging isn't ready in this browser. Try again in a moment.",
+      "sentWithoutChat": "Application sent. This employer hasn't set up secure chat yet, so it was delivered to their applications list."
     }
+  },
+  "Product": {
+    "home": "Home",
+    "metaTitle": "{brand} {model} specs",
+    "metaDescription": "Full specifications for the {brand} {model} on PhsarKhmer.",
+    "notFound": "Product not found",
+    "trustedBadge": "Trusted specs",
+    "trustedNote": "Specifications entered and maintained by PhsarKhmer staff.",
+    "specifications": "Specifications",
+    "activeAds": "Active ads for this model",
+    "noActiveAds": "No active ads for this model right now."
   },
   "Category": {
     "notFound": "Category not found"
@@ -466,7 +552,7 @@
     }
   },
   "Footer": {
-    "follow": "Follow PSA-Khmer",
+    "follow": "Follow PhsarKhmer",
     "facebook": "Facebook",
     "youtube": "Youtube",
     "customerService": "Customer Service",
@@ -478,7 +564,7 @@
     "safetyTips": "Safety Tips",
     "postingRule": "Posting Rule",
     "feedback": "Feedback",
-    "downloadApp": "Download PSA-NPIC app for FREE",
+    "downloadApp": "Download PhsarKhmer app for FREE",
     "weAccept": "We Accept:",
     "backToTop": "Back to top"
   },
@@ -709,10 +795,31 @@
       "renews": "Renews",
       "active": "Active",
       "expired": "Expired",
+      "hidden": "Hidden",
+      "hiddenBadge": "Hidden — over your limit",
+      "hiddenNote": "{count, plural, one {# ad is hidden over your plan's limit} other {# ads are hidden over your plan's limit}}",
+      "hiddenNotice": "These ads are over your plan's limit, so they are not shown in the marketplace. Delete an ad or upgrade to make room.",
+      "noHidden": "You don't have any ads hidden over your plan's limit.",
+      "upgradePlan": "Upgrade plan",
+      "expiresInDays": "Expires in {days} days",
+      "expiresWithinDay": "Expires within a day",
       "noResult": "No Result!",
       "noActive": "Oops! You don't have any active ads.",
       "sell": "Sell your stuff",
-      "noExpired": "You don't have any expired ads yet."
+      "noExpired": "You don't have any expired ads yet.",
+      "actions": "Ad actions",
+      "view": "View ad",
+      "renew": "Renew ad",
+      "share": "Share",
+      "delete": "Delete ad",
+      "cancel": "Cancel",
+      "renewTitle": "Renew this ad?",
+      "renewBody": "The ad stays live for another 30 days and uses one renewal from your plan.",
+      "deleteTitle": "Delete this ad?",
+      "deleteBody": "The ad will be removed from the marketplace and from your Manage Ads list.",
+      "renewed": "Ad renewed.",
+      "deleted": "Ad deleted.",
+      "actionError": "Something went wrong. Please try again."
     },
     "about": {
       "title": "About",
@@ -756,10 +863,10 @@
       "noApplications": "You don't have any job applications right now.",
       "thisJob": "This job",
       "applicant": "Applicant",
-      "resumeChip": "Résumé",
+      "resumeChip": "Resume",
       "noCv": "No CV file",
-      "noResume": "No résumé",
-      "viewResume": "View résumé",
+      "noResume": "No resume",
+      "viewResume": "View Resume",
       "message": "Message",
       "hire": "Hire",
       "reject": "Reject",
@@ -769,9 +876,9 @@
       "appliedAt": "Applied {date}"
     },
     "applicantResume": {
-      "title": "{name}'s résumé",
-      "description": "As it was when they applied — later edits to their résumé are not reflected here.",
-      "noResume": "This application carried no résumé.",
+      "title": "{name}'s resume",
+      "description": "As it was when they applied — later edits to their resume are not reflected here.",
+      "noResume": "This application carried no resume.",
       "email": "Email",
       "phone": "Phone",
       "location": "Location",
@@ -796,14 +903,23 @@
       "account": "Account",
       "statusAll": "Status: All",
       "expired": "Expired",
+      "active": "Active",
+      "superseded": "Upgraded",
+      "revoked": "Revoked",
       "nearly": "Nearly Expiry",
       "sortStart": "Sort: Start Date",
       "sortStartOldNew": "Sort: Start Date: Old - New",
       "sortStartNewOld": "Sort: Start Date: New - Old",
       "sortEndOldNew": "Sort: End Date: Old - New",
+      "service": "Service",
+      "accountId": "Account ID",
+      "validUntil": "Valid Until",
+      "price": "Price",
       "noResult": "No Result!",
       "empty": "Oops! You do not have a subscription yet.",
-      "subscribeNow": "Subscribe Now"
+      "subscribeNow": "Subscribe Now",
+      "loadError": "We couldn't load your subscriptions. Please try again.",
+      "retry": "Try again"
     },
     "membership": {
       "title": "Membership",
@@ -862,6 +978,7 @@
       "appliedJobs": "Applied Jobs",
       "jobApplications": "Job Applications",
       "subscriptions": "Subscriptions",
+      "membership": "Membership",
       "billingAddresses": "Billing Address"
     },
     "subscriptionsTab": "Subscriptions"
@@ -901,6 +1018,7 @@
     "chooseOption": "Choose…",
     "loadingModels": "Loading...",
     "noModel": "No model found.",
+    "noProduct": "No published product spec yet.",
     "published": "Your ad was published",
     "labels": {
       "photos": "Photos",
@@ -909,6 +1027,7 @@
       "jobTitle": "Job Title",
       "brand": "Brand",
       "model": "Model",
+      "productSpec": "Product Specification",
       "year": "Year",
       "taxType": "Tax Type",
       "condition": "Condition",
@@ -947,6 +1066,7 @@
     "placeholders": {
       "chooseBrand": "Choose a brand",
       "chooseModel": "Choose a model",
+      "chooseProduct": "Search specs or paste a PhsarKhmer product link",
       "chooseYear": "Choose a year",
       "chooseColor": "Choose a color",
       "chooseBodyType": "Choose a body type",
@@ -979,18 +1099,23 @@
       "electric": "Electric",
       "hybrid": "Hybrid",
       "lpg": "LPG",
-      "petrol": "Petrol"
+      "petrol": "Petrol",
+      "andAbove": "{value} & Above",
+      "andBelow": "{value} or below",
+      "integrated": "Integrated"
     },
     "errors": {
       "formNotLoaded": "Form data is not loaded yet",
       "titleRequired": "Title is required",
-      "priceInvalid": "Enter a valid price",
+      "priceInvalid": "Enter a price greater than 0",
       "typeRequired": "Choose a type",
       "jobTypeRequired": "Choose a job type",
       "experienceRequired": "Choose experience",
       "accessoryRequired": "Choose an accessory",
       "networkRequired": "Choose a network",
       "brandRequired": "Choose a brand",
+      "productRequired": "Choose the product specification for this ad",
+      "productLinkInvalid": "That link isn't a published PhsarKhmer product. Copy the link from one of our product pages, or search by name.",
       "screenSizeRequired": "Choose a screen size",
       "storageRequired": "Choose storage",
       "ramRequired": "Choose a RAM size",

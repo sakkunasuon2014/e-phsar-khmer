@@ -8,13 +8,7 @@ import type {
 const CHECK_TRANSACTION_PATH =
   'api/payment-gateway/v1/payments/check-transaction-2';
 
-/**
- * The check-transaction action for ABA PayWay — the network call behind
- * `AbaPaywayProvider.reconcile()`. A non-`"00"` `status.code` in the response
- * means ABA has no record of this `tran_id` yet, not a rejection — the
- * provider treats that as inconclusive (`pending`), so this handler just
- * returns the response as-is rather than modeling ok/failed itself.
- */
+/** The network call behind `reconcile()`; returns ABA's response as-is. */
 export const checkAbaPaywayTransaction = Effect.fn('checkAbaPaywayTransaction')(
   function* (
     apiClient: ApiClient,

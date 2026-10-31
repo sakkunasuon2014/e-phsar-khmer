@@ -1,19 +1,12 @@
 import {
-  approveHistoryRequest,
-  consumeHistoryRequest,
-  createHistoryRequest,
-  declineHistoryRequest,
   fetchBackupSegments,
   fetchBackupStatus,
-  fetchMyHistoryRequest,
-  fetchPendingHistoryRequests,
   initBackup,
   setBackupPasscode,
   unlockBackup,
   uploadBackupSegment,
 } from "@/actions/e2e-backup";
-import type { BackupStatus, HistoryRequest } from "@/actions/e2e-backup";
-import { fetchE2eDeviceBundle } from "@/actions/e2e";
+import type { BackupStatus } from "@/actions/e2e-backup";
 import { base64ToBytes, bytesToBase64 } from "./crypto/base64";
 import {
   DEFAULT_KDF,
@@ -29,19 +22,15 @@ import {
   unwrapBackupKey,
   wrapBackupKey,
 } from "./backup-crypto";
-import { isNewSessionHeader } from "./decrypt-message";
+import { openSegments } from "./backup-segments";
 import { loadIdentity, saveIdentity } from "./keys";
-import { V2_LOCK, withConversationLock } from "./lock";
 import {
-  createIndexedDbStore,
   listLocalPlaintext,
   listUploadedIds,
   markUploaded,
-  peerKey,
   saveRestored,
 } from "./store";
 import type { PlaintextItem } from "./store";
-import type { RatchetEngine } from "./types";
 
 /**
  * Chat-history backup flows (tasks/plan-e2e-multi-device.md, Phase 4/5).
@@ -58,6 +47,13 @@ import type { RatchetEngine } from "./types";
 
 /** Fired on `window` after restored plaintext lands — decrypt hooks re-run. */
 export const E2E_HISTORY_RESTORED = "e2e-history-restored";
+
+/**
+ * Fired on `window` after newly decrypted plaintext is cached locally. The
+ * backup sync listens so a fresh batch is uploaded right away instead of
+ * waiting for the next 60 s tick.
+ */
+export const E2E_PLAINTEXT_CACHED = "e2e-plaintext-cached";
 
 export type BackupState =
   | { kind: "ready"; hasPasscode: boolean }
@@ -85,28 +81,81 @@ async function saveBackupKey(userId: string, bk: Uint8Array): Promise<void> {
   await saveIdentity({ ...identity, backupKey: bytesToBase64(bk) });
 }
 
+/** Drop the local BK (keeping the rest of the identity) — it is not usable. */
+async function clearBackupKey(userId: string): Promise<void> {
+  const identity = await loadIdentity(userId);
+  if (!identity || identity.backupKey === undefined) return;
+  await saveIdentity({ ...identity, backupKey: undefined });
+}
+
+/**
+ * Cross-tab lock guarding backup creation: two first devices opening at the
+ * same time must not both create a key — the loser's BK can never open the
+ * account backup, so its uploads would be unreadable forever.
+ */
+const INIT_LOCK = "e2e-backup-init";
+let initChain: Promise<unknown> = Promise.resolve();
+
+function withInitLock<T>(fn: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    // lib.dom types the callback as returning T, not Promise<T> — it doesn't
+    // model the (spec-correct) async-callback case (same note as lock.ts).
+    return navigator.locks.request(INIT_LOCK, fn) as unknown as Promise<T>;
+  }
+  // No Web Locks (older browsers, test environments): serialize this tab.
+  const run = initChain.then(fn, fn);
+  initChain = run.catch(() => {});
+  return run;
+}
+
 /**
  * Where does this device stand? Creates the account backup if none exists
  * yet (first device ever → it owns BK). A device that loses the creation
  * race, or any later new device, comes back `locked`.
+ *
+ * The whole status → create → re-read sequence runs under INIT_LOCK, so the
+ * status read always reflects the winner of the race. Any stored BK is then
+ * validated against the server's `keyCheck`: on mismatch it is cleared, never
+ * used and never kept, and the device reports `locked`.
  */
-export async function ensureBackup(userId: string): Promise<BackupState> {
-  const statusRes = await fetchBackupStatus();
-  if (!statusRes.ok) return { kind: "error", message: statusRes.message };
-  let status = statusRes.data;
+export async function ensureBackup(
+  userId: string,
+  deviceId: string,
+): Promise<BackupState> {
+  return withInitLock(async () => {
+    const statusRes = await fetchBackupStatus();
+    if (!statusRes.ok) return { kind: "error", message: statusRes.message };
+    let status = statusRes.data;
 
-  if (!status.exists) {
-    const bk = newBackupKey();
-    // Save locally BEFORE telling the server: a crash in between must never
-    // leave the server pointing at a key no device holds.
-    await saveBackupKey(userId, bk);
-    const res = await initBackup(keyCheckOf(bk), keyProofOf(bk));
-    if (!res.ok) return { kind: "error", message: res.message };
-    status = res.data;
-  }
+    if (!status.exists) {
+      const bk = newBackupKey();
+      // Save locally BEFORE telling the server: a crash in between must never
+      // leave the server pointing at a key no device holds.
+      await saveBackupKey(userId, bk);
+      const res = await initBackup(deviceId, keyCheckOf(bk), keyProofOf(bk));
+      if (!res.ok) return { kind: "error", message: res.message };
+      status = res.data;
+      if (!res.data.created) {
+        // We lost the creation race: the account already had a BK this device
+        // does not hold, so the key just saved can never open it. Drop it and
+        // report locked so the device asks for approval instead.
+        await clearBackupKey(userId);
+        return stateFrom(status, false);
+      }
+    }
 
-  const bk = await localBackupKey(userId);
-  return stateFrom(status, !!bk && keyCheckOf(bk) === status.keyCheck);
+    const bk = await localBackupKey(userId);
+    const keyCheck = status.keyCheck;
+    if (bk && keyCheck !== null && keyCheckOf(bk) !== keyCheck) {
+      // A stale key from an older backup, or another account's: never use it.
+      await clearBackupKey(userId);
+      return stateFrom(status, false);
+    }
+    return stateFrom(
+      status,
+      !!bk && keyCheck !== null && keyCheckOf(bk) === keyCheck,
+    );
+  });
 }
 
 // ── Upload (every device holding BK) ───────────────────────────────────────
@@ -183,22 +232,24 @@ export function syncBackup(userId: string, deviceId: string): Promise<number> {
  */
 async function pullFromBackup(
   userId: string,
+  deviceId: string,
   bk: Uint8Array,
   fromCursor: string | undefined,
 ): Promise<number> {
   let cursor = fromCursor;
   let restored = 0;
   for (;;) {
-    const page = await fetchBackupSegments(cursor);
+    const page = await fetchBackupSegments(deviceId, cursor);
     if (!page.ok) throw new Error(page.message);
-    const items: PlaintextItem[] = [];
-    for (const segment of page.data.items) {
-      try {
-        items.push(...openSegment(bk, segment.ciphertext));
-      } catch {
-        // A segment under a different/old key — skip, keep the rest.
-      }
-    }
+    // Callers validated `bk` against the account's keyCheck, so an unopenable
+    // segment is skipped, never a reason to stop (see backup-segments.ts).
+    const { items, skipped } = openSegments(page.data.items, (ciphertext) =>
+      openSegment(bk, ciphertext),
+    );
+    if (skipped > 0)
+      console.warn(
+        `[e2e] skipped ${skipped} backup segment(s) this key cannot open`,
+      );
     if (items.length > 0) await saveRestored(items);
     restored += items.length;
     cursor = page.data.latestCursor ?? cursor;
@@ -214,24 +265,38 @@ async function pullFromBackup(
   return restored;
 }
 
-/** Incremental pull for a device that already holds BK. */
-export async function pullBackup(userId: string): Promise<number> {
+/**
+ * Incremental pull for a device that already holds BK. The stored key is
+ * validated against the account first: a stale/mismatched key is cleared and
+ * nothing is pulled (the device is treated as locked on the next status read).
+ */
+export async function pullBackup(
+  userId: string,
+  deviceId: string,
+): Promise<number> {
   const identity = await loadIdentity(userId);
   if (!identity?.backupKey) return 0;
-  return pullFromBackup(
-    userId,
-    base64ToBytes(identity.backupKey),
-    identity.backupCursor,
-  );
-}
-
-async function adoptBackupKey(userId: string, bk: Uint8Array): Promise<number> {
+  const bk = base64ToBytes(identity.backupKey);
   const status = await fetchBackupStatus();
   if (!status.ok) throw new Error(status.message);
-  if (keyCheckOf(bk) !== status.data.keyCheck)
+  if (!status.data.keyCheck || keyCheckOf(bk) !== status.data.keyCheck) {
+    await clearBackupKey(userId);
+    return 0;
+  }
+  return pullFromBackup(userId, deviceId, bk, identity.backupCursor);
+}
+
+async function adoptBackupKey(
+  userId: string,
+  deviceId: string,
+  bk: Uint8Array,
+): Promise<number> {
+  const status = await fetchBackupStatus();
+  if (!status.ok) throw new Error(status.message);
+  if (!status.data.keyCheck || keyCheckOf(bk) !== status.data.keyCheck)
     throw new Error("backup key does not match this account");
   await saveBackupKey(userId, bk);
-  return pullFromBackup(userId, bk, undefined); // full pull, from the start
+  return pullFromBackup(userId, deviceId, bk, undefined); // full pull, from the start
 }
 
 // ── Passcode ────────────────────────────────────────────────────────────────
@@ -245,6 +310,7 @@ export type PasscodeResult =
 
 export async function restoreWithPasscode(
   userId: string,
+  deviceId: string,
   passcode: string,
 ): Promise<PasscodeResult> {
   const status = await fetchBackupStatus();
@@ -286,7 +352,10 @@ export async function restoreWithPasscode(
 
   try {
     const bk = unwrapBackupKey(wrapKey, unlock.data.wrappedKey);
-    return { ok: true, restored: await adoptBackupKey(userId, bk) };
+    return {
+      ok: true,
+      restored: await adoptBackupKey(userId, deviceId, bk),
+    };
   } catch (err) {
     return {
       ok: false,
@@ -321,120 +390,4 @@ export async function setPasscode(
     authKey,
   });
   return res.ok ? { ok: true } : { ok: false, message: res.message };
-}
-
-// ── Approval by another device ─────────────────────────────────────────────
-
-export function requestApproval(engine: RatchetEngine) {
-  if (!engine.deviceId) throw new Error("device not registered");
-  return createHistoryRequest(engine.deviceId);
-}
-
-/**
- * Requester side: poll this device's request. Once approved, unwrap BK from
- * the approver's envelope (same Double Ratchet session the two devices use
- * for chat), adopt it, restore, and tell the server to drop the copy.
- */
-export async function checkApproval(
-  engine: RatchetEngine,
-): Promise<
-  | { status: "none" | "pending" | "declined" | "expired" }
-  | { status: "restored"; restored: number }
-  | { status: "error"; message: string }
-> {
-  if (!engine.userId || !engine.deviceId)
-    return { status: "error", message: "device not registered" };
-  const userId = engine.userId;
-  const deviceId = engine.deviceId;
-
-  const res = await fetchMyHistoryRequest(deviceId);
-  if (!res.ok) return { status: "error", message: res.message };
-  const request = res.data;
-  if (!request) return { status: "none" };
-  if (request.status === "pending") return { status: "pending" };
-  if (request.status === "declined" || request.status === "expired")
-    return { status: request.status };
-  if (
-    request.status !== "approved" ||
-    !request.header ||
-    !request.wrappedKey ||
-    !request.approverDeviceId
-  )
-    return { status: "none" };
-
-  const header = request.header;
-  const wrappedKey = request.wrappedKey;
-  const key = peerKey(userId, request.approverDeviceId);
-  const store = createIndexedDbStore();
-  try {
-    const bk = await withConversationLock(V2_LOCK, async () => {
-      const session = isNewSessionHeader(header)
-        ? null
-        : await store.getDeviceSession(key);
-      const unwrapped = await engine.decryptBytes(session, header, wrappedKey);
-      await store.commitSessions([
-        { peerKey: key, session: unwrapped.session },
-      ]);
-      return unwrapped.plaintext;
-    });
-    const restored = await adoptBackupKey(userId, bk);
-    await consumeHistoryRequest(request.id, deviceId);
-    return { status: "restored", restored };
-  } catch (err) {
-    return {
-      status: "error",
-      message: err instanceof Error ? err.message : "approval failed",
-    };
-  }
-}
-
-/** Approver side: other devices' requests waiting on this one. */
-export async function listPendingApprovals(
-  engine: RatchetEngine,
-): Promise<HistoryRequest[]> {
-  if (!engine.deviceId) return [];
-  const res = await fetchPendingHistoryRequests(engine.deviceId);
-  return res.ok ? res.data : [];
-}
-
-/** Approver side: send BK to the requesting device over its E2E session. */
-export async function approveRequest(
-  engine: RatchetEngine,
-  request: HistoryRequest,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (!engine.userId || !engine.deviceId)
-    return { ok: false, message: "device not registered" };
-  const userId = engine.userId;
-  const approverDeviceId = engine.deviceId;
-  const bk = await localBackupKey(userId);
-  if (!bk) return { ok: false, message: "no-backup-key" };
-
-  const key = peerKey(userId, request.requesterDeviceId);
-  const store = createIndexedDbStore();
-  return withConversationLock(V2_LOCK, async () => {
-    const session = await store.getDeviceSession(key);
-    let bundle;
-    if (!session) {
-      const b = await fetchE2eDeviceBundle(request.requesterDeviceId);
-      if (!b.ok) return { ok: false as const, message: b.message };
-      bundle = b.data;
-    }
-    const wrapped = await engine.encryptBytes(session, bk, bundle);
-    const res = await approveHistoryRequest(request.id, {
-      approverDeviceId,
-      header: wrapped.header,
-      wrappedKey: wrapped.ciphertext,
-    });
-    if (!res.ok) return { ok: false as const, message: res.message };
-    // Advance our side only once the server holds the envelope.
-    await store.commitSessions([{ peerKey: key, session: wrapped.session }]);
-    return { ok: true as const };
-  });
-}
-
-export async function declineRequest(
-  engine: RatchetEngine,
-  request: HistoryRequest,
-): Promise<void> {
-  if (engine.deviceId) await declineHistoryRequest(request.id, engine.deviceId);
 }

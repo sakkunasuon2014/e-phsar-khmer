@@ -67,6 +67,25 @@ Respond with:
 - Remove speculative abstractions.
 - Explain every new file and dependency.
 
+## Project conventions
+
+- **Stack:** TypeScript monorepo managed with pnpm and Turborepo. It contains a NestJS backend (Drizzle ORM, PostgreSQL, Supabase), a Next.js/React web app, an Expo/React Native mobile app, and shared React UI packages.
+- **Style:** Follow the naming, formatting, and module patterns already used in the affected package; use strong TypeScript types and validate inputs at boundaries. In the backend, use DTO validation and the existing NestJS exception handling rather than ad hoc parsing or response shapes. Add tests for changed behavior using the package's existing test setup; do not add a test framework just for a change.
+- **Important paths:** Treat `apps/backend/src/auth/`, `apps/backend/src/payment/`, `apps/backend/src/chat/` (especially `e2e/`), `apps/backend/src/db/schema/`, and `apps/backend/drizzle/migrations/` as high-impact areas. Trace their callers, database constraints, and API contracts before changing them. Never expose or commit secrets from environment files.
+- **Never:** Add dependencies without a concrete need; introduce Kafka, microservices, CQRS, or other architectural complexity unless explicitly requested; or edit generated output and lockfiles by hand. Use the relevant source files and tooling instead.
+
+## Review rules
+
+When reviewing changes, report actionable findings with the affected behavior and location. Always flag:
+
+- Logic errors and edge cases that can produce incorrect results or state.
+- Security issues, including authorization, input validation, and secret exposure.
+- Cross-file regressions or broken API/database contracts.
+- Missing error handling when a failure can cause incorrect behavior, unsafe partial work, or a misleading success response.
+- Missing tests for non-trivial changed behavior when the existing test setup can cover it.
+
+Treat as **Nit** style-only inconsistencies with conventions in the touched file or module. Do not downgrade correctness, security, or maintainability problems to Nits. Skip generated files, lockfiles, and pure formatting changes unless they contain a substantive issue.
+
 ## Module README convention
 
 A request like "give me the README for `<module>`" or "let's do a README for `src/<module>`" means: write `src/<module>/README.md` in the fixed shape below, so module docs stay comparable to each other instead of drifting into whatever shape felt natural that day. `apps/backend/src/payment/README.md` and `apps/backend/src/chat/README.md` are the canonical examples — re-read both for tone and depth before writing a new one; this section describes their shape, not a substitute for looking at them.

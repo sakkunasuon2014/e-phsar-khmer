@@ -6,6 +6,11 @@ export interface ChatUserSummary {
   id: string;
   username: string | null;
   profilePhotoUrl: string | null;
+  /**
+   * Coarse last activity (ActivityService touches at most every 5 minutes),
+   * not live presence — disconnected users keep their last timestamp.
+   */
+  lastSeenAt: Date | null;
 }
 
 export interface ListingContext {

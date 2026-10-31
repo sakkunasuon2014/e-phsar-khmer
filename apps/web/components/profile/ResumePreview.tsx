@@ -265,7 +265,7 @@ function ClampedText({ text }: { text: string }) {
       <p
         ref={ref}
         className={cn(
-          "text-base whitespace-pre-wrap text-foreground",
+          "type-body whitespace-pre-wrap text-foreground",
           !expanded && "line-clamp-4",
         )}
       >
@@ -275,7 +275,7 @@ function ClampedText({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="mt-1 cursor-pointer text-sm font-medium text-[#00a0e9] transition-colors hover:text-[#00a0e9]/80"
+          className="mt-1 cursor-pointer type-nav text-[#00a0e9] transition-colors hover:text-[#00a0e9]/80"
         >
           {expanded ? t("showLess") : t("showMore")}
         </button>
@@ -669,7 +669,7 @@ export function ResumePreview({
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
         <Icon size={22} />
       </span>
-      <h2 className="text-xl font-bold text-foreground">{title}</h2>
+      <h2 className="type-section-title text-foreground">{title}</h2>
       <button
         type="button"
         aria-label={addAria}
@@ -690,7 +690,7 @@ export function ResumePreview({
       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#00a0e9] text-white">
         <IconPlus size={13} />
       </span>
-      <span className="text-base font-medium">{label}</span>
+      <span className="type-nav">{label}</span>
     </button>
   );
 
@@ -704,7 +704,7 @@ export function ResumePreview({
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
         <Icon size={22} />
       </span>
-      <h2 className="text-xl font-bold text-foreground">{title}</h2>
+      <h2 className="type-section-title text-foreground">{title}</h2>
       <button
         type="button"
         aria-label={t("editAria", { name: title })}
@@ -724,7 +724,7 @@ export function ResumePreview({
       className="mt-5 flex cursor-pointer items-center gap-2 text-[#00a0e9] transition-colors hover:text-[#00a0e9]/80"
     >
       <IconPencil size={16} />
-      <span className="text-base font-medium">{label}</span>
+      <span className="type-nav">{label}</span>
     </button>
   );
 
@@ -733,7 +733,7 @@ export function ResumePreview({
       {/* Resume (CV) */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
         <div className="flex items-center justify-between border-b pb-4">
-          <h1 className="text-xl font-bold text-foreground">{t("title")}</h1>
+          <h1 className="type-page-title text-foreground">{t("title")}</h1>
           {/* Hidden, never inert: nothing to download means no control. */}
           {doc.attachment && (
             <button
@@ -750,10 +750,13 @@ export function ResumePreview({
 
         <div className="mt-5 flex flex-col gap-6 sm:flex-row">
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-foreground">{name}</h2>
+            <h2 className="type-section-title text-foreground">{name}</h2>
             <div className="mt-4 grid grid-cols-1 gap-x-10 gap-y-3 sm:grid-cols-2">
               {rows.map(({ icon: Icon, label, value, link }) => (
-                <div key={label} className="flex items-center gap-2 text-sm">
+                <div
+                  key={label}
+                  className="flex items-center gap-2 type-body-sm"
+                >
                   <Icon size={16} className="shrink-0 text-gray-500" />
                   <span className="text-gray-500">{label}:</span>
                   <span
@@ -783,7 +786,7 @@ export function ResumePreview({
                     strokeWidth={1.5}
                     className="text-gray-400"
                   />
-                  <span className="text-base text-gray-500">3 x 4</span>
+                  <span className="type-body text-gray-500">3 x 4</span>
                 </div>
               }
             />
@@ -793,7 +796,7 @@ export function ResumePreview({
         <button
           type="button"
           onClick={onEdit}
-          className="mt-6 h-11 w-full cursor-pointer rounded-sm bg-[#00a0e9]/10 text-base font-medium text-[#00a0e9] transition-colors hover:bg-[#00a0e9]/20"
+          className="mt-6 h-11 w-full cursor-pointer rounded-sm bg-[#00a0e9]/10 type-nav text-[#00a0e9] transition-colors hover:bg-[#00a0e9]/20"
         >
           {t("editPersonal")}
         </button>
@@ -801,10 +804,10 @@ export function ResumePreview({
 
       {/* Completed Profile */}
       <div className="rounded-2xl border bg-card p-6 sm:p-8">
-        <h2 className="text-xl font-bold text-foreground">
+        <h2 className="type-section-title text-foreground">
           {t("completedProfile")}
         </h2>
-        <p className="mt-3 text-base text-foreground">
+        <p className="mt-3 type-body text-foreground">
           {t("completedPercent", { percent })}
         </p>
         <div className="mt-3 h-1.5 w-full rounded-full bg-red-500/15">
@@ -819,7 +822,7 @@ export function ResumePreview({
               key={item.label}
               type="button"
               onClick={() => handleItem(item)}
-              className="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg bg-[#00a0e9]/10 px-3 text-sm text-foreground transition-colors hover:bg-[#00a0e9]/20"
+              className="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-lg bg-[#00a0e9]/10 px-3 type-body-sm text-foreground transition-colors hover:bg-[#00a0e9]/20"
             >
               <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#00a0e9] text-white">
                 <IconPlus size={12} />
@@ -854,7 +857,7 @@ export function ResumePreview({
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.summary.desc")}
             </p>
             {addLink(t("sections.summary.add"), () => onAdd(2))}
@@ -880,10 +883,8 @@ export function ResumePreview({
                   className="flex items-start gap-3 border-b border-border py-4 last:border-0 last:pb-0"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-base font-semibold text-foreground">
-                      {x.company}
-                    </p>
-                    <p className="text-sm italic text-muted-foreground">
+                    <p className="type-nav text-foreground">{x.company}</p>
+                    <p className="type-body-sm italic text-muted-foreground">
                       {formatRange(
                         x.startDate,
                         x.endDate,
@@ -892,14 +893,14 @@ export function ResumePreview({
                         t("present"),
                       )}
                     </p>
-                    <p className="text-base text-foreground">
+                    <p className="type-body text-foreground">
                       {x.position}
                       {x.place?.province
                         ? ` · ${resumeLocationLabel(x.place)}`
                         : ""}
                     </p>
                     {x.description && (
-                      <p className="mt-1 line-clamp-2 text-sm whitespace-pre-wrap text-muted-foreground">
+                      <p className="mt-1 line-clamp-2 type-body-sm whitespace-pre-wrap text-muted-foreground">
                         {x.description}
                       </p>
                     )}
@@ -915,7 +916,7 @@ export function ResumePreview({
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.work.desc")}
             </p>
             {addLink(t("sections.work.add"), () => onAdd(3))}
@@ -941,10 +942,8 @@ export function ResumePreview({
                   className="flex items-start gap-3 border-b border-border py-4 last:border-0 last:pb-0"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-base font-semibold text-foreground">
-                      {x.school}
-                    </p>
-                    <p className="text-sm italic text-muted-foreground">
+                    <p className="type-nav text-foreground">{x.school}</p>
+                    <p className="type-body-sm italic text-muted-foreground">
                       {formatRange(
                         x.startDate,
                         x.endDate,
@@ -953,14 +952,14 @@ export function ResumePreview({
                         t("present"),
                       )}
                     </p>
-                    <p className="text-base text-foreground">
+                    <p className="type-body text-foreground">
                       {t("values.degreeIn", {
                         degree: x.degree,
                         major: x.major,
                       })}
                     </p>
                     {x.description && (
-                      <p className="mt-1 line-clamp-2 text-sm whitespace-pre-wrap text-muted-foreground">
+                      <p className="mt-1 line-clamp-2 type-body-sm whitespace-pre-wrap text-muted-foreground">
                         {x.description}
                       </p>
                     )}
@@ -976,7 +975,7 @@ export function ResumePreview({
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.educations.desc")}
             </p>
             {addLink(t("sections.educations.add"), () => onAdd(4))}
@@ -1001,7 +1000,7 @@ export function ResumePreview({
                   key={x.id}
                   className="flex items-center gap-3 border-b border-border py-3.5 last:border-0 last:pb-0"
                 >
-                  <p className="min-w-0 flex-1 text-base text-foreground">
+                  <p className="min-w-0 flex-1 type-body text-foreground">
                     <span className="font-semibold">{x.title}</span>
                     {" • "}
                     {x.level}
@@ -1017,7 +1016,7 @@ export function ResumePreview({
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.skills.desc")}
             </p>
             {addLink(t("sections.skills.add"), () => onAdd(5))}
@@ -1042,7 +1041,7 @@ export function ResumePreview({
                   key={x.id}
                   className="flex items-center gap-3 border-b border-border py-3.5 last:border-0 last:pb-0"
                 >
-                  <p className="min-w-0 flex-1 text-base text-foreground">
+                  <p className="min-w-0 flex-1 type-body text-foreground">
                     <span className="font-semibold">{x.title}</span>
                     {" • "}
                     {x.level}
@@ -1058,7 +1057,7 @@ export function ResumePreview({
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.languages.desc")}
             </p>
             {addLink(t("sections.languages.add"), () => onAdd(6))}
@@ -1088,7 +1087,7 @@ export function ResumePreview({
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.hobbies.desc")}
             </p>
             {addLink(t("sections.hobbies.add"), () => onAdd(7))}
@@ -1121,14 +1120,12 @@ export function ResumePreview({
                     className="flex items-start gap-3 border-b border-border py-4 last:border-0 last:pb-0"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-base font-semibold text-foreground">
-                        {x.name}
-                      </p>
-                      <p className="text-base text-foreground">
+                      <p className="type-nav text-foreground">{x.name}</p>
+                      <p className="type-body text-foreground">
                         {[x.position, x.company].filter(Boolean).join(", ")}
                       </p>
                       {contacts && (
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1 type-body-sm text-muted-foreground">
                           {contacts}
                         </p>
                       )}
@@ -1145,7 +1142,7 @@ export function ResumePreview({
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.references.desc")}
             </p>
             {addLink(t("sections.references.add"), () => onAdd(8))}
@@ -1165,17 +1162,17 @@ export function ResumePreview({
           </span>
           <h2
             className={cn(
-              "text-xl font-bold",
+              "type-section-title",
               cvNoticed ? "text-amber-500" : "text-foreground",
             )}
           >
             {t("sections.cv.title")}
           </h2>
         </div>
-        <p className="mt-4 text-base text-foreground">
+        <p className="mt-4 type-body text-foreground">
           {t("sections.cv.desc")}
         </p>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 type-body-sm text-muted-foreground">
           {t("sections.cv.types")}
         </p>
         {doc.attachment && (
@@ -1184,10 +1181,10 @@ export function ResumePreview({
               size={20}
               className="shrink-0 text-[#00a0e9]"
             />
-            <span className="min-w-0 flex-1 truncate text-base text-foreground">
+            <span className="min-w-0 flex-1 truncate type-body text-foreground">
               {doc.attachment.fileName}
             </span>
-            <span className="shrink-0 text-sm text-muted-foreground">
+            <span className="shrink-0 type-body-sm text-muted-foreground">
               {formatFileSize(doc.attachment.size)}
             </span>
             <button
@@ -1212,7 +1209,7 @@ export function ResumePreview({
           type="button"
           onClick={() => cvInputRef.current?.click()}
           disabled={cvUploading}
-          className="mt-4 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-sm bg-[#00a0e9]/10 text-base font-medium text-[#00a0e9] transition-colors hover:bg-[#00a0e9]/20 disabled:cursor-not-allowed disabled:opacity-40"
+          className="mt-4 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-sm bg-[#00a0e9]/10 type-nav text-[#00a0e9] transition-colors hover:bg-[#00a0e9]/20 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <IconPaperclip size={18} />
           {cvUploading
@@ -1245,17 +1242,15 @@ export function ResumePreview({
                 key={label}
                 className="border-b border-border py-4 last:border-0"
               >
-                <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="mt-0.5 text-base font-semibold text-foreground">
-                  {value}
-                </p>
+                <p className="type-body-sm text-muted-foreground">{label}</p>
+                <p className="mt-0.5 type-nav text-foreground">{value}</p>
               </div>
             ))}
             {editLink(t("sections.jobPreferences.edit"), onJobPreference)}
           </div>
         ) : (
           <>
-            <p className="mt-4 text-base text-muted-foreground">
+            <p className="mt-4 type-body text-muted-foreground">
               {t("sections.jobPreferences.desc")}
             </p>
             {addLink(t("sections.jobPreferences.add"), onJobPreference)}

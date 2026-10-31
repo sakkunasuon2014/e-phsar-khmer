@@ -96,7 +96,7 @@ function CommandInput({
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
-            "h-full w-full bg-transparent text-base outline-hidden placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50",
+            "h-full w-full bg-transparent type-body outline-hidden placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-50",
             className,
           )}
           {...props}
@@ -137,7 +137,7 @@ function CommandEmpty({
   return (
     <CommandPrimitive.Empty
       data-slot="command-empty"
-      className={cn("py-6 text-center text-sm", className)}
+      className={cn("py-6 text-center type-body-sm", className)}
       {...props}
     />
   );
@@ -181,7 +181,7 @@ function CommandItem({
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        "group/command-item relative flex cursor-default items-center gap-3 rounded-md px-3 py-3 text-[15px] outline-hidden select-none text-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
+        "group/command-item relative flex cursor-default items-center gap-3 rounded-md px-3 py-3 type-body-sm outline-hidden select-none text-foreground data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-muted data-selected:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-selected:*:[svg]:text-foreground",
         className,
       )}
       {...props}
@@ -200,7 +200,7 @@ function CommandShortcut({
     <span
       data-slot="command-shortcut"
       className={cn(
-        "ml-auto text-xs tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
+        "ml-auto type-meta tracking-widest text-muted-foreground group-data-selected/command-item:text-foreground",
         className,
       )}
       {...props}

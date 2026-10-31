@@ -50,9 +50,14 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
-  OUTBOX_WORKER_CONCURRENCY: z.coerce.number().default(5),
-  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().default(2000),
-  OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
+  OUTBOX_WORKER_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  // Longest an idle worker sleeps between due-time checks (one cheap query).
+  // A producer in this process wakes the pool instantly and backoff retries
+  // fire at their own due time, so this only bounds the latency of a lost
+  // wakeup or of a producer in ANOTHER process (e.g. an API-only instance
+  // whose drainers run elsewhere) — lower it for that topology.
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(30_000),
+  OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(5),
   // How long a claim is honoured before another dispatcher may steal the
   // row. Must exceed the slowest realistic handler, or two dispatchers will
@@ -99,12 +104,34 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   // Namespaces every BullMQ key, so a shared Redis can host more than one
   // environment without one draining the other's jobs.
-  QUEUE_PREFIX: z.string().default('psa'),
+  QUEUE_PREFIX: z.string().default('phsarkhmer'),
 
   // Payment job retry policy (BullMQ-side, distinct from the outbox budget)
   PAYMENT_JOB_ATTEMPTS: z.coerce.number().default(3),
   PAYMENT_JOB_BACKOFF_MS: z.coerce.number().default(5000),
   PAYMENT_WORKER_CONCURRENCY: z.coerce.number().default(5),
+
+  // Payment reconciler — the guarantee that a payment which was actually made
+  // settles even if the app crashed, the poll chain broke, or the browser
+  // closed. Reads straight from Postgres (no BullMQ, no outbox row), so it
+  // works whichever instance runs it. See src/payment/reconciler/.
+  PAYMENT_RECONCILER_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  PAYMENT_RECONCILE_INTERVAL_MS: z.coerce.number().default(15_000),
+  // Gap between passes while nothing is unresolved (no pending attempt, nothing
+  // to activate or expire). Any activity returns to the interval above.
+  PAYMENT_RECONCILE_IDLE_INTERVAL_MS: z.coerce.number().default(60_000),
+  // Providers the reconciler polls: only those with no webhook (Bakong). ABA
+  // PayWay is webhook-only — its expiry is `ABA_PAYWAY_LIFETIME_MINUTES`.
+  PAYMENT_RECONCILE_PROVIDERS: z.string().default('bakong'),
+  // A pending attempt this old that the provider still reports unpaid is
+  // failed (the QR has long expired). 15 min vs. the 5 min QR lifetime.
+  PAYMENT_PENDING_ABANDON_MS: z.coerce.number().default(15 * 60 * 1000),
+  // How long after creation a failed-by-timeout attempt is still checked, so
+  // a late-arriving payment is honoured instead of lost.
+  PAYMENT_LATE_PAYMENT_GRACE_MS: z.coerce.number().default(24 * 60 * 60 * 1000),
 
   // ABA PayWay gateway credentials. Optional so build/tests don't require
   // sandbox access — AbaPaywayProvider fails fast with a clear message if
@@ -119,12 +146,15 @@ const envSchema = z.object({
     .default('https://checkout-sandbox.payway.com.kh'),
   // The `return_url` ABA PayWay is told to POST payment results to on
   // every purchase call — this backend's own public
-  // /api/v1/payments/aba-payway/webhook route. Must be a publicly
+  // /api/v1/payments/webhooks/aba-payway route. Must be a publicly
   // reachable absolute URL (ABA calls it server-to-server); optional so
   // build/tests don't require one, but charge() refuses to call ABA
   // without it configured — silently omitting it would mean ABA has
   // nowhere to report a payment outcome to.
   ABA_PAYWAY_WEBHOOK_URL: z.string().optional().default(''),
+  // How long an ABA checkout stays payable (ABA's `lifetime`, minutes, min 3;
+  // ABA defaults to 30 days if omitted). After it ABA rejects the payment.
+  ABA_PAYWAY_LIFETIME_MINUTES: z.coerce.number().int().min(3).default(15),
 
   // Bakong KHQR credentials/merchant identity. Unlike ABA, Bakong has no
   // server-side "create transaction" call — BakongProvider.charge() builds
@@ -153,12 +183,6 @@ const envSchema = z.object({
   // expired — bakong-khqr requires an expirationTimestamp for any KHQR that
   // carries an amount (a "dynamic" QR), so this always applies here.
   BAKONG_QR_EXPIRY_SECONDS: z.coerce.number().default(300),
-  // Bakong delivers no webhooks — this is the delay between poll-attempt
-  // jobs re-checking check_transaction_by_md5 (see
-  // src/payment/providers/bakong/README.md). Short enough that a payer
-  // sees their payment confirmed quickly, long enough not to hammer
-  // Bakong's API for the several minutes a KHQR stays valid.
-  BAKONG_POLL_INTERVAL_MS: z.coerce.number().default(4000),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

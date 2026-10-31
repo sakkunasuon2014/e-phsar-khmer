@@ -94,7 +94,7 @@ export default function LocationMapPicker({
             <button
               type="button"
               onClick={openDialog}
-              className="absolute inset-x-0 bottom-0 z-1000 cursor-pointer bg-card/90 py-2 text-center text-sm font-medium text-card-foreground backdrop-blur-sm transition-colors hover:bg-card"
+              className="absolute inset-x-0 bottom-0 z-1000 cursor-pointer bg-card/90 py-2 text-center type-nav text-card-foreground backdrop-blur-sm transition-colors hover:bg-card"
             >
               {t("changeLocation")}
             </button>
@@ -103,7 +103,7 @@ export default function LocationMapPicker({
           <button
             type="button"
             onClick={openDialog}
-            className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-card px-4 py-2.5 text-sm font-medium text-card-foreground shadow-md transition-colors hover:bg-muted"
+            className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-md border border-gray-200 bg-card px-4 py-2.5 type-nav text-card-foreground shadow-md transition-colors hover:bg-muted"
           >
             <MapPinned className="h-4 w-4 text-[#dc2626]" />
             {t("selectLocationOnMap")}
@@ -136,7 +136,7 @@ export default function LocationMapPicker({
           <div className="p-4">
             <Button
               type="button"
-              className="h-11 w-full cursor-pointer rounded-full bg-[#00a0e9] text-base font-medium text-white hover:bg-[#0090d0]"
+              className="h-11 w-full cursor-pointer rounded-full bg-[#00a0e9] type-nav text-white hover:bg-[#0090d0]"
               disabled={!staged}
               onClick={confirm}
             >

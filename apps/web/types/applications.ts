@@ -5,7 +5,7 @@
  * narrowed to the ISO strings they arrive as over JSON.
  */
 
-import type { ChatUserSummary, ListingStatus } from "@/types/chat";
+import type { ChatMessage, ChatUserSummary, ListingStatus } from "@/types/chat";
 
 export type JobApplicationStatus = "pending" | "viewed" | "hired" | "rejected";
 
@@ -36,6 +36,12 @@ export interface AppliedJob {
   updatedAt: string;
   listing: ApplicationListing;
   poster: ChatUserSummary;
+  /**
+   * The encrypted chat delivery, on the POST response only. Null when the
+   * poster had no encrypted-chat devices and the application was recorded
+   * without a message. The list endpoints omit the field entirely.
+   */
+  chat?: { conversationId: string; message: ChatMessage } | null;
 }
 
 /** One row of `/me/job-applications`. */

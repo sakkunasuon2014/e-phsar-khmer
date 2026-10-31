@@ -32,10 +32,8 @@ export function SignOutDialog({ trigger }: { trigger: ReactNode }) {
 
       <DialogContent className="sm:max-w-[600px] rounded-sm">
         <DialogHeader>
-          <DialogTitle className="text-lg font-semibold">
-            {t("title")}
-          </DialogTitle>
-          <DialogDescription className="mt-2 text-base text-muted-foreground">
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription className="mt-2 text-muted-foreground">
             {t("description")}
           </DialogDescription>
         </DialogHeader>

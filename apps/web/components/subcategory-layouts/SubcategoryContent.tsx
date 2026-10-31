@@ -58,7 +58,12 @@ export default function SubcategoryContent({
 
   return (
     <>
-      {/* BRAND GRID: Show when no brand is selected */}
+      {/* BRAND GRID: steps aside once a brand is applied — same rule as the
+          attribute sets below. A pick drills INTO the brand: the grid is
+          replaced by its Model grid (captain, 2026-10-27: "it show get into
+          the brand … it should work like bodytype"). The applied brand stays
+          visible in the More Filters dialog (Brand select + badge) and in the
+          breadcrumb; it is not a toggle on the tile. */}
       {!selectedBrand && !!brands?.length && (
         <OptionGrid
           options={brands}

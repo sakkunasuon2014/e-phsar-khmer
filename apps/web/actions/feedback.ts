@@ -1,77 +1,70 @@
 "use server";
 
-/**
- * The public feedback form. Both calls go through `userServerFetch` so a
- * signed-in visitor's submission is stamped with their account id — the
- * backend route is `@Public()`, so an anonymous visitor works identically
- * (the fetch simply carries no bearer token).
- */
-
-import { ApiError, userServerFetch } from "@/lib/api/client";
-import type { SignUploadResponse } from "@/actions/files";
-
-export interface FeedbackInput {
-  name: string;
-  phone: string;
-  email?: string;
-  description: string;
-  imagePaths?: string[];
-}
-
-export interface FeedbackResult {
-  success: boolean;
-  error?: string;
-}
+import { API_URL, ApiError, serverFetch } from "@/lib/api/client";
+import { getUserAccessToken } from "@/lib/auth/session";
 
 /**
- * Signed upload URL for a feedback photo. `/files/sign` is JWT-only, so the
- * backend exposes a dedicated public (throttled) door under `/feedback`.
+ * Submit the public Feedback form. The backend endpoint is public; when the
+ * visitor is signed in, their access token rides along so the submission is
+ * linked to the account (an expired token simply submits anonymously).
  */
-export async function signFeedbackUpload(filename: string) {
+export async function submitFeedback(
+  formData: FormData,
+): Promise<{ success: true } | { success: false; error: string }> {
   try {
-    const { data } = await userServerFetch<SignUploadResponse>(
-      "/feedback/attachments/sign",
-      {
-        method: "POST",
-        body: JSON.stringify({ filename }),
-      },
-    );
-    return { success: true as const, data };
-  } catch (err) {
-    return {
-      success: false as const,
-      error: err instanceof ApiError ? err.message : "Failed to sign upload",
-    };
+    const token = await getUserAccessToken().catch(() => null);
+    const res = await fetch(`${API_URL}/feedback`, {
+      method: "POST",
+      body: formData,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: "no-store",
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as {
+        error?: { message?: string };
+      } | null;
+      return {
+        success: false,
+        error:
+          res.status === 429
+            ? "Too many submissions — please try again later."
+            : (body?.error?.message ?? "Failed to send feedback"),
+      };
+    }
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to send feedback" };
   }
 }
 
-/**
- * The global validation pipe collapses every DTO failure into this one
- * message, so the form cannot tell which field failed from it — the client
- * counters are the primary guard, this is the bypass fallback.
- */
-const VALIDATION_FAILED = "Validation failed";
-
-function describeSubmitError(err: unknown): string {
-  if (!(err instanceof ApiError)) return "Failed to submit feedback";
-  if (err.message === VALIDATION_FAILED)
-    return "Please check your entries — one or more fields are too long or malformed.";
-  return err.message;
+export interface AdminFeedbackRow {
+  id: string;
+  userId: string | null;
+  name: string;
+  phone: string;
+  email: string | null;
+  description: string;
+  images: string[];
+  createdAt: string;
 }
 
-export async function submitFeedback(
-  input: FeedbackInput,
-): Promise<FeedbackResult> {
+export async function getAdminFeedback(): Promise<AdminFeedbackRow[]> {
+  // The dashboard filters/paginates client-side (see Page conventions), so
+  // pull the newest 100 in one go.
+  const { data } = await serverFetch<AdminFeedbackRow[]>(
+    "/admin/feedback?pageSize=100",
+  );
+  return data;
+}
+
+export async function deleteFeedback(id: string) {
   try {
-    await userServerFetch("/feedback", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-    return { success: true };
+    await serverFetch(`/admin/feedback/${id}`, { method: "DELETE" });
+    return { success: true as const };
   } catch (err) {
     return {
-      success: false,
-      error: describeSubmitError(err),
+      success: false as const,
+      error: err instanceof ApiError ? err.message : "Delete failed",
     };
   }
 }

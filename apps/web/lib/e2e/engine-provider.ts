@@ -14,6 +14,10 @@ import type { StoredIdentity } from "./keys";
 import { E2E_V2_ENABLED } from "./config";
 import { deviceLabel } from "./device-label";
 import {
+  recordBootstrapFailure,
+  recordBootstrapSuccess,
+} from "./bootstrap-health";
+import {
   addE2eDevicePrekeys,
   fetchE2ePrekeyCount,
   heartbeatE2eDevice,
@@ -170,9 +174,14 @@ export function getE2eEngine(userId: string): Promise<RatchetEngine> {
       // Skipped if this attempt was superseded (user switch / reset).
       if (enginePromise === attempt)
         for (const listener of listeners) listener(userId, engine);
+      recordBootstrapSuccess();
+      requestPersistentStorage();
       return engine;
     },
     (err: unknown) => {
+      // Counted so the chat can tell "this browser cannot hold keys" from a
+      // blip (bootstrap-health.ts); the retries themselves are unchanged.
+      recordBootstrapFailure(err);
       // Allow a retry on the next call instead of caching the failure.
       if (enginePromise === attempt) {
         engineUserId = null;
@@ -185,8 +194,56 @@ export function getE2eEngine(userId: string): Promise<RatchetEngine> {
   return attempt;
 }
 
+let persistRequested = false;
+
+/**
+ * Identity keys live only in IndexedDB, which the browser may evict under
+ * storage pressure — silently turning this browser into a new device that
+ * cannot read anything sent before. Ask once per page load, after keys
+ * exist, for persistent storage. Chrome grants or denies without a prompt
+ * (engagement-based); Firefox may prompt. Best effort: the result is only
+ * logged.
+ */
+function requestPersistentStorage(): void {
+  if (persistRequested) return;
+  persistRequested = true;
+  const storage =
+    typeof navigator !== "undefined" ? navigator.storage : undefined;
+  if (!storage?.persist) return;
+  void (async () => {
+    try {
+      const already = await storage.persisted();
+      const granted = already || (await storage.persist());
+      console.info(
+        `[e2e] persistent storage ${granted ? "granted" : "not granted"}${already ? " (already)" : ""}`,
+      );
+    } catch (err) {
+      console.info("[e2e] persistent storage request failed", err);
+    }
+  })();
+}
+
 /** Drop the cached engine (e.g. on sign-out) so the next login re-bootstraps. */
 export function resetE2eEngine(): void {
   engineUserId = null;
   enginePromise = null;
+}
+
+/**
+ * Re-run the device heartbeat (and prekey top-up) for an already-bootstrapped
+ * device, independent of the once-per-page-load bootstrap in `getE2eEngine`.
+ * A long-lived tab never calls `bootstrap()` again, so without this
+ * `last_seen_at` only advances when the page is reloaded — see
+ * `lib/e2e/heartbeat-schedule.ts` / `hooks/use-e2e-engine.ts` for the
+ * scheduler that calls this every ~6 h.
+ *
+ * A no-op when v2 is off (no device-level heartbeat in v1) or the device
+ * isn't registered yet (the initial `getE2eEngine` call handles that case).
+ */
+export async function reheartbeatE2eDevice(userId: string): Promise<void> {
+  if (!E2E_V2_ENABLED) return;
+  const row = await loadIdentity(userId);
+  if (!row?.deviceId) return;
+  // ensureDevice persists any changes (prekey top-up, re-registration) itself.
+  await ensureDevice(row);
 }

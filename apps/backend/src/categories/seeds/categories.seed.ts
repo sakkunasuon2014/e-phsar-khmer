@@ -79,6 +79,18 @@ const conditionField: FieldDef = {
   options: ['Used', 'New'],
 };
 
+/**
+ * Trusted product spec (2026-10-30): the five family forms must link one of the
+ * admin-entered spec pages. Required in the form only — the create DTO keeps
+ * `productModelId` optional like every other per-form rule.
+ */
+const productSpecField: FieldDef = {
+  key: 'productSpec',
+  label: { en: 'Product Specification' },
+  type: 'product',
+  required: true,
+};
+
 const vehicleMakeModelYearFields: FieldDef[] = [
   { key: 'brand', label: { en: 'Brand' }, type: 'select', required: false },
   { key: 'model', label: { en: 'Model' }, type: 'select', required: false },
@@ -281,6 +293,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...vehicleMakeModelYearFields,
+          productSpecField,
           taxTypeField,
           conditionField,
           {
@@ -442,6 +455,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...vehicleMakeModelYearFields,
+          productSpecField,
           taxTypeField,
           conditionField,
           {
@@ -1035,6 +1049,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...phoneBrandModelFields,
+          productSpecField,
           conditionField,
           {
             key: 'price',
@@ -1112,6 +1127,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...tabletBrandModelFields,
+          productSpecField,
           conditionField,
           {
             key: 'price',
@@ -1189,6 +1205,7 @@ export const categoriesSeed: CategorySeed[] = [
             required: true,
           },
           ...smartWatchBrandModelFields,
+          productSpecField,
           conditionField,
           {
             key: 'price',

@@ -7,21 +7,19 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
 import DbImage from "@/components/common/DbImage";
 import { formatPrice } from "@/lib/chat/format";
-import type {
-  ApplicationListing,
-  JobApplicationStatus,
-} from "@/types/applications";
+import type { ApplicationListing } from "@/types/applications";
 
 /**
  * One row of either /me job list. The two sides lead with different things —
  * a seeker reads the job, a poster reads the applicant — so the caller passes
  * what leads and this renders the shared shape: leading block, headline,
- * second line, meta line, badge, actions.
+ * second line, meta line, chips, actions. There is deliberately no status
+ * pill: the application workflow is the chat thread, not a hired/rejected
+ * state machine.
  */
 export function JobApplicationRow({
   view,
   listing,
-  status,
   createdAt,
   title,
   subtitle,
@@ -32,7 +30,6 @@ export function JobApplicationRow({
 }: {
   view: "applied" | "received";
   listing: ApplicationListing;
-  status: JobApplicationStatus;
   /** ISO — when the application was sent. */
   createdAt: string;
   /** The headline: the job title (seeker) or the applicant's name (poster). */
@@ -79,7 +76,7 @@ export function JobApplicationRow({
               className="h-11 w-11 shrink-0 rounded-full border border-border object-cover"
             />
           ) : (
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold text-muted-foreground">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted type-nav text-muted-foreground">
               {/* A poster's row leads with a handle — the initial is the first
                   letter of the name, not the "@" in front of it. */}
               {title.replace(/^@/, "").slice(0, 1).toUpperCase()}
@@ -108,20 +105,20 @@ export function JobApplicationRow({
           {!jobGone && view === "applied" ? (
             <Link
               href={{ pathname: "/post/[slug]", params: { slug: listing.id } }}
-              className="block truncate text-sm font-semibold text-foreground hover:text-[#00a0e9]"
+              className="block truncate type-nav text-foreground hover:text-[#00a0e9]"
             >
               {title}
             </Link>
           ) : (
-            <p className="truncate text-sm font-semibold text-foreground">
-              {title}
-            </p>
+            <p className="truncate type-nav text-foreground">{title}</p>
           )}
           {subtitle ? (
-            <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+            <p className="truncate type-meta text-muted-foreground">
+              {subtitle}
+            </p>
           ) : null}
 
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-muted-foreground">
             {view === "received" ? (
               <>
                 {jobLine}
@@ -140,7 +137,7 @@ export function JobApplicationRow({
           </p>
 
           {note ? (
-            <p className="mt-2 line-clamp-2 text-xs text-foreground/80">
+            <p className="mt-2 line-clamp-2 type-meta text-foreground/80">
               {note}
             </p>
           ) : null}
@@ -151,46 +148,10 @@ export function JobApplicationRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-2 sm:flex-col sm:items-end">
-        <StatusBadge status={status} view={view} />
         {actions ? (
           <div className="flex flex-wrap items-center gap-2">{actions}</div>
         ) : null}
       </div>
     </li>
-  );
-}
-
-/**
- * The status pill. `pending` reads "New" to the poster and "Pending" to the
- * seeker — the same state, named for the side looking at it (the two mocks
- * say so).
- */
-function StatusBadge({
-  status,
-  view,
-}: {
-  status: JobApplicationStatus;
-  view: "applied" | "received";
-}) {
-  const t = useTranslations("Me.jobsPage");
-  const styles: Record<JobApplicationStatus, string> = {
-    pending: "bg-amber-50 text-amber-700 border-amber-100",
-    viewed: "bg-blue-50 text-[#00a0e9] border-blue-100",
-    hired: "bg-green-50 text-green-700 border-green-100",
-    rejected: "bg-red-50 text-[#e3281b] border-red-100",
-  };
-  const labels: Record<JobApplicationStatus, string> = {
-    pending: view === "received" ? t("statusNew") : t("statusPending"),
-    viewed: t("statusViewed"),
-    hired: t("statusHired"),
-    rejected: t("statusRejected"),
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-xs font-medium whitespace-nowrap ${styles[status]}`}
-    >
-      {labels[status]}
-    </span>
   );
 }

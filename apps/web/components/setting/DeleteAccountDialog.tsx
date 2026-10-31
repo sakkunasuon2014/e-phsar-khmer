@@ -68,11 +68,11 @@ export function DeleteAccountDialog({
 
       <DialogContent className="sm:max-w-[550px] rounded-md p-6">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-foreground">
+          <DialogTitle>
             {username ? `${username}: ` : ""}
             {t("title")}
           </DialogTitle>
-          <DialogDescription className="mt-4 text-[15px] leading-relaxed text-foreground/90">
+          <DialogDescription className="mt-4 type-body-sm text-foreground/90">
             {t("description")}
           </DialogDescription>
         </DialogHeader>

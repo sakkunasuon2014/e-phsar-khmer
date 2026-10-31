@@ -1,7 +1,5 @@
-import { Link } from "@/i18n/routing";
-import Image from "next/image";
 import { getLocale, getTranslations } from "next-intl/server";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
+import AdvertisementCarousel from "@/components/ads/AdvertisementCarousel";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 import CommonCategoryLayout from "@/components/category-layouts/CommonCategoryLayout";
 import ServicesCategoryLayout from "@/components/category-layouts/ServicesCategoryLayout";
@@ -18,6 +16,7 @@ import {
   toCardPost,
   type ListingsFeedParams,
 } from "@/lib/api/categories";
+import { getAdvertisements } from "@/lib/api/advertisements";
 import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
 
 const SUBCATEGORY_LAYOUT: Record<string, number> = {
@@ -96,29 +95,21 @@ export default async function CategoryPage({
     ...parseFeedParams(await searchParams),
     categorySlug,
   };
-  const feed = await getListingsFeed(feedQuery, locale);
+  const [feed, banners] = await Promise.all([
+    getListingsFeed(feedQuery, locale),
+    getAdvertisements("category"),
+  ]);
   const feedPosts = (feed?.items ?? []).map(toCardPost);
 
   return (
     <main className="min-h-screen flex flex-col bg-muted">
-      <div className="w-full flex justify-center py-6">
-        <div className="w-full max-w-4xl">
-          <Link href="/" target="_blank">
-            <AspectRatio
-              ratio={4}
-              className="bg-muted rounded-none cursor-pointer"
-            >
-              <Image
-                src="/ads/landforsale.jpg"
-                alt="Photo"
-                fill
-                priority
-                className="object-cover rounded-none"
-              />
-            </AspectRatio>
-          </Link>
+      {banners.length > 0 && (
+        <div className="w-full flex justify-center py-6">
+          <div className="w-full max-w-4xl">
+            <AdvertisementCarousel banners={banners} priority />
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="px-4 py-2">
         <div className="max-w-7xl mx-auto w-full pb-1">

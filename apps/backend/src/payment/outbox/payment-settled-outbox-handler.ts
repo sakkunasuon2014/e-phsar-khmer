@@ -5,6 +5,7 @@ import type { HandlerOutcome, OutboxHandler } from '../../outbox/outbox.types';
 import { NotificationsService } from '../../notifications/notifications.service';
 import type { PaymentSettledEventPayload } from '../use-cases/payments/processing/enqueue-payment-settled-event.use-case';
 import { PAYMENT_SETTLED_OUTBOX_EVENT_TYPE } from './payment-outbox-events';
+import { SubscriptionActivationService } from '../../subscriptions/subscription-activation.service';
 
 /**
  * Consumes `payment.succeeded` and notifies the payment's owner. Unlike the
@@ -23,6 +24,7 @@ export class PaymentSettledOutboxHandler
   constructor(
     private readonly notifications: NotificationsService,
     private readonly registry: OutboxRegistry,
+    private readonly activation: SubscriptionActivationService,
   ) {}
 
   onModuleInit(): void {
@@ -32,29 +34,48 @@ export class PaymentSettledOutboxHandler
   async handle(event: OutboxEventRow): Promise<HandlerOutcome> {
     const payload = event.payload as PaymentSettledEventPayload;
 
-    // A transaction with no customerId (e.g. a not-yet-modeled system/tenant
-    // payment) has no one to notify — that's not a failure to retry.
-    if (!payload.customerId) {
-      this.logger.warn(
-        `payment.succeeded for transaction ${payload.paymentTransactionId} has no customerId — nothing to notify`,
-      );
-      return { status: 'published' };
-    }
-
     try {
-      await this.notifications.notify({
-        userId: payload.customerId,
-        type: this.eventType,
-        title: 'Payment successful',
-        body: `Your payment of ${payload.amount} ${payload.currency} has been received.`,
-        data: {
+      if (payload.orderId) {
+        const result = await this.activation.activatePaidPurchase({
+          purchaseId: payload.orderId,
           paymentTransactionId: payload.paymentTransactionId,
-          ledgerTransactionId: payload.ledgerTransactionId,
+          customerId: payload.customerId,
           amount: payload.amount,
           currency: payload.currency,
-          occurredAt: payload.occurredAt,
-        },
-      });
+        });
+        if (result.status === 'payment_link_pending') {
+          return {
+            status: 'retry',
+            error: `Purchase ${payload.orderId} is not linked to its payment yet`,
+          };
+        }
+        if (
+          result.status === 'payment_mismatch' ||
+          result.status === 'needs_refund' ||
+          result.status === 'not_pending' ||
+          result.status === 'not_found'
+        ) {
+          this.logger.warn(
+            `Settled transaction ${payload.paymentTransactionId} could not activate subscription purchase ${payload.orderId} (${result.status}) — needs manual review`,
+          );
+        }
+      }
+
+      if (payload.customerId) {
+        await this.notifications.notify({
+          userId: payload.customerId,
+          type: this.eventType,
+          title: 'Payment successful',
+          body: `Your payment of ${payload.amount} ${payload.currency} has been received.`,
+          data: {
+            paymentTransactionId: payload.paymentTransactionId,
+            ledgerTransactionId: payload.ledgerTransactionId,
+            amount: payload.amount,
+            currency: payload.currency,
+            occurredAt: payload.occurredAt,
+          },
+        });
+      }
       return { status: 'published' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

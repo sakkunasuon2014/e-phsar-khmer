@@ -17,10 +17,13 @@ export default function CarrierBadge({
     <Image
       src={src}
       alt=""
-      width={32}
+      width={16}
       height={16}
       unoptimized
-      className={`object-contain h-4 w-8 shrink-0 ${className}`}
+      // The logo assets are square; a fixed 32px-wide box letterboxed them
+      // (object-contain) so the visible logo sat ~8px in from the row edge.
+      // Natural width keeps the logo ink flush with the text beside it.
+      className={`object-contain h-4 w-auto shrink-0 ${className}`}
     />
   );
 }

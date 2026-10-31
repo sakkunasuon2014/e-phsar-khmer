@@ -1,4 +1,5 @@
 import { LANGUAGES, useLanguage } from "@/contexts/LanguageContext";
+import { BrandWordmark } from "@/components/common/BrandWordmark";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
@@ -42,16 +43,9 @@ const NavBar: React.FC<NavBarProps> = ({
         shadowRadius: 8,
       }}
     >
-      {/* Brand Text Logo with modern badge element */}
+      {/* Brand Text Logo */}
       <View className="flex-row items-center">
-        <Text className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-          psa
-        </Text>
-        <View className="ml-1 px-2 py-0.5 bg-sky-500 rounded-lg justify-center items-center shadow-xs">
-          <Text className="text-sm font-black text-white italic leading-none">
-            khmer
-          </Text>
-        </View>
+        <BrandWordmark className="text-2xl" />
       </View>
 
       {/* Header Actions */}

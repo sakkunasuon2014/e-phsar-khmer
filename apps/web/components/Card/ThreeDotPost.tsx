@@ -8,10 +8,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { EllipsisVertical, BookmarkIcon } from "lucide-react";
 import { Toggle } from "@/components/ui/toggle";
-import { Post } from "@/lib/posts";
-import { getUserById } from "@/lib/data";
+import type { Post } from "@/lib/posts";
 import { useState } from "react";
 import { toSlug } from "@/lib/utils";
+import { SITE_URL } from "@/lib/site";
 import { useRouter } from "@/i18n/routing";
 import { ReportPost } from "../report/ReportPost";
 import { IconShare3, IconUser, IconAlertTriangle } from "@tabler/icons-react";
@@ -29,7 +29,7 @@ import { useTranslations } from "next-intl";
  * own x.
  */
 const ITEM =
-  "flex w-full items-center gap-3 px-3 py-2 text-sm cursor-pointer outline-none transition-colors hover:bg-muted";
+  "flex w-full items-center gap-3 px-3 py-2 type-nav cursor-pointer outline-none transition-colors hover:bg-muted";
 
 /** One icon box for all four rows. */
 const ICON = "size-[18px] shrink-0";
@@ -37,11 +37,7 @@ const ICON = "size-[18px] shrink-0";
 export function ThreeDotPost({ post }: { post: Post }) {
   const t = useTranslations();
   const router = useRouter();
-  // The real feed carries the seller's handle; mock posts fall back to the
-  // mock users array. It used to come from that array alone, so on a real
-  // listing the id missed and "View Profile" did nothing at all.
-  const username =
-    post.sellerUsername ?? getUserById(post.userId)?.username ?? null;
+  const username = post.sellerUsername ?? null;
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const reactions = useReactions();
@@ -53,7 +49,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
         <DropdownMenuTrigger asChild>
           <Button
             onClick={(e) => e.stopPropagation()}
-            className="bg-card w-7 h-7  hover:bg-card/90 text-foreground rounded-full p-1.5 transition-colors shadow-sm outline-none cursor-pointer"
+            className="bg-card h-11 w-11 shrink-0 hover:bg-card/90 text-foreground rounded-full p-1.5 transition-colors shadow-sm outline-none cursor-pointer"
           >
             <EllipsisVertical size={14} />
           </Button>
@@ -131,7 +127,7 @@ export function ThreeDotPost({ post }: { post: Post }) {
       <ShareModal
         open={shareOpen}
         onOpenChange={setShareOpen}
-        url={`https://psakhmer.com/${toSlug(post.title)}-adid-${post.postId}`}
+        url={`${SITE_URL}/${toSlug(post.title)}-adid-${post.postId}`}
       />
       <ReportPost open={reportOpen} onOpenChange={setReportOpen} post={post} />
     </>

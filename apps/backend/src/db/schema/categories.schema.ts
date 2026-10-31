@@ -121,7 +121,8 @@ export type FieldDef = {
     | 'discount'
     | 'photos'
     | 'location'
-    | 'contact';
+    | 'contact'
+    | 'product';
   required: boolean;
   options?: string[];
   max?: number;

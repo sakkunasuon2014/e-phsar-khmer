@@ -1,7 +1,7 @@
 import { Context, Effect, Exit, Layer } from 'effect';
 import type { DbExecutor } from './drizzle.provider';
 
-export const DB_PROVIDER_ID = 'psa-npic/db/DbClient';
+export const DB_PROVIDER_ID = 'phsarkhmer/db/DbClient';
 
 /**
  * Effect-side handle for the Drizzle executor. This wraps either the root

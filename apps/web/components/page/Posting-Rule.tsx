@@ -15,40 +15,42 @@ export default function PostingRule() {
       <main className="w-full bg-muted">
         <div className="pb-20">
           <div className="max-w-4xl mx-auto bg-card px-8 pt-6 pb-4">
-            <h1 className="text-2xl font-bold text-center mb-6">
+            <h1 className="type-page-title text-center mb-6">
               Ad Posting Rule
             </h1>
 
             <p className="mb-4">
-              <strong className="text-lg font-medium">
-                PSA-KHMER&apos;S AD LISTING POLICIES ARE INTENDED TO:
+              <strong className="type-card-heading">
+                PhsarKhmer&apos;s ad listing policies are intended to:
               </strong>
             </p>
 
             <ul className="list-decimal pl-6 space-y-1 mb-4">
-              <li className="text-sm">
+              <li className="type-body">
                 Support government laws and regulations
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 Minimize risks to both buyers and sellers
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 Provide equal opportunity to all buyers and sellers
               </li>
-              <li className="text-sm">Protect intellectual property rights</li>
-              <li className="text-sm">
+              <li className="type-body">
+                Protect intellectual property rights
+              </li>
+              <li className="type-body">
                 Provide an enjoyable buying & selling experience
               </li>
-              <li className="text-sm">
-                Support the values of the PSA-NPIC Community
+              <li className="type-body">
+                Support the values of the PhsarKhmer Community
               </li>
             </ul>
 
-            <p className="font-semibold text-lg font-medium mb-2">
+            <p className="type-card-heading mb-2">
               Every seller must know and follow:
             </p>
             <ul className="list-decimal pl-6 space-y-2 mb-4">
-              <li className="text-sm">
+              <li className="type-body">
                 <a
                   href="#restricted-items"
                   className="text-[#00a0e9] hover:underline"
@@ -57,7 +59,7 @@ export default function PostingRule() {
                   and cannot be listed
                 </a>
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 <a
                   href="#restricted-services"
                   className="text-[#00a0e9] hover:underline"
@@ -65,7 +67,7 @@ export default function PostingRule() {
                   Rules about Prohibited and Restricted Services
                 </a>
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 <a
                   href="#birds-animals"
                   className="text-[#00a0e9] hover:underline"
@@ -73,7 +75,7 @@ export default function PostingRule() {
                   Rules about Birds & Animals
                 </a>
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 <a
                   href="#intellectual-property"
                   className="text-[#00a0e9] hover:underline"
@@ -83,7 +85,7 @@ export default function PostingRule() {
                   other rights.
                 </a>
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 <a
                   href="#prohibited-practices"
                   className="text-[#00a0e9] hover:underline"
@@ -92,7 +94,7 @@ export default function PostingRule() {
                   products for sale and services for offer.
                 </a>
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 <a
                   href="#miscellaneous"
                   className="text-[#00a0e9] hover:underline"
@@ -100,15 +102,15 @@ export default function PostingRule() {
                   Miscellaneous info - Your listing, information, Advertisement
                 </a>
               </li>
-              <li className="text-sm">
+              <li className="type-body">
                 <a
                   href="#consequences"
                   className="text-[#00a0e9] hover:underline"
                 >
                   Consequences of Breach of Listing Policy.
                 </a>
-                <p className="text-foreground leading-7 mb-4">
-                  Learning about PSA-NPIC&apos;s policies will help you avoid
+                <p className="text-foreground mb-4">
+                  Learning about PhsarKhmer&apos;s policies will help you avoid
                   breaking rules (including the law) and aid you in trading with
                   reliable, trustworthy buyers and sellers.
                 </p>
@@ -116,10 +118,10 @@ export default function PostingRule() {
             </ul>
 
             <section id="restricted-items" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">
+              <h2 className="type-section-title mb-2">
                 1. Prohibited and Restricted Items
               </h2>
-              <ul className="list-decimal pl-6 space-y-1 text-sm">
+              <ul className="list-decimal pl-6 space-y-1 type-body">
                 <li>Adoption of Children & Babies</li>
                 <li>Adult / Pornographic Material</li>
                 <li>Alcohol</li>
@@ -185,10 +187,10 @@ export default function PostingRule() {
             </section>
 
             <section id="restricted-services" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">
+              <h2 className="type-section-title mb-2">
                 2. Prohibited and Restricted Services
               </h2>
-              <ul className="list-decimal pl-6 space-y-1 text-sm">
+              <ul className="list-decimal pl-6 space-y-1 type-body">
                 <li>Adult Massage services</li>
                 <li>
                   Any kind of government service - Only consultancy/guidance is
@@ -206,10 +208,10 @@ export default function PostingRule() {
             </section>
 
             <section id="birds-animals" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">
+              <h2 className="type-section-title mb-2">
                 3. Rules about Birds & Animals
               </h2>
-              <ul className="list-decimal pl-6 space-y-1 text-sm">
+              <ul className="list-decimal pl-6 space-y-1 type-body">
                 <li>
                   In birds, we only allow Chickens, Roosters, Chicks, Geese,
                   Emus, Pigeons, Turkeys & Ducks
@@ -223,7 +225,7 @@ export default function PostingRule() {
                   prohibited
                 </li>
                 <li>
-                  PSA-NPIC only allows ads selling Meat & Eggs of the
+                  PhsarKhmer only allows ads selling Meat & Eggs of the
                   animals/birds listed above with an exception of Cow meat.
                 </li>
                 <li>
@@ -234,11 +236,11 @@ export default function PostingRule() {
             </section>
 
             <section id="intellectual-property" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">
+              <h2 className="type-section-title mb-2">
                 4. The following items are restricted or prohibited because they
                 would potentially infringe on intellectual property rights:
               </h2>
-              <ul className="list-decimal pl-6 space-y-1 text-sm">
+              <ul className="list-decimal pl-6 space-y-1 type-body">
                 <li>Counterfeit items</li>
                 <li>Faces, names and signatures and autographed items</li>
                 <li>Software & movie piracy</li>
@@ -248,15 +250,15 @@ export default function PostingRule() {
             </section>
 
             <section id="prohibited-practices" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">
+              <h2 className="type-section-title mb-2">
                 5. Prohibited Practices
               </h2>
-              <p className="text-foreground leading-7 mb-4">
-                To promote a safe, fair and enjoyable experience, PSA-NPIC has
+              <p className="text-foreground mb-4">
+                To promote a safe, fair and enjoyable experience, PhsarKhmer has
                 established a set of rules and policies for item listings. You
                 are requested, not to ---
               </p>
-              <ul className="list-decimal pl-6 space-y-1 text-sm">
+              <ul className="list-decimal pl-6 space-y-1 type-body">
                 <li>
                   Post Duplicate Ad listings - Any ad posted more than once with
                   the same content or Title in the same city and category would
@@ -281,10 +283,8 @@ export default function PostingRule() {
             </section>
 
             <section id="miscellaneous" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">
-                6. Miscellaneous Info
-              </h2>
-              <ul className="list-decimal pl-6 space-y-1 text-sm">
+              <h2 className="type-section-title mb-2">6. Miscellaneous Info</h2>
+              <ul className="list-decimal pl-6 space-y-1 type-body">
                 <li>
                   Shall not be defamatory, trade libelous, unlawfully
                   threatening or unlawfully harassing. Further shall not be
@@ -307,15 +307,15 @@ export default function PostingRule() {
               </ul>
             </section>
             <section id="consequences" className="scroll-mt-24 mb-4">
-              <h2 className="text-lg font-medium mb-2">
+              <h2 className="type-section-title mb-2">
                 7. Consequences of Breach of Listing Policy
               </h2>
-              <p className="text-foreground leading-7 px-6 text-sm">
+              <p className="text-foreground px-6 type-body">
                 Users who violate the prohibited items policy and or the
                 restricted items policy may be subject to the following actions
               </p>
-              <ul className="list-decimal pl-6 space-y-1 text-sm">
-                <li>Permanent blacklisting from PSA-NPIC community</li>
+              <ul className="list-decimal pl-6 space-y-1 type-body">
+                <li>Permanent blacklisting from PhsarKhmer community</li>
                 <li>Reporting to Law Enforcement or Appropriate Authorities</li>
               </ul>
             </section>

@@ -1,0 +1,1 @@
+ALTER TABLE "payment"."payment_transactions" DROP COLUMN IF EXISTS "tenant_id";

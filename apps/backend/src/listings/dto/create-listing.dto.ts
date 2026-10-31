@@ -114,6 +114,17 @@ export class CreateListingDto {
   @IsUUID()
   communeId?: string;
 
+  /**
+   * The trusted product-spec page this ad links to (a `models` id). Validated
+   * by the service against a *published* spec page; null clears it on update.
+   * The phones form makes it required — the API keeps it optional like every
+   * other per-form rule.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  productModelId?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

@@ -10,7 +10,7 @@ import { PaymentGatewayRegistry } from './payment-gateway.registry';
 export class PaymentGatewayRegistryTag extends Context.Service<
   PaymentGatewayRegistryTag,
   PaymentGatewayRegistry
->()('psa-npic/payment/PaymentGatewayRegistry') {
+>()('phsarkhmer/payment/PaymentGatewayRegistry') {
   static readonly layer = (registry: PaymentGatewayRegistry) =>
     Layer.succeed(PaymentGatewayRegistryTag, registry);
 }

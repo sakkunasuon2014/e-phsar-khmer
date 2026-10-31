@@ -59,20 +59,14 @@ export interface ChargeResult {
   failureMessage?: string;
   rawResponse: unknown;
   /**
-   * Set by a provider with no webhook channel at all (e.g. Bakong) on a
-   * `pending` result, asking `processPaymentAttempt` to schedule a
-   * `reconcile()` poll instead of waiting for a callback that will never
-   * arrive. Absent (the default) means no polling is scheduled — a provider
-   * that gets webhooks (ABA) drives its own transitions via
-   * `processProviderEvent` instead. See `providers/bakong/README.md` for
-   * the full polling architecture this drives.
+   * Epoch ms after which the provider itself refuses payment. A pending
+   * attempt is stored with it (`payment_transactions.expires_at`) and failed
+   * once it passes plus a short grace. For a webhook-only provider (ABA) that
+   * happens without asking the provider; for a polled one (Bakong, which has
+   * no webhook at all and is driven by `PaymentReconciler`) the provider is
+   * asked one last time first, so a payer at the deadline still settles.
    */
-  poll?: {
-    /** Delay in ms before the next `reconcile()` poll. */
-    intervalMs: number;
-    /** Absolute epoch ms after which polling gives up and the attempt fails as expired. */
-    expiresAt: number;
-  };
+  expiresAt?: number;
 }
 
 export interface WebhookVerification {

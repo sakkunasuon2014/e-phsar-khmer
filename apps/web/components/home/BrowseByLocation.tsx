@@ -23,7 +23,7 @@ export default async function BrowseByLocation() {
 
   return (
     <div className="bg-card rounded border border-border p-6">
-      <h2 className="text-lg font-medium text-foreground mb-4">{t("title")}</h2>
+      <h2 className="type-section-title text-foreground mb-4">{t("title")}</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-x-9 gap-y-3">
         {provinces.map((province) => (
@@ -35,7 +35,7 @@ export default async function BrowseByLocation() {
                 [LOCATION_PRO_PARAM]: province.slug,
               },
             }}
-            className="text-foreground hover:text-[#0095ca] text-sm"
+            className="text-foreground hover:text-[#0095ca] type-body-sm"
           >
             {locale === "km" && province.nameKm
               ? province.nameKm

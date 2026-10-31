@@ -1,8 +1,6 @@
-import Image from "next/image";
-import { Link } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
+import AdvertisementCarousel from "@/components/ads/AdvertisementCarousel";
 import { Breadcrumbs } from "@/components/common/Breadcrumbs";
 // ─── Header: one component; chip flags come from the maps below ──────────────
 import LSPCYEHeader, {
@@ -15,6 +13,7 @@ import { GridCardSell } from "@/components/ads/GridCardSell";
 import { ListCardSell } from "@/components/ads/ListCardSell";
 import { Tabs } from "@/components/ui/tabs";
 import { FeedResults } from "@/components/search/FeedResults";
+import { getAdvertisements } from "@/lib/api/advertisements";
 import { feedQueryKey, parseFeedParams } from "@/lib/search-params";
 import {
   getBrandsForSubcategory,
@@ -23,6 +22,7 @@ import {
   getLinkedAttributeOptions,
   getListingsFeed,
   getModelsForBrand,
+  getYears,
   toCardPost,
   type ListingsFeedParams,
 } from "@/lib/api/categories";
@@ -244,6 +244,7 @@ export default async function SubcategoryPage({
   })).filter((s) => s.options.length > 0);
 
   // Model grid for the selected brand (per-brand fetch; brands carry no nested models)
+  let modelName: string | undefined;
   if (sp.ad_field) {
     const selected = brandRows.find((b) => b.slug === sp.ad_field);
     if (selected) {
@@ -252,6 +253,10 @@ export default async function SubcategoryPage({
       const modelRows = await getModelsForBrand(selected.id, subcategorySlug);
       if (modelRows.length > 0) {
         models = modelRows.map((m) => ({ slug: m.slug, name: m.name }));
+      }
+      // The grid/dialog picks a slug; the feed filters on the stored name.
+      if (sp.ad_model) {
+        modelName = modelRows.find((m) => m.slug === sp.ad_model)?.name;
       }
     }
   }
@@ -287,16 +292,26 @@ export default async function SubcategoryPage({
       : undefined;
 
   // Real active listings — every subcategory runs the real feed, narrowed by
-  // the drill-down (brand/type) and the filter bar's URL params.
+  // the drill-down (brand/type) and the filter bar's URL params. The dialog's
+  // `attrs` object carries every schema-declared attribute; a browse-grid
+  // click adds its own key/value on top so both survive a mixed URL.
+  const parsedParams = parseFeedParams(sp);
+  const attrFilters: Record<string, string> = { ...(parsedParams.attrs ?? {}) };
+  if (attrKey && clickedOption?.name) {
+    attrFilters[attrKey] = clickedOption.name;
+  }
   const feedQuery: ListingsFeedParams = {
-    ...parseFeedParams(sp),
+    ...parsedParams,
     subcategorySlug,
     brand: brandName,
+    model: modelName,
     bodyType: bodyTypeName,
-    attrKey,
-    attrValue: attrKey ? clickedOption?.name : undefined,
+    attrs: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
   };
-  const feed = await getListingsFeed(feedQuery, locale);
+  const [feed, banners] = await Promise.all([
+    getListingsFeed(feedQuery, locale),
+    getAdvertisements("subcategory"),
+  ]);
   const feedItems: Post[] = (feed?.items ?? []).map(toCardPost);
 
   // ── Header component ────────────────────────────────────────────────────────
@@ -304,14 +319,26 @@ export default async function SubcategoryPage({
     SUBCATEGORY_HEADER_FLAGS[subcategory.slug] ??
     CATEGORY_HEADER_FLAGS[category.slug] ??
     DEFAULT_HEADER_FLAGS;
-  // Engine chip options are the real `enginetypes` names — exactly what the
-  // post form stores in attributes.engineType — never a hardcoded list.
-  const engineOptions =
+  // Engine + Year chip options are the real `enginetypes` names and the
+  // generated `years` set — exactly what the post form offers, never a
+  // hardcoded list. Both fetches are independent, so run them together.
+  const [engineOptions, yearOptions] = await Promise.all([
     headerFlags.engine !== false
-      ? (await getAttributeOptions("enginetypes")).map((row) => row.name)
-      : [];
+      ? getAttributeOptions("enginetypes").then((rows) =>
+          rows.map((row) => row.name),
+        )
+      : Promise.resolve<string[]>([]),
+    headerFlags.year !== false
+      ? getYears().then((rows) => rows.map((row) => row.name))
+      : Promise.resolve<string[]>([]),
+  ]);
+  // The mock labels the vehicle price chip "Sale Price" (jobs keeps Salary).
   const priceLabel =
-    category.slug === "jobs" ? t("Filters.price.salary") : undefined;
+    category.slug === "jobs"
+      ? t("Filters.price.salary")
+      : category.slug === "cars-and-vehicles"
+        ? t("Filters.price.salePrice")
+        : undefined;
 
   // ── Active filter label — display names when available (slug-derived
   //    fallback only: slugs like `honda-moto` would read "honda moto") ───────
@@ -328,24 +355,13 @@ export default async function SubcategoryPage({
   return (
     <main className="min-h-screen flex flex-col bg-gray-100">
       {/* ── Top banner ad ─────────────────────────────────────────────────── */}
-      <div className="w-full flex justify-center py-6">
-        <div className="w-full max-w-4xl">
-          <Link href="/">
-            <AspectRatio
-              ratio={4}
-              className="bg-muted rounded-none cursor-pointer"
-            >
-              <Image
-                src="/ads/landforsale.jpg"
-                alt="Land for sale advertisement"
-                fill
-                priority
-                className="object-cover rounded-none"
-              />
-            </AspectRatio>
-          </Link>
+      {banners.length > 0 && (
+        <div className="w-full flex justify-center py-6">
+          <div className="w-full max-w-4xl">
+            <AdvertisementCarousel banners={banners} priority />
+          </div>
         </div>
-      </div>
+      )}
       {/* ── Breadcrumb + header ───────────────────────────────────────────── */}
       <div className="px-4 py-2">
         <div className="max-w-7xl mx-auto w-full pb-1">
@@ -399,6 +415,7 @@ export default async function SubcategoryPage({
           title={subcategory.name}
           {...headerFlags}
           engineOptions={engineOptions}
+          yearOptions={yearOptions}
           priceLabel={priceLabel}
         />
         {/* Main listing content (visible in both grid/list views — same as

@@ -34,3 +34,20 @@ export function formatPhoneLocal(phone: string): string {
 export function isLocalPhone(raw: string): boolean {
   return /^0\d{7,9}$/.test(raw.trim());
 }
+
+/**
+ * Hide the last three digits of a phone number behind the detail page's
+ * "Show Phone Number" gate (`0963024444` → `0963024XXX`). Spacing and any
+ * other formatting in the stored value are preserved.
+ */
+export function maskPhone(phone: string): string {
+  const chars = [...phone];
+  let remaining = 3;
+  for (let i = chars.length - 1; i >= 0 && remaining > 0; i--) {
+    if (/\d/.test(chars[i])) {
+      chars[i] = "X";
+      remaining--;
+    }
+  }
+  return chars.join("");
+}

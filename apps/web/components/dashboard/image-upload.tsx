@@ -6,6 +6,7 @@ import DbImage, { isStorageObjectUrl } from "@/components/common/DbImage";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { signUpload, type UploadScope } from "@/actions/files";
+import { cn } from "@/lib/utils";
 
 // Mirrors backend FilesService.validateImage (5MB, image/*).
 const MAX_SIZE = 5 * 1024 * 1024;
@@ -17,6 +18,10 @@ interface ImageUploadProps {
   label?: string;
   accept?: string;
   className?: string;
+  /** Size classes for the preview box (default: 160 px square). */
+  previewClassName?: string;
+  /** `cover` crops to the box; `contain` shows the whole image. */
+  imageFit?: "cover" | "contain";
   /** Called after a successful upload — lets the parent track uploads so it
    *  can clean up files abandoned on cancel (the `path` is what `DELETE /files`
    *  needs; the `url` identifies the upload in the form state). */
@@ -37,6 +42,8 @@ export function ImageUpload({
   label = "Image",
   accept = "image/png,image/jpeg,image/webp",
   className,
+  previewClassName = "h-40 w-40",
+  imageFit = "cover",
   onUpload,
 }: ImageUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,14 +100,17 @@ export function ImageUpload({
       type="button"
       onClick={open}
       disabled={uploading}
-      className="flex h-40 w-40 cursor-pointer flex-col items-center justify-center gap-2 rounded border border-dashed border-border text-muted-foreground transition-colors hover:border-sky-500 hover:text-sky-500 disabled:opacity-50"
+      className={cn(
+        "flex cursor-pointer flex-col items-center justify-center gap-2 rounded border border-dashed border-border text-muted-foreground transition-colors hover:border-sky-500 hover:text-sky-500 disabled:opacity-50",
+        previewClassName,
+      )}
     >
       {uploading ? (
         <Loader2 className="size-6 animate-spin" />
       ) : (
         <ImagePlus className="size-6" />
       )}
-      <span className="text-xs">{uploading ? "Uploading..." : caption}</span>
+      <span className="type-meta">{uploading ? "Uploading..." : caption}</span>
     </button>
   );
 
@@ -114,7 +124,13 @@ export function ImageUpload({
               alt={label}
               width={160}
               height={160}
-              className="h-40 w-40 cursor-pointer rounded border border-border object-cover"
+              className={cn(
+                "cursor-pointer rounded border border-border",
+                previewClassName,
+                imageFit === "contain"
+                  ? "object-contain bg-muted/40"
+                  : "object-cover",
+              )}
               onClick={open}
               fallback={emptySlot(`No ${label} stored`)}
             />

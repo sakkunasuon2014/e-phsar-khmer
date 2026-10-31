@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, count, desc, eq, inArray, ne } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
 import type { DbClient } from '../db/drizzle.provider';
 import { listingLikes, listingSaves } from '../db/schema/reactions.schema';
@@ -174,7 +174,10 @@ export class ReactionsService {
         // seller's handle, so these lists resolve it the same way.
         .leftJoin(users, eq(users.id, listings.userId))
         .where(
-          and(eq(listingLikes.userId, userId), ne(listings.status, 'deleted')),
+          and(
+            eq(listingLikes.userId, userId),
+            notInArray(listings.status, ['deleted', 'restricted']),
+          ),
         )
         // `id` breaks ties so a page boundary can never repeat or skip a row
         // when several edges land on the same timestamp.
@@ -186,7 +189,10 @@ export class ReactionsService {
         .from(listingLikes)
         .innerJoin(listings, eq(listings.id, listingLikes.listingId))
         .where(
-          and(eq(listingLikes.userId, userId), ne(listings.status, 'deleted')),
+          and(
+            eq(listingLikes.userId, userId),
+            notInArray(listings.status, ['deleted', 'restricted']),
+          ),
         ),
     ]);
 
@@ -226,7 +232,10 @@ export class ReactionsService {
         // Same as the liked list: the feed's card needs the seller's handle.
         .leftJoin(users, eq(users.id, listings.userId))
         .where(
-          and(eq(listingSaves.userId, userId), ne(listings.status, 'deleted')),
+          and(
+            eq(listingSaves.userId, userId),
+            notInArray(listings.status, ['deleted', 'restricted']),
+          ),
         )
         .orderBy(desc(listingSaves.createdAt), desc(listingSaves.id))
         .limit(pageSize)
@@ -236,7 +245,10 @@ export class ReactionsService {
         .from(listingSaves)
         .innerJoin(listings, eq(listings.id, listingSaves.listingId))
         .where(
-          and(eq(listingSaves.userId, userId), ne(listings.status, 'deleted')),
+          and(
+            eq(listingSaves.userId, userId),
+            notInArray(listings.status, ['deleted', 'restricted']),
+          ),
         ),
     ]);
 

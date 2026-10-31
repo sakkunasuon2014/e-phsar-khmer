@@ -41,9 +41,6 @@ export const paymentTransactions = paymentSchema.table(
   'payment_transactions',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    // No tenants table exists yet in this codebase; kept for forward
-    // compatibility with multi-tenant billing, not wired to anything today.
-    tenantId: uuid('tenant_id').notNull(),
     reference: text('reference').notNull(),
     idempotencyKey: text('idempotency_key'),
     amount: numeric('amount', { precision: 20, scale: 2 }).notNull(),

@@ -7,11 +7,7 @@ import type {
 
 const PURCHASE_PATH = 'api/payment-gateway/v1/payments/purchase';
 
-/**
- * The network call behind `AbaPaywayProvider.charge()`. Returns ABA's
- * response as-is — interpreting `status.code` into a `ChargeResult` is the
- * provider's job, not this handler's.
- */
+/** The network call behind `charge()`; returns ABA's response as-is. */
 export const createAbaPaywayTransaction = Effect.fn(
   'createAbaPaywayTransaction',
 )(function* (

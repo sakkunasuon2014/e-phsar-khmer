@@ -9,7 +9,7 @@ import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import Fullscreen from "yet-another-react-lightbox/plugins/fullscreen";
 import "yet-another-react-lightbox/styles.css";
 import "yet-another-react-lightbox/plugins/thumbnails.css";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 
 const MAX_THUMBS = 7;
 
@@ -411,7 +411,7 @@ export default function PostImage({
 
                 {showOverlay && (
                   <div className="absolute inset-0 bg-black/55 flex items-center justify-center">
-                    <span className="text-white font-medium text-lg md:text-2xl">
+                    <span className="text-white type-section-title">
                       +{remaining}
                     </span>
                   </div>
@@ -455,7 +455,7 @@ export default function PostImage({
         }}
         animation={{ fade: 300, zoom: 300 }}
         render={{
-          // "1 / 18" counter in top-left like Khmer24
+          // "1 / 18" counter in top-left like PhsarKhmer
           iconPrev: () => (
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -486,7 +486,7 @@ export default function PostImage({
           ),
           // Counter badge top-left
           slideHeader: () => (
-            <div className="absolute top-4 left-4 z-50 bg-black/50 text-white text-sm font-semibold px-3 py-1 rounded-full backdrop-blur-sm">
+            <div className="absolute top-4 left-4 z-50 bg-black/50 text-white type-photo-badge px-3 py-1 rounded-full backdrop-blur-sm">
               {lightboxIndex + 1} / {slides.length}
             </div>
           ),

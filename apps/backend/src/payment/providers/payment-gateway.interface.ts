@@ -19,6 +19,9 @@ import type {
 export interface PaymentGatewayProvider {
   readonly name: PaymentProviderName;
 
+  /** Human-readable label for the checkout's provider picker. */
+  readonly displayName: string;
+
   charge(request: ChargeRequest): Promise<ChargeResult>;
 
   /**
@@ -31,6 +34,13 @@ export interface PaymentGatewayProvider {
    * provider with no such lookup.
    */
   reconcile?(providerTransactionId: string): Promise<ChargeResult>;
+
+  /**
+   * The provider's webhook is signed, so once `verifyWebhookSignature` passes
+   * its status is final: `processProviderEvent` settles on it directly instead
+   * of calling `reconcile()` (a webhook-only provider has no polling).
+   */
+  readonly trustsVerifiedWebhook?: boolean;
 
   /**
    * Whether this provider has the credentials it needs to actually call

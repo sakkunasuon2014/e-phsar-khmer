@@ -1,13 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Archive,
-  Loader2,
-  MessagesSquare,
-  MoreVertical,
-  Trash2,
-} from "lucide-react";
+import { Loader2, MessagesSquare, MoreVertical, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -28,6 +22,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { previewOf } from "@/lib/chat/format";
+import { parseStructuredChatContent } from "@/lib/e2e/chat-content";
 import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { useE2eInboxPreviews } from "@/hooks/use-e2e-inbox-previews";
 import type { InboxItem } from "@/types/chat";
@@ -103,10 +98,8 @@ export function ConversationList({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-16 text-center">
         <MessagesSquare className="size-8 text-muted-foreground" />
-        <p className="text-sm font-medium text-foreground">
-          {t("inbox.emptyTitle")}
-        </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="type-nav text-foreground">{t("inbox.emptyTitle")}</p>
+        <p className="type-meta text-muted-foreground">
           {t("inbox.emptyDescription")}
         </p>
       </div>
@@ -163,6 +156,9 @@ export function ConversationList({
       {items.map((item) => {
         const name = item.otherUser?.username ?? t("unknownUser");
         const deleting = deletingId === item.id;
+        const plaintext = item.lastMessage
+          ? (e2ePreviews.get(item.lastMessage.id) ?? null)
+          : null;
         return (
           <div
             key={item.id}
@@ -190,15 +186,15 @@ export function ConversationList({
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">{name}</span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                  <span className="truncate type-nav">{name}</span>
+                  <span className="shrink-0 type-meta text-muted-foreground">
                     <RelativeTime iso={item.lastMessageAt} />
                   </span>
                 </div>
                 <div className="mt-0.5 flex items-center justify-between gap-2">
                   <p
                     className={cn(
-                      "truncate text-xs",
+                      "truncate type-meta",
                       item.unreadCount > 0
                         ? "font-medium text-foreground"
                         : "text-muted-foreground",
@@ -210,10 +206,13 @@ export function ConversationList({
                         image: t("inbox.previewImage"),
                         listing: t("inbox.previewListing"),
                         none: t("inbox.previewEmpty"),
+                        voice: t("thread.voiceNote"),
+                        location: t("thread.locationShared"),
                       },
-                      item.lastMessage
-                        ? e2ePreviews.get(item.lastMessage.id)
-                        : null,
+                      plaintext,
+                      // Structured content carries no human text — without this
+                      // the row would render the decrypted JSON blob.
+                      plaintext ? parseStructuredChatContent(plaintext) : null,
                     )}
                   </p>
                   {item.unreadCount > 0 && (
@@ -221,7 +220,7 @@ export function ConversationList({
                       aria-label={t("inbox.unreadCount", {
                         count: item.unreadCount,
                       })}
-                      className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#f04d4e] px-1.5 text-[10px] font-bold text-white"
+                      className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#f04d4e] px-1.5 type-photo-badge text-white"
                     >
                       {item.unreadCount > 99 ? "99+" : item.unreadCount}
                     </span>
@@ -249,16 +248,12 @@ export function ConversationList({
                   )}
                 </button>
               </DropdownMenuTrigger>
+              {/* Portaled to <body> — inherits the html-level theme scope,
+                  same as the chat panel itself. */}
               <DropdownMenuContent
                 align="end"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Archive isn't built yet — kept visible so the affordance
-                    is discoverable, but it deliberately does nothing. */}
-                <DropdownMenuItem>
-                  <Archive className="size-4" />
-                  {t("inbox.archive")}
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   variant="destructive"
                   onSelect={() => setPendingDelete(item)}
@@ -277,7 +272,7 @@ export function ConversationList({
           <Button
             type="button"
             variant="ghost"
-            className="w-full text-xs"
+            className="w-full type-meta"
             onClick={onLoadMore}
             disabled={isLoadingMore}
           >

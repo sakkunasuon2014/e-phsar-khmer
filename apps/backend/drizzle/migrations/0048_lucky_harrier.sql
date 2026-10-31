@@ -1,0 +1,1 @@
+ALTER TABLE "product_specs" ADD COLUMN "image" varchar(500);

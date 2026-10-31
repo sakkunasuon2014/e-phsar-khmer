@@ -1,5 +1,5 @@
 /**
- * Local, non-durable wakeup signal (spec §30's exact permitted use).
+ * Local, non-durable wakeup signal: advisory only — PostgreSQL stays the source of truth.
  *
  * A producer emits this *after* its transaction commits; the listener turns
  * it into a capacity-1 wakeup token for the worker pool. EventEmitter is

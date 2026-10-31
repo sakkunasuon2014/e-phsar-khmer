@@ -1,0 +1,2952 @@
+{
+  "generatedAt": "2026-10-26T08:43:20.890Z",
+  "results": [
+    {
+      "label": "home",
+      "route": "/en",
+      "width": 390,
+      "href": "http://localhost:3011/en",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 30
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 30
+        },
+        {
+          "k": "a|340x20|text-foreground hover:text-[#0095ca] text-sm",
+          "n": 25
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 34,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$10,000 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-8%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$100 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-4%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "all-ads",
+      "route": "/en/all-ads",
+      "width": 390,
+      "href": "http://localhost:3011/en/all-ads",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 25,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "mx-auto flex items-center justify-center bg-blue-50 rounded-full w-16 h-16 group-hover:bg-blue-100 transition-colors",
+          "left": 332,
+          "right": 396,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "img",
+          "cls": "object-contain",
+          "left": 332,
+          "right": 396,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "mx-auto flex items-center justify-center bg-blue-50 rounded-full w-16 h-16 group-hover:bg-blue-100 transition-colors",
+          "left": 332,
+          "right": 396,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "img",
+          "cls": "object-contain",
+          "left": 332,
+          "right": 396,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "8Free Deliverycar car02:28 PMPao"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-12%$1.44 OFFFree Deliverytest 1"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-10%$1 OFFFree Deliverycar test "
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "Free DeliveryPets E2E dog ad12:0"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "Books E2E instrument11:57 PMMala"
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 23
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 23
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "button|42x25|relative inline-flex h-[calc(100%-1px)] flex-1 ite",
+          "n": 2
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 24,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-1%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$0.1 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-12%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$1.44 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "category-cars",
+      "route": "/en/category/cars-and-vehicles",
+      "width": 390,
+      "href": "http://localhost:3011/en/category/cars-and-vehicles",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 21,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "mx-auto bg-blue-50 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-blue-100 transition-colors",
+          "left": 330,
+          "right": 394,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "mx-auto bg-blue-50 rounded-full w-16 h-16 flex items-center justify-center group-hover:bg-blue-100 transition-colors",
+          "left": 330,
+          "right": 394,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "8Free Deliverycar car02:28 PMPao"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-12%$1.44 OFFFree Deliverytest 1"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-10%$1 OFFFree Deliverycar test "
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 5
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 5
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "button|42x25|relative inline-flex h-[calc(100%-1px)] flex-1 ite",
+          "n": 2
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 6,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-1%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$0.1 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-12%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$1.44 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "search",
+      "route": "/en/search",
+      "width": 390,
+      "href": "http://localhost:3011/en/search",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 25,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-1%$0.1 OFFFree Deliverycar lang"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "Luk kmeng khoch04:54 PMPhnom Pen"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-10%$1.2 OFFFoods E2E meat ad12:"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "Fishing E2E rod11:59 PMMalai, Ba"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-2%$0.24 OFFFree Deliverysdad11:"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-12%$1.44 OFFTable 0111:27 PMMon"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "Furniture E2E dining table11:19 "
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-12%$1.2 OFFFree Deliverydsadad1"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 203,
+          "right": 463,
+          "w": 260,
+          "text": "-1%$0.1 OFFFree Deliverymen10:33"
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 20
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 20
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "button|42x25|relative inline-flex h-[calc(100%-1px)] flex-1 ite",
+          "n": 2
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 24,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-1%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$0.1 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-12%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$1.44 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "login",
+      "route": "/en/login",
+      "width": 390,
+      "href": "http://localhost:3011/en/login",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "button|87x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 3
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "input|294x36|h-9 w-full min-w-0 rounded-sm border border-input ",
+          "n": 2
+        },
+        {
+          "k": "button|294x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 2
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 0,
+      "tinySample": [],
+      "vh": []
+    },
+    {
+      "label": "listing",
+      "route": "/en/6158a7a1-6dfe-49a6-9c78-46195911e4de",
+      "width": 390,
+      "href": "http://localhost:3011/en/6158a7a1-6dfe-49a6-9c78-46195911e4de",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "a|93x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "a|98x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "a|356x40|mt-8 text-sm text-[#00a0e9] hover:underline",
+          "n": 1
+        }
+      ],
+      "tiny": 0,
+      "tinySample": [],
+      "vh": [
+        "min-h-screen bg-muted py-6"
+      ]
+    },
+    {
+      "label": "me",
+      "route": "/en/me",
+      "width": 390,
+      "href": "http://localhost:3011/en/login",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "button|87x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 3
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "input|294x36|h-9 w-full min-w-0 rounded-sm border border-input ",
+          "n": 2
+        },
+        {
+          "k": "button|294x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 2
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 0,
+      "tinySample": [],
+      "vh": []
+    },
+    {
+      "label": "chats",
+      "route": "/en/chats",
+      "width": 390,
+      "href": "http://localhost:3011/en/chats",
+      "iw": 390,
+      "ih": 844,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "a|93x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "a|98x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "a|62x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 0,
+      "tinySample": [],
+      "vh": []
+    },
+    {
+      "label": "home",
+      "route": "/en",
+      "width": 320,
+      "href": "http://localhost:3011/en",
+      "iw": 320,
+      "ih": 568,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 30
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 30
+        },
+        {
+          "k": "a|270x20|text-foreground hover:text-[#0095ca] text-sm",
+          "n": 25
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 34,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$10,000 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-8%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$100 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-4%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "all-ads",
+      "route": "/en/all-ads",
+      "width": 320,
+      "href": "http://localhost:3011/en/all-ads",
+      "iw": 320,
+      "ih": 568,
+      "sw": 785,
+      "overflowCount": 25,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "All Categories"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "All Categories"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 307,
+          "right": 395,
+          "w": 88,
+          "text": "All Categories"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "mx-auto flex items-center justify-center bg-blue-50 rounded-full w-16 h-16 group-hover:bg-blue-100 transition-colors",
+          "left": 273,
+          "right": 337,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "img",
+          "cls": "object-contain",
+          "left": 273,
+          "right": 337,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "mx-auto flex items-center justify-center bg-blue-50 rounded-full w-16 h-16 group-hover:bg-blue-100 transition-colors",
+          "left": 273,
+          "right": 337,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "img",
+          "cls": "object-contain",
+          "left": 273,
+          "right": 337,
+          "w": 64,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 168,
+          "right": 428,
+          "w": 260,
+          "text": "8Free Deliverycar car02:28 PMPao"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 168,
+          "right": 428,
+          "w": 260,
+          "text": "-12%$1.44 OFFFree Deliverytest 1"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 168,
+          "right": 428,
+          "w": 260,
+          "text": "-10%$1 OFFFree Deliverycar test "
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 168,
+          "right": 428,
+          "w": 260,
+          "text": "Free DeliveryPets E2E dog ad12:0"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 168,
+          "right": 428,
+          "w": 260,
+          "text": "Books E2E instrument11:57 PMMala"
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 23
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 23
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "button|42x25|relative inline-flex h-[calc(100%-1px)] flex-1 ite",
+          "n": 2
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 24,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-1%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$0.1 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-12%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$1.44 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "home",
+      "route": "/en",
+      "width": 768,
+      "href": "http://localhost:3011/en",
+      "iw": 768,
+      "ih": 1024,
+      "sw": 824,
+      "overflowCount": 8,
+      "overflow": [
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 564,
+          "right": 824,
+          "w": 260,
+          "text": "-12%$1.44 OFFFree Deliverytest 1"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 564,
+          "right": 824,
+          "w": 260,
+          "text": "Free DeliveryPets E2E dog ad12:0"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 564,
+          "right": 824,
+          "w": 260,
+          "text": "-12%$1.44 OFFFree Deliverytest11"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 564,
+          "right": 824,
+          "w": 260,
+          "text": "-12%$1.44 OFFFree DeliveryHealth"
+        },
+        {
+          "tag": "div",
+          "cls": "group/card flex flex-col gap-4 py-2 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>",
+          "left": 564,
+          "right": 824,
+          "w": 260,
+          "text": "-1%$0.1 OFFFree DeliveryWomen 01"
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 30
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 30
+        },
+        {
+          "k": "a|215x20|text-foreground hover:text-[#0095ca] text-sm",
+          "n": 25
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 34,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$10,000 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-8%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$100 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-4%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "home-km",
+      "route": "/km",
+      "width": 360,
+      "href": "http://localhost:3011/km",
+      "iw": 360,
+      "ih": 640,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "ប្រភេទទាំងអស់"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "ប្រភេទទាំងអស់"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "ប្រភេទទាំងអស់"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 304,
+          "right": 398,
+          "w": 94,
+          "text": "ប្រភេទទាំងអស់"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 30
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 30
+        },
+        {
+          "k": "a|310x20|text-foreground hover:text-[#0095ca] text-sm",
+          "n": 25
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 34,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$10,000 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-8%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$100 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-4%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    },
+    {
+      "label": "home-zh",
+      "route": "/zh",
+      "width": 360,
+      "href": "http://localhost:3011/zh",
+      "iw": 360,
+      "ih": 640,
+      "sw": 785,
+      "overflowCount": 16,
+      "overflow": [
+        {
+          "tag": "form",
+          "cls": "flex flex-1 items-center max-w-lg",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "所有分类"
+        },
+        {
+          "tag": "div",
+          "cls": "flex w-full items-center border rounded bg-card h-[42px] focus-within:ring-1 focus-within:ring-[#00a0e9] focus-within:border-[#00a",
+          "left": 265,
+          "right": 496,
+          "w": 231,
+          "text": "所有分类"
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 rounded-lg border border-transparent bg-clip-padding font-medium outline-none select-none focus-visible:bord",
+          "left": 266,
+          "right": 436,
+          "w": 170,
+          "text": "所有分类"
+        },
+        {
+          "tag": "span",
+          "cls": "absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center",
+          "left": 323,
+          "right": 379,
+          "w": 56,
+          "text": "所有分类"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 405,
+          "right": 417,
+          "w": 13,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "group/input-group w-full min-w-0 border border-input transition-colors outline-none in-data-[slot=combobox-content]:focus-within:b",
+          "left": 436,
+          "right": 495,
+          "w": 59,
+          "text": ""
+        },
+        {
+          "tag": "input",
+          "cls": "h-9 w-full min-w-0 border-input px-2.5 py-1 text-base transition-colors outline-none file:inline-flex file:h-6 file:border-0 file:",
+          "left": 437,
+          "right": 453,
+          "w": 16,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-",
+          "left": 453,
+          "right": 499,
+          "w": 46,
+          "text": ""
+        },
+        {
+          "tag": "button",
+          "cls": "group/button shrink-0 justify-center border border-transparent bg-clip-padding font-medium whitespace-nowrap transition-all outlin",
+          "left": 453,
+          "right": 491,
+          "w": 38,
+          "text": ""
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 462,
+          "right": 482,
+          "w": 20,
+          "text": ""
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center gap-4 flex-shrink-0 ml-2",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "div",
+          "cls": "flex items-center",
+          "left": 520,
+          "right": 785,
+          "w": 265,
+          "text": "LoginRegisterSell"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 520,
+          "right": 595,
+          "w": 75,
+          "text": "Login"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center bg-clip-padding whitespace-nowrap outline-none select-none focus-vis",
+          "left": 595,
+          "right": 688,
+          "w": 93,
+          "text": "Register"
+        },
+        {
+          "tag": "a",
+          "cls": "group/button inline-flex shrink-0 items-center justify-center border border-transparent bg-clip-padding whitespace-nowrap outline-",
+          "left": 688,
+          "right": 785,
+          "w": 98,
+          "text": "Sell"
+        },
+        {
+          "tag": "svg",
+          "cls": "[object SVGAnimatedString]",
+          "left": 711,
+          "right": 730,
+          "w": 19,
+          "text": ""
+        }
+      ],
+      "small": [
+        {
+          "k": "button|28x28|group/button inline-flex shrink-0 items-center jus",
+          "n": 30
+        },
+        {
+          "k": "button|36x36|group/heart h-9 w-9 z-30  rounded-full bg-card hov",
+          "n": 30
+        },
+        {
+          "k": "a|310x20|text-foreground hover:text-[#0095ca] text-sm",
+          "n": 25
+        },
+        {
+          "k": "a|128x32|",
+          "n": 3
+        },
+        {
+          "k": "a|67x19|hover:underline",
+          "n": 2
+        },
+        {
+          "k": "a|157x36|flex items-center gap-2",
+          "n": 1
+        },
+        {
+          "k": "button|36x36|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|40x40|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        },
+        {
+          "k": "button|170x40|group/button shrink-0 rounded-lg border border-tra",
+          "n": 1
+        },
+        {
+          "k": "input|16x36|h-9 w-full min-w-0 border-input px-2.5 py-1 text-b",
+          "n": 1
+        },
+        {
+          "k": "button|38x40|group/button shrink-0 justify-center border border",
+          "n": 1
+        },
+        {
+          "k": "a|75x42|group/button inline-flex shrink-0 items-center jus",
+          "n": 1
+        }
+      ],
+      "tiny": 34,
+      "tinySample": [
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-10%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$10,000 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-8%"
+        },
+        {
+          "px": "10px",
+          "cls": "bg-black/70 text-white text-[10px] px-2 py-0.5 rou",
+          "text": "$100 OFF"
+        },
+        {
+          "px": "11px",
+          "cls": "bg-red-600 text-white text-[11px] font-bold px-2 p",
+          "text": "-4%"
+        }
+      ],
+      "vh": [
+        "min-h-screen flex flex-col bg-muted"
+      ]
+    }
+  ]
+}

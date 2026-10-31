@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
 import Image from "next/image";
 import {
   Settings,
@@ -13,10 +12,12 @@ import {
   FolderOpen,
   BriefcaseBusiness,
   Info,
-  FileText,
+  BadgeDollarSign,
   Loader2,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import UserAvatar from "@/components/common/UserAvatar";
+import { VerifiedAccountCheck } from "@/components/common/VerifiedAccountBadge";
 import { Link, usePathname, useRouter } from "@/i18n/routing";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/sonner";
@@ -37,6 +38,8 @@ export interface ProfileUser {
   following: number;
   follower: number;
   joinDate: string;
+  /** Paid-plan badge (active subscription), derived by the backend. */
+  verifiedAccount?: boolean;
 }
 
 interface ProfileHeaderProps {
@@ -45,55 +48,25 @@ interface ProfileHeaderProps {
 }
 
 const PROFILE_TABS = [
-  // `routes` = every route this tab owns. The Jobs tab has two faces
-  // (/me/job-applications and /me/applied-jobs); a route owned by no tab
-  // highlights nothing rather than the wrong tab.
-  {
-    value: "manage-ads",
-    href: "/me",
-    routes: ["/me"],
-    labelKey: "Me.manageAdsTab",
-    icon: FolderOpen,
-  },
-  {
-    value: "about",
-    href: "/me/about",
-    routes: ["/me/about"],
-    labelKey: "Me.aboutTab",
-    icon: Info,
-  },
+  { value: "manage-ads", href: "/me", label: "Manage Ads", icon: FolderOpen },
+  { value: "about", href: "/me/about", label: "About", icon: Info },
   {
     value: "jobs",
     href: "/me/job-applications",
-    routes: ["/me/job-applications", "/me/applied-jobs"],
-    labelKey: "Me.jobs",
+    label: "Jobs",
     icon: BriefcaseBusiness,
   },
-  {
-    value: "saved",
-    href: "/me/saved",
-    routes: ["/me/saved"],
-    labelKey: "Nav.saved",
-    icon: Bookmark,
-  },
-  {
-    value: "likes",
-    href: "/me/likes",
-    routes: ["/me/likes"],
-    labelKey: "Nav.likes",
-    icon: Heart,
-  },
+  { value: "saved", href: "/me/saved", label: "Saved", icon: Bookmark },
+  { value: "likes", href: "/me/likes", label: "Likes", icon: Heart },
   {
     value: "subscriptions",
     href: "/me/subscriptions",
-    routes: ["/me/subscriptions"],
-    labelKey: "Me.subscriptionsTab",
-    icon: FileText,
+    label: "Subscriptions",
+    icon: BadgeDollarSign,
   },
 ] as const;
 
 export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
-  const t = useTranslations();
   const [open, setOpen] = useState(false);
   const [image, setImage] = useState<string | null>(null);
 
@@ -106,20 +79,21 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  // The tabs are routes, so the default is derived from the URL: the highlight
+  // stays correct on a hard load of a sub-tab and on back/forward (an
+  // uncontrolled Tabs would keep showing "Manage Ads"). The key remounts Tabs
+  // when the route changes so Radix's internal state can't go stale, while a
+  // click still lights its own tab immediately — no waiting for navigation.
   const pathname = usePathname();
+  const activeTab =
+    PROFILE_TABS.find(({ href }) => href === pathname)?.value ??
+    // /me/* pages that are not tabs (followers, membership, ...) keep the
+    // default section lit instead of dropping the highlight entirely.
+    "manage-ads";
 
-  // The tab strip is controlled by the route, not by click state: the header
-  // is shared by every /me page, so arriving from the avatar dropdown (or a
-  // hard reload) must highlight the tab the URL belongs to. Match exactly —
-  // a `/me` prefix rule would swallow every /me subpage. Unmatched subpages
-  // (followers/following, membership) highlight nothing.
-  const activeTab = PROFILE_TABS.find(({ routes }) =>
-    routes.some((route) => pathname === route),
-  )?.value;
-
-  // The profile page currently renders from a mock currentUser; these overrides
-  // reflect an upload immediately. router.refresh() keeps server data in sync
-  // once the page consumes real /users/me data (tracked follow-up).
+  // These overrides reflect an upload immediately; router.refresh() keeps the
+  // server data in sync.
   const displayedAvatar = avatarOverride ?? user.avatar;
   const displayedCover = coverOverride ?? user.cover;
   const handleImageClick = (src: string) => {
@@ -129,11 +103,11 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
 
   async function handlePhotoUpload(kind: "avatar" | "cover", file: File) {
     if (!file.type.startsWith("image/")) {
-      toast.error(t("Me.imageOnly"));
+      toast.error("Only image files are allowed");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error(t("Me.imageTooLarge"));
+      toast.error("Image must be 5MB or smaller");
       return;
     }
     const setUploading =
@@ -151,12 +125,10 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
         if (kind === "avatar") setAvatarOverride(url);
         else setCoverOverride(url);
       }
-      toast.success(
-        t(kind === "avatar" ? "Me.avatarUpdated" : "Me.coverUpdated"),
-      );
+      toast.success(`${kind === "avatar" ? "Avatar" : "Cover"} updated`);
       router.refresh();
     } catch {
-      toast.error(t("Me.uploadFailed"));
+      toast.error("Upload failed");
     } finally {
       setUploading(false);
     }
@@ -207,7 +179,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
             {displayedCover && (
               <Image
                 src={displayedCover}
-                alt={t("Me.coverAlt")}
+                alt="Cover"
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 fill
                 unoptimized
@@ -230,7 +202,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                   <Camera className="scale-135 text-foreground" />
                 )}
                 <span className="text-sm font-bold text-foreground">
-                  {uploadingCover ? t("Common.uploading") : t("Me.uploadCover")}
+                  {uploadingCover ? "Uploading..." : "Upload Cover"}
                 </span>
               </Button>
             )}
@@ -238,16 +210,22 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           <div className="px-6 pb-6">
             <div className="flex flex-col md:flex-row md:items-end gap-4 mt-1">
               <div
-                onClick={() => handleImageClick(displayedAvatar)}
+                onClick={() => {
+                  // No photo yet: the circle shows initials, and on your own
+                  // profile a click opens the picker (the cover behaves the
+                  // same way rather than opening a lightbox with nothing in it).
+                  if (displayedAvatar) {
+                    handleImageClick(displayedAvatar);
+                  } else if (isOwnProfile) {
+                    avatarInputRef.current?.click();
+                  }
+                }}
                 className="relative cursor-pointer"
               >
-                <Image
+                <UserAvatar
                   src={displayedAvatar}
-                  alt={user.name}
-                  width={120}
-                  height={120}
-                  unoptimized
-                  className="w-32 h-32 rounded-full border-4 border-card shadow-lg -mt-24"
+                  name={user.name}
+                  className="w-32 h-32 border-4 border-card shadow-lg -mt-24 text-4xl"
                 />
                 {isOwnProfile && (
                   <Button
@@ -272,7 +250,10 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
               <div className="flex-1">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div className="">
-                    <h1 className="text-xl font-medium ">{user.name}</h1>
+                    <div className="flex items-center gap-1.5">
+                      <h1 className="text-xl font-medium">{user.name}</h1>
+                      {user.verifiedAccount && <VerifiedAccountCheck />}
+                    </div>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="text-muted-foreground">@{user.username}</p>
                       <Button
@@ -280,7 +261,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                         onClick={() => router.replace("/me/membership")}
                         className="h-6 rounded-full border-orange-500 text-orange-500 bg-transparent px-3 text-[10px] font-medium hover:bg-orange-500 hover:text-white transition-colors cursor-pointer"
                       >
-                        {t("Me.upgradeAccount")}
+                        Upgrade Account
                       </Button>
                     </div>
                     <div className="flex gap-4 mb-2">
@@ -288,31 +269,24 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                         href="/me/following"
                         className="text-sm transition-colors hover:text-[#00a0e9]"
                       >
-                        {t("Me.followingCount", {
-                          count: user.following,
-                        })}
+                        {user.following} Following
                       </Link>
                       <Link
                         href="/me/followers"
                         className="text-sm transition-colors hover:text-[#00a0e9]"
                       >
-                        {t("Me.followersCount", {
-                          count: user.follower,
-                        })}
+                        {user.follower} Followers
                       </Link>
                     </div>
                     <p className="text-sm text-muted-foreground ">
-                      {t("Me.joined", { date: user.joinDate })}
+                      Joined {user.joinDate}
                     </p>
                   </div>
 
                   <div className="flex gap-2 flex-wrap md:flex-nowrap">
-                    <Button
-                      onClick={() => router.push("/me/resume")}
-                      className="flex items-center gap-2 px-5 h-11 bg-card border border-gray-300 rounded-lg font-medium text-slate-600 hover:bg-muted/50 transition cursor-pointer"
-                    >
+                    <Button className="flex items-center gap-2 px-5 h-11 bg-card border border-gray-300 rounded-lg font-medium text-slate-600 hover:bg-muted/50 transition cursor-pointer">
                       <IdCard className="h-5 w-5" />
-                      {t("Nav.resume")}
+                      Resume (CV)
                     </Button>
                     <Button className="flex items-center justify-center h-11 w-11 bg-card border border-gray-300 rounded-lg text-slate-600 hover:bg-muted/50 transition cursor-pointer">
                       <Forward className="h-5 w-5" />
@@ -330,9 +304,16 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
           </div>
           <hr className="border-border w-full" />
           <div className="flex items-center px-4 gap-4 h-14">
-            <Tabs value={activeTab ?? ""} className="flex-1">
-              <TabsList variant="line" className="w-full">
-                {PROFILE_TABS.map(({ value, href, labelKey, icon: Icon }) => (
+            <Tabs
+              key={activeTab}
+              defaultValue={activeTab}
+              className="flex-1 min-w-0"
+            >
+              <TabsList
+                variant="line"
+                className="w-full justify-start overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden group-data-horizontal/tabs:h-auto"
+              >
+                {PROFILE_TABS.map(({ value, href, label, icon: Icon }) => (
                   <TabsTrigger
                     key={value}
                     value={value}
@@ -344,7 +325,7 @@ export function MyProfileHeader({ user, isOwnProfile }: ProfileHeaderProps) {
                       className="flex items-center gap-2 font-medium transition"
                     >
                       <Icon className="h-4 w-4" />
-                      {t(labelKey)}
+                      {label}
                     </Link>
                   </TabsTrigger>
                 ))}

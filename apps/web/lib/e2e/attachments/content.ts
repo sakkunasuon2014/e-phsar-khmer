@@ -23,6 +23,10 @@ export interface AttachmentMeta {
   thumb?: string;
   /** MIME of `thumb`. */
   thumbMime?: string;
+  /** Optional purpose stored only inside the encrypted body. */
+  purpose?: "voice-note";
+  /** Voice-note duration, also encrypted with the message body. */
+  durationMs?: number;
 }
 
 export interface AttachmentContent {
@@ -46,12 +50,23 @@ export function buildAttachmentContent(
 function isMeta(a: unknown): a is AttachmentMeta {
   if (!a || typeof a !== "object") return false;
   const m = a as Record<string, unknown>;
+  if (
+    typeof m.id !== "string" ||
+    (m.kind !== "image" && m.kind !== "file") ||
+    typeof m.mime !== "string" ||
+    typeof m.key !== "string" ||
+    typeof m.ciphertextHash !== "string"
+  )
+    return false;
+  if (m.purpose === undefined) return m.durationMs === undefined;
   return (
-    typeof m.id === "string" &&
-    (m.kind === "image" || m.kind === "file") &&
-    typeof m.mime === "string" &&
-    typeof m.key === "string" &&
-    typeof m.ciphertextHash === "string"
+    m.purpose === "voice-note" &&
+    m.kind === "file" &&
+    m.mime.startsWith("audio/") &&
+    typeof m.durationMs === "number" &&
+    Number.isFinite(m.durationMs) &&
+    m.durationMs >= 300 &&
+    m.durationMs <= 60_000
   );
 }
 

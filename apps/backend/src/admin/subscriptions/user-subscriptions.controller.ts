@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
+  ParseBoolPipe,
+  ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -15,16 +17,21 @@ import { GrantSubscriptionDto } from './dto/grant-subscription.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/user-subscriptions')
 export class UserSubscriptionsController {
   constructor(private readonly service: UserSubscriptionsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List user subscriptions (joined, with status)' })
-  list() {
-    return this.service.list();
+  @ApiOperation({
+    summary:
+      'List current user subscriptions; history=true adds superseded rows',
+  })
+  list(
+    @Query('history', new ParseBoolPipe({ optional: true })) history?: boolean,
+  ) {
+    return this.service.list(history ?? false);
   }
 
   @Post()
@@ -33,9 +40,11 @@ export class UserSubscriptionsController {
     return this.service.grant(dto);
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete a user subscription' })
-  remove(@Param('id') id: string) {
-    return this.service.remove(id);
+  @Post(':id/revoke')
+  @ApiOperation({
+    summary: 'Revoke a current subscription (kept as history, never deleted)',
+  })
+  revoke(@Param('id', ParseUUIDPipe) id: string) {
+    return this.service.revoke(id);
   }
 }

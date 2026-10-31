@@ -5,6 +5,7 @@
  */
 
 import type { AttachmentMeta } from "@/lib/e2e/attachments/content";
+import type { SharedLocation } from "@/lib/e2e/chat-content";
 
 export type ListingStatus = "draft" | "active" | "expired" | "deleted";
 
@@ -12,6 +13,12 @@ export interface ChatUserSummary {
   id: string;
   username: string | null;
   profilePhotoUrl: string | null;
+  /**
+   * ISO over JSON. Coarse last activity ("last active 25 minutes ago"), not
+   * live presence — `null` when the user has never been active. Only ever
+   * shown to a participant of the conversation.
+   */
+  lastSeenAt?: string | null;
 }
 
 /** Listing context card attached to a message. Null when the ad was deleted. */
@@ -134,7 +141,6 @@ export interface SendMessageInput {
   recipientId: string;
   body?: string;
   listingId?: string;
-  imagePath?: string;
   groupId?: string;
   e2eHeader?: E2eHeader;
   /** v1: the identity key the session was built against (server 409s if it changed). */
@@ -183,6 +189,25 @@ export interface ThreadMessage extends ChatMessage {
    * its plaintext by the thread (the bubble renders `body` as the caption).
    */
   e2eFiles?: AttachmentMeta[];
+  /**
+   * Decrypted position of a structured location body. Its plaintext JSON is
+   * consumed here, never rendered as text (lib/e2e/chat-content.ts).
+   */
+  sharedLocation?: SharedLocation;
+  /** Decrypted body is the structured "listing card only" marker. */
+  listingOnly?: boolean;
+  /**
+   * No envelope for this device (`decrypt-message.ts` "unavailable" outcome)
+   * — predates this device joining the account's active set. Drives the
+   * collapsed notice row in `message-thread.tsx` (`lib/chat/group-unavailable`).
+   */
+  unavailable?: boolean;
+  /**
+   * Local-only row for a send the recipient cannot receive yet (no E2E device
+   * registered): "held" waits and sends by itself, "expired" gave up after the
+   * hold lifetime. Never present on server rows.
+   */
+  held?: "held" | "expired";
   pending?: boolean;
   failed?: boolean;
   /** Local correlation id for the optimistic echo (temp rows only). */

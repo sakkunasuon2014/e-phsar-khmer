@@ -6,7 +6,8 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --test \"lib/**/*.test.ts\""
   },
   "dependencies": {
     "@iconify/react": "^6.0.2",
@@ -32,6 +33,7 @@
     "next-themes": "^0.4.6",
     "next-top-loader": "^1.0.4",
     "nextjs-toploader": "^3.9.17",
+    "qrcode.react": "^4.2.0",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-day-picker": "^9.14.0",

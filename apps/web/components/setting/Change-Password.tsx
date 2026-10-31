@@ -69,7 +69,7 @@ export default function ChangePassword({ me }: { me?: SettingsUser | null }) {
           <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm ">
-              <h1 className="text-2xl font-medium text-foreground  mb-4 mt-12 text-center ">
+              <h1 className="type-page-title text-foreground mb-4 mt-12 text-center">
                 {t("title")}
               </h1>
               <p className="text-center mb-6">{t("description")}</p>
@@ -77,7 +77,7 @@ export default function ChangePassword({ me }: { me?: SettingsUser | null }) {
               {/* Asking for the current password is what stops a borrowed,
                   still-signed-in session from locking the owner out. */}
               <Field className="w-full max-w-md mx-auto">
-                <FieldLabel className="text-sm  text-foreground tracking-tight">
+                <FieldLabel className="text-foreground tracking-tight">
                   {t("current")} <span className="text-destructive">*</span>
                 </FieldLabel>
 
@@ -109,14 +109,14 @@ export default function ChangePassword({ me }: { me?: SettingsUser | null }) {
                   </InputGroupAddon>
                 </InputGroup>
                 {isCurrentInvalid && (
-                  <FieldDescription className="text-destructive text-sm">
+                  <FieldDescription className="text-destructive">
                     {t("currentHelp")}
                   </FieldDescription>
                 )}
               </Field>
 
               <Field className="w-full max-w-md mx-auto mt-6">
-                <FieldLabel className="text-sm  text-foreground tracking-tight">
+                <FieldLabel className="text-foreground tracking-tight">
                   {t("newPassword")} <span className="text-destructive">*</span>
                 </FieldLabel>
 
@@ -146,13 +146,13 @@ export default function ChangePassword({ me }: { me?: SettingsUser | null }) {
                   </InputGroupAddon>
                 </InputGroup>
                 {isPasswordInvalid && (
-                  <FieldDescription className="text-destructive text-sm">
+                  <FieldDescription className="text-destructive">
                     {t("newPasswordHelp")}
                   </FieldDescription>
                 )}
               </Field>
               <Field className="w-full max-w-md mx-auto mt-6">
-                <FieldLabel className="text-sm text-foreground tracking-tight">
+                <FieldLabel className="text-foreground tracking-tight">
                   {t("confirm")} <span className="text-destructive">*</span>
                 </FieldLabel>
 
@@ -185,7 +185,7 @@ export default function ChangePassword({ me }: { me?: SettingsUser | null }) {
                 </InputGroup>
 
                 {isConfirmInvalid && (
-                  <FieldDescription className="text-destructive text-sm">
+                  <FieldDescription className="text-destructive">
                     {t("confirmHelp")}
                   </FieldDescription>
                 )}

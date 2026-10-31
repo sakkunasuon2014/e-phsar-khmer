@@ -26,7 +26,7 @@ export function DialogStickyPostingRule() {
         </DialogHeader>
         <div className="-mx-4 no-scrollbar max-h-[50vh] overflow-y-auto px-4">
           <p>
-            Khmer24 Free Classifieds strives to offer its visitors the many
+            PhsarKhmer Free Classifieds strives to offer its visitors the many
             advantages of internet technology and to provide an interactive and
             personalized experience. We may use Personally Identifiable
             Information (your name, e-mail address, street address, telephone

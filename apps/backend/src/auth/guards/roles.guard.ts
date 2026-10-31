@@ -3,6 +3,14 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import type { RequestWithUser } from '../../common/types/request-with-user.type';
 
+/**
+ * Literal role matching — there is no hierarchy between roles. Since
+ * 2026-10-26 `super_admin` is a **governance tier, not a bigger admin tier**:
+ * it does not satisfy `@Roles('admin')`. Catalogue, listings, attributes,
+ * subscriptions and payments are admin work; stats, reports, team (via
+ * `/admin/users`), feedback and advertisements are the super_admin mandate, so
+ * those controllers name both roles explicitly.
+ */
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}

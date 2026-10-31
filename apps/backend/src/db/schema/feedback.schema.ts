@@ -10,13 +10,10 @@ import {
 import { users } from './users.schema';
 
 /**
- * Product feedback submitted from the public `/feedback` page.
- *
- * `userId` is null for an anonymous submission and SET NULL when the account
- * is purged: the feedback itself is platform history (the submitter's name,
- * phone and email are already on the row), so deleting the account must not
- * erase the queue. `imagePaths` holds storage paths under `feedback/`, not
- * public URLs — the admin API derives the URLs.
+ * Product feedback from the public Feedback page. Anonymous submissions are
+ * allowed (`userId` null); a signed-in submitter is linked so staff can see
+ * the account. `imagePaths` are storage paths under `feedback/` in the default
+ * bucket, uploaded server-side by FeedbackService.
  */
 export const feedback = pgTable(
   'feedback',
@@ -25,19 +22,16 @@ export const feedback = pgTable(
     userId: uuid('user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
-    name: varchar('name', { length: 200 }).notNull(),
+    name: varchar('name', { length: 150 }).notNull(),
     phone: varchar('phone', { length: 32 }).notNull(),
-    email: varchar('email', { length: 254 }),
+    email: varchar('email', { length: 255 }),
     description: text('description').notNull(),
     imagePaths: jsonb('image_paths').$type<string[]>().default([]).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
   },
-  (t) => [
-    index('feedback_created_at_idx').on(t.createdAt),
-    index('feedback_user_id_idx').on(t.userId),
-  ],
+  (t) => [index('feedback_created_at_idx').on(t.createdAt)],
 );
 
 export type FeedbackRow = typeof feedback.$inferSelect;

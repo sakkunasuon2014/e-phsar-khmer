@@ -17,7 +17,7 @@ export const isStorageObjectUrl = (src: string): boolean =>
 
 /** Admin-table stand-in for a DB image with no loadable Storage object. */
 export const NoImageCell = () => (
-  <span className="text-xs text-muted-foreground">—</span>
+  <span className="type-meta text-muted-foreground">—</span>
 );
 
 /**

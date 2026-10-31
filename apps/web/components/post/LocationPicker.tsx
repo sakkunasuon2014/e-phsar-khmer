@@ -165,7 +165,7 @@ export default function LocationPicker({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className={`flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
+            className={`flex w-full cursor-pointer items-center justify-between rounded-lg border px-3 py-2.5 text-left type-nav text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
               error
                 ? "border-destructive ring-3 ring-destructive/20"
                 : "border-gray-200"
@@ -203,7 +203,7 @@ export default function LocationPicker({
                 <ChevronLeft className="h-4 w-4" />
               </button>
             )}
-            <span className="truncate px-2 text-[15px]">
+            <span className="truncate px-2 type-body-sm">
               {crumbs.length > 0 ? crumbs.join(" › ") : t("chooseLocation")}
             </span>
             <button
@@ -212,7 +212,7 @@ export default function LocationPicker({
                 onChange(EMPTY_PLACE);
                 setLevel("province");
               }}
-              className="shrink-0 cursor-pointer rounded-full bg-muted px-3 py-1 text-[13px] text-muted-foreground hover:bg-muted/70"
+              className="shrink-0 cursor-pointer rounded-full bg-muted px-3 py-1 type-meta text-muted-foreground hover:bg-muted/70"
             >
               {t("clear")}
             </button>
@@ -220,11 +220,11 @@ export default function LocationPicker({
 
           <div className="max-h-80 overflow-y-auto py-1">
             {loading && rows.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-muted-foreground">
+              <p className="px-4 py-3 type-body-sm text-muted-foreground">
                 {t("loading")}
               </p>
             ) : rows.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-muted-foreground">
+              <p className="px-4 py-3 type-body-sm text-muted-foreground">
                 {t("nothingHere")}
               </p>
             ) : (
@@ -233,7 +233,7 @@ export default function LocationPicker({
                   key={row.id}
                   type="button"
                   onClick={() => pick(row)}
-                  className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left text-[15px] hover:bg-muted ${
+                  className={`flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left type-body-sm hover:bg-muted ${
                     selected?.id === row.id ? "bg-muted" : ""
                   }`}
                 >
@@ -251,7 +251,7 @@ export default function LocationPicker({
           </div>
         </PopoverContent>
       </Popover>
-      {error && <p className="mt-1.5 text-sm text-destructive">{error}</p>}
+      {error && <p className="mt-1.5 type-body-sm text-destructive">{error}</p>}
     </div>
   );
 }

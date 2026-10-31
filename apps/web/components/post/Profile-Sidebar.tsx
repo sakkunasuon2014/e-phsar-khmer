@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import UserAvatar from "@/components/common/UserAvatar";
+import { VerifiedAccountBadge } from "@/components/common/VerifiedAccountBadge";
 import { useFormatter, useTranslations } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { getUserById } from "@/lib/data";
 import { type User } from "@/lib/user";
 import {
   IconBuilding,
@@ -16,17 +18,31 @@ import { ContactSellerButton } from "@/components/chat/contact-seller-button";
 import { FollowButton } from "@/components/profile/FollowButton";
 import type { ListingContext } from "@/types/chat";
 import { trackEvent } from "@/lib/insights/queue";
+import { maskPhone } from "@/lib/phone";
+
+/**
+ * The email counterpart of `maskPhone`: the local part is reduced to its
+ * first character, the domain stays readable so the visitor can tell which
+ * mailbox they are asking for. A very short local part is fully masked.
+ */
+function maskEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0) return "***";
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  return `${local.length > 2 ? local[0] : "*"}***@${domain}`;
+}
 
 export default function ProfileSidebar({
   userId,
-  user: userProp,
+  user,
   listingId,
   listing,
   viewerId,
   initialFollowing = false,
 }: {
   userId: string;
-  user?: User;
+  user: User;
   listingId?: string;
   /** Preview card for the ad, stashed for the chat page — see ContactSellerButton. */
   listing?: ListingContext | null;
@@ -38,12 +54,60 @@ export default function ProfileSidebar({
 }) {
   const t = useTranslations("Post");
   const format = useFormatter();
-  const user = userProp ?? getUserById(userId);
-  if (!user) return null;
+  // Same "Show Phone Number" gate as the description block: the numbers stay
+  // masked until the visitor asks for them. The email follows the same rule —
+  // the "Show Email Address" control used to only log the event, leaving the
+  // address already readable above it.
+  const [phoneRevealed, setPhoneRevealed] = useState(false);
+  const [emailRevealed, setEmailRevealed] = useState(false);
   const isOwnAd = !!viewerId && viewerId === userId;
+  // An expired ad keeps its seller card (identity, follow) but offers no way
+  // to contact anyone: the offer is no longer live (captain, 2026-10-27).
+  const expired = listing?.status === "expired";
 
   const phone0 = user.phone?.[0];
   const phone1 = user.phone?.[1];
+  const phones: { value: string; badgeBg: string; letter: string }[] = [];
+  if (phone0) {
+    phones.push({ value: phone0, badgeBg: "bg-orange-400", letter: "C" });
+  }
+  if (phone1) {
+    phones.push({ value: phone1, badgeBg: "bg-green-600", letter: "S" });
+  }
+
+  // One list serves both states: revealed (linked) and masked (the reveal
+  // button, or the expired row that offers no action at all).
+  const phoneNodes = (linked: boolean) => (
+    <>
+      {phones.map((phone) => (
+        <span key={phone.value} className="flex items-center gap-1 font-bold">
+          <CarrierBadge
+            phone={phone.value}
+            fallback={
+              <span
+                className={`${phone.badgeBg} w-4 h-4 rounded-sm flex items-center justify-center type-discount text-white`}
+              >
+                {phone.letter}
+              </span>
+            }
+          />
+          {linked ? (
+            <a
+              href={`tel:${phone.value}`}
+              onClick={() => {
+                if (listingId) trackEvent(listingId, "call");
+              }}
+              className="hover:underline"
+            >
+              {phone.value}
+            </a>
+          ) : (
+            maskPhone(phone.value)
+          )}
+        </span>
+      ))}
+    </>
+  );
 
   // Avatar + name + handle. It becomes a link to the seller's profile only
   // when there is a real handle to link to — the server joins it onto the
@@ -52,24 +116,24 @@ export default function ProfileSidebar({
   const identity = (
     <>
       <div className="relative h-16 w-16 rounded-full border-4 border-card overflow-hidden">
-        <Image
+        <UserAvatar
           src={user?.avatar}
-          alt="avatar"
-          width={100}
-          height={100}
-          className="object-cover bg-card"
-          priority
-          unoptimized
+          name={user?.name}
+          className="h-full w-full text-xl"
+          imgClassName="bg-card"
         />
       </div>
-      <div className="text-card">
-        <h2 className="font-medium text-lg leading-tight">{user?.name}</h2>
+      <div className="text-card min-w-0">
+        <h2 className="type-card-heading flex min-w-0 items-center gap-1.5">
+          <span className="truncate">{user?.name}</span>
+          {user?.verifiedAccount && <VerifiedAccountBadge />}
+        </h2>
         {/* No handle, no row — the same rule the company, phone and email
             rows below already follow. */}
         {user?.username && (
-          <p className="text-sm opacity-90">@{user.username}</p>
+          <p className="type-body-sm opacity-90">@{user.username}</p>
         )}
-        <p className="text-xs">
+        <p className="type-meta">
           {t("membersSince", {
             date: user?.joinDate
               ? format.dateTime(new Date(user.joinDate), {
@@ -94,12 +158,14 @@ export default function ProfileSidebar({
                 pathname: "/[username]",
                 params: { username: user.username },
               }}
-              className="flex items-center gap-3  cursor-pointer"
+              className="flex min-w-0 flex-1 items-center gap-3  cursor-pointer"
             >
               {identity}
             </Link>
           ) : (
-            <div className="flex items-center gap-3">{identity}</div>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              {identity}
+            </div>
           )}
 
           {/* Nothing sits here on your own ad — the "Your Ad" badge that used
@@ -118,7 +184,7 @@ export default function ProfileSidebar({
         </div>
 
         {/* Contact Info Section */}
-        <div className="p-3 space-y-3 text-sm">
+        <div className="p-3 space-y-3 type-body-sm">
           {/* The jobs form's Company leads this list. Every row follows the
               same design — a muted icon square plus its text — and the first
               row is normally the username, so a job listing swaps in the
@@ -135,7 +201,7 @@ export default function ProfileSidebar({
                     stroke={1.5}
                   />
                 </div>
-                <p className="truncate leading-tight mt-1">{user.company}</p>
+                <p className="truncate type-body-sm mt-1">{user.company}</p>
               </div>
               <div className="border-t border-muted-foreground/30" />
             </>
@@ -153,7 +219,7 @@ export default function ProfileSidebar({
                 pathname: "/[username]",
                 params: { username: user?.username },
               }}
-              className="text-[#00a0e9] hover:underline truncate leading-tight mt-1"
+              className="type-body-sm text-[#00a0e9] hover:underline truncate mt-1"
             >
               {user?.userlink || "username"}
             </Link>
@@ -168,94 +234,81 @@ export default function ProfileSidebar({
                 <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
                   <IconPhoneCall size={18} className="text-muted-foreground" />
                 </div>
-                <div className="space-y-1">
-                  <div className="flex gap-3">
-                    {phone0 ? (
-                      <span className="flex items-center gap-1 font-bold">
-                        <CarrierBadge
-                          phone={phone0}
-                          fallback={
-                            <span className="bg-orange-400 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] text-white">
-                              C
-                            </span>
-                          }
-                        />
-                        <a
-                          href={`tel:${phone0}`}
-                          onClick={() => {
-                            if (listingId) trackEvent(listingId, "call");
-                          }}
-                          className="hover:underline"
-                        >
-                          {phone0}
-                        </a>
-                      </span>
-                    ) : null}
-                    {phone1 ? (
-                      <span className="flex items-center gap-1 font-bold">
-                        <CarrierBadge
-                          phone={phone1}
-                          fallback={
-                            <span className="bg-green-600 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] text-white">
-                              S
-                            </span>
-                          }
-                        />
-                        <a
-                          href={`tel:${phone1}`}
-                          onClick={() => {
-                            if (listingId) trackEvent(listingId, "call");
-                          }}
-                          className="hover:underline"
-                        >
-                          {phone1}
-                        </a>
-                      </span>
-                    ) : null}
+                {phoneRevealed ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {phoneNodes(true)}
                   </div>
+                ) : expired ? (
+                  <span className="flex flex-wrap items-center gap-3">
+                    {phoneNodes(false)}
+                  </span>
+                ) : (
                   <button
                     type="button"
                     onClick={() => {
+                      setPhoneRevealed(true);
                       if (listingId) trackEvent(listingId, "show_contact");
                     }}
-                    className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer"
+                    className="-m-1 flex cursor-pointer flex-col items-start gap-1 rounded-md p-1 text-left transition-colors hover:bg-muted"
                   >
-                    {t("showPhone")}
+                    <span className="flex flex-wrap items-center gap-3">
+                      {phoneNodes(false)}
+                    </span>
+                    <span className="text-[#00a0e9] type-body-sm italic">
+                      {t("showPhone")}
+                    </span>
                   </button>
-                </div>
+                )}
               </div>
               <div className="border-t border-muted-foreground/30" />
             </>
           ) : null}
           {/* Email — same rule: no address, no row (captain, 2026-09-24:
               "if it has no data don't let it appear … I don't enter any then
-              it still show email row"). */}
-          {user?.email ? (
+              it still show email row"). An expired ad hides it entirely:
+              there is no live offer to reply to. */}
+          {!expired && user?.email ? (
             <>
               <div className="flex gap-3">
                 <div className="bg-muted h-8 w-8 rounded-sm flex items-center justify-center flex-shrink-0">
                   <IconMail size={18} className="text-muted-foreground" />
                 </div>
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">{user.email}</p>
+                {emailRevealed ? (
+                  <a
+                    href={`mailto:${user.email}`}
+                    className="font-medium text-foreground hover:underline break-all"
+                  >
+                    {user.email}
+                  </a>
+                ) : (
                   <button
                     type="button"
                     onClick={() => {
+                      setEmailRevealed(true);
                       if (listingId) trackEvent(listingId, "show_contact");
                     }}
-                    className="text-[#00a0e9] text-xs italic hover:underline cursor-pointer"
+                    className="-m-1 flex cursor-pointer flex-col items-start gap-1 rounded-md p-1 text-left transition-colors hover:bg-muted"
                   >
-                    {t("showEmail")}
+                    <span className="font-medium text-foreground break-all">
+                      {maskEmail(user.email)}
+                    </span>
+                    <span className="text-[#00a0e9] type-body-sm italic">
+                      {t("showEmail")}
+                    </span>
                   </button>
-                </div>
+                )}
               </div>
               <div className="border-t border-muted-foreground/30" />
             </>
           ) : null}
 
           {isOwnAd ? (
-            <div className="w-full bg-muted text-muted-foreground h-10 rounded-sm font-medium text-sm flex items-center justify-center text-center px-2">
+            <div className="w-full bg-muted text-muted-foreground h-10 rounded-sm type-nav flex items-center justify-center text-center px-2">
               {t("ownAdNote")}
+            </div>
+          ) : expired ? (
+            <div className="w-full bg-muted text-muted-foreground h-10 rounded-sm type-nav flex items-center justify-center text-center px-2">
+              {t("expiredContact")}
             </div>
           ) : (
             <ContactSellerButton
@@ -263,7 +316,7 @@ export default function ProfileSidebar({
               listingId={listingId}
               listing={listing}
               viewerId={viewerId}
-              className="w-full bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 rounded-sm font-medium text-base cursor-pointer"
+              className="w-full bg-[#f68b1e] hover:bg-[#e57a10] text-white h-10 rounded-sm type-nav cursor-pointer"
             />
           )}
         </div>
@@ -277,11 +330,11 @@ export default function ProfileSidebar({
             height={32}
             unoptimized
           />
-          <h2 className="text-[#e3281b] text-lg font-bold">
+          <h2 className="text-[#e3281b] type-card-heading">
             {t("safetyTips.title")}
           </h2>
         </div>
-        <ol className="space-y-3 text-sm text-foreground list-decimal pl-6 pb-3">
+        <ol className="space-y-3 type-body-sm text-foreground list-decimal pl-6 pb-3">
           <li className="px-2">{t("safetyTips.noMoney")}</li>
           <li className="px-2">{t("safetyTips.checkItem")}</li>
           <li className="px-2">{t("safetyTips.payAfter")}</li>

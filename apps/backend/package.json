@@ -23,7 +23,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed": "ts-node src/db/seed.ts"
+    "db:seed": "ts-node src/db/seed.ts",
+    "db:seed:subscriptions": "ts-node src/subscriptions/seeds/run-subscriptions-seed.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^12.0.0",

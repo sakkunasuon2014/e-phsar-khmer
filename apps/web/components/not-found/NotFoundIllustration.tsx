@@ -83,12 +83,12 @@ export default function NotFoundIllustration({
         x="213"
         y="203"
         textAnchor="middle"
-        fontSize="17"
+        fontSize="14"
         fontWeight="700"
         fill="#ffffff"
         className="font-sans"
       >
-        psakhmer
+        PhsarKhmer
       </text>
 
       {/* ── Head: white face, blue outline, dot eyes, frown ───────────────── */}

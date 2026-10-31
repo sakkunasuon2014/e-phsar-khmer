@@ -69,10 +69,15 @@ function mockSelect(db: MockDb, rows: unknown[]) {
   });
 }
 
-function mockUpdate(db: MockDb) {
-  const set = jest
-    .fn()
-    .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) });
+function mockUpdate(db: MockDb, reclaimed: Array<{ id: string }> = []) {
+  const set = jest.fn().mockReturnValue({
+    where: jest.fn().mockReturnValue({
+      returning: () => Promise.resolve(reclaimed),
+      then: (resolve: (v: undefined) => unknown) =>
+        Promise.resolve(undefined).then(resolve),
+      catch: () => undefined,
+    }),
+  });
   db.update.mockReturnValue({ set });
   return set;
 }
@@ -259,7 +264,7 @@ describe('IdempotencyMiddleware', () => {
         lockedAt: new Date(Date.now() - 60_000),
       },
     ]);
-    const set = mockUpdate(db);
+    const set = mockUpdate(db, [{ id: 'row-1' }]);
     const middleware = makeMiddleware(db);
 
     await middleware.use(
@@ -299,5 +304,74 @@ describe('IdempotencyMiddleware', () => {
         responseBody: { success: true, data: { id: 'listing-1' } },
       }),
     );
+  });
+
+  it('returns 422 when a completed key is replayed with a different body', async () => {
+    mockDelete(db);
+    mockInsert(db, []);
+    mockSelect(db, [
+      {
+        id: 'row-1',
+        status: 'completed',
+        requestHash: bodyHash({ other: 'body' }),
+        responseStatus: 201,
+        responseBody: { success: true },
+      },
+    ]);
+    const middleware = makeMiddleware(db);
+    const { res, status } = makeRes();
+
+    await middleware.use(
+      makeReq({ headers: { 'idempotency-key': 'key-1' } }),
+      res,
+      next,
+    );
+
+    expect(status).toHaveBeenCalledWith(422);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when another retry already reclaimed the stale row', async () => {
+    mockDelete(db);
+    mockInsert(db, []);
+    mockSelect(db, [
+      {
+        id: 'row-1',
+        status: 'processing',
+        requestHash: null,
+        lockedAt: new Date(Date.now() - 60_000),
+      },
+    ]);
+    mockUpdate(db, []);
+    const middleware = makeMiddleware(db);
+    const { res, status } = makeRes();
+
+    await middleware.use(
+      makeReq({ headers: { 'idempotency-key': 'key-1' } }),
+      res,
+      next,
+    );
+
+    expect(status).toHaveBeenCalledWith(409);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('marks a 5xx response failed instead of caching it', async () => {
+    mockDelete(db);
+    mockInsert(db, [{ id: 'row-1' }]);
+    const set = mockUpdate(db);
+    const middleware = makeMiddleware(db);
+    const { res } = makeRes();
+
+    await middleware.use(
+      makeReq({ headers: { 'idempotency-key': 'key-1' } }),
+      res,
+      next,
+    );
+    res.statusCode = 500;
+    res.json({ success: false });
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(set).toHaveBeenCalledWith({ status: 'failed' });
   });
 });

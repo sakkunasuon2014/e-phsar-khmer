@@ -39,7 +39,7 @@ export default function CategoryTileBody({
           />
         )}
       </div>
-      <span className="mt-4 text-sm leading-tight text-foreground">{name}</span>
+      <span className="mt-4 type-body-sm text-foreground">{name}</span>
     </>
   );
 }

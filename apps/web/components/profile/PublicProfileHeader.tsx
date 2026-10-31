@@ -6,7 +6,9 @@ import { usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Link } from "@/i18n/routing";
 import { Button } from "@/components/ui/button";
-import { User } from "@/lib/user";
+import UserAvatar from "@/components/common/UserAvatar";
+import { VerifiedAccountCheck } from "@/components/common/VerifiedAccountBadge";
+import type { User } from "@/lib/user";
 import {
   profileTabHref,
   pushProfileTab,
@@ -24,7 +26,6 @@ import {
   Globe,
   Link2,
 } from "lucide-react";
-import { IconRosetteDiscountCheckFilled } from "@tabler/icons-react";
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
@@ -114,12 +115,10 @@ export default function PublicProfileHeader({
               <div className="relative w-full h-full rounded-full border-[4px] border-card bg-card shadow-md">
                 {/* Inner Image Mask — Only this layer hides the image corners */}
                 <div className="w-full h-full rounded-full overflow-hidden relative">
-                  <Image
+                  <UserAvatar
                     src={profileImg}
-                    alt={t("avatarAlt")}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover"
+                    name={user.name}
+                    className="h-full w-full text-4xl"
                   />
                 </div>
 
@@ -132,16 +131,16 @@ export default function PublicProfileHeader({
             <div className="flex-1 flex flex-row justify-between items-start pt-3 pb-4 gap-4 min-w-0">
               <div className="flex flex-col gap-1 min-w-0 space-y-1 mt-1">
                 <div className="flex items-center gap-2 flex-wrap ">
-                  <h1 className="text-xl font-bold text-foreground leading-tight">
+                  <h1 className="type-page-title text-foreground">
                     {user.name}
                   </h1>
-                  <IconRosetteDiscountCheckFilled className="w-5 h-5 text-blue-500 fill-blue-100 shrink-0" />
+                  {user.verifiedAccount && <VerifiedAccountCheck />}
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className="type-body-sm text-muted-foreground">
                   @{user.username}
                 </p>
 
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-4 type-body-sm text-muted-foreground">
                   {(
                     [
                       {
@@ -187,7 +186,7 @@ export default function PublicProfileHeader({
                     );
                   })}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                <div className="flex items-center gap-2 type-meta text-muted-foreground flex-wrap">
                   <span className="flex items-center gap-1">
                     <Calendar size={12} />{" "}
                     {t("joined", { date: user.joinDate ?? "" })}
@@ -231,7 +230,7 @@ export default function PublicProfileHeader({
                   initialFollowing={initialFollowing}
                   viewerId={viewerId}
                   variant="profile"
-                  className="rounded-full bg-card hover:bg-card/80 text-foreground px-5 h-9 text-sm font-semibold shadow-sm"
+                  className="rounded-full bg-card hover:bg-card/80 text-foreground px-5 h-9 type-nav shadow-sm"
                 />
                 {/* Each contact button renders only when the profile actually
                     carries that detail: a real profile exposes neither a phone

@@ -36,9 +36,25 @@ function limitQuery(rows: unknown[]) {
   };
 }
 
+// .from().where().orderBy().limit() → rows
+function listQuery(rows: unknown[]) {
+  return {
+    from: () => ({
+      where: () => ({
+        orderBy: () => ({ limit: () => Promise.resolve(rows) }),
+      }),
+    }),
+  };
+}
+
 function makeDb() {
   return { select: jest.fn(), update: jest.fn(), insert: jest.fn() };
 }
+
+const pubsub = { publish: jest.fn() };
+beforeEach(() => {
+  pubsub.publish.mockReset().mockResolvedValue(undefined);
+});
 
 describe('E2eBackupService.unlock', () => {
   let authHash: string;
@@ -56,7 +72,7 @@ describe('E2eBackupService.unlock', () => {
         ]),
       )
       .mockReturnValueOnce(updateReturning([], sets));
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     await expect(service.unlock('u1', 'right-auth-key')).resolves.toEqual({
       wrappedKey: 'wk',
@@ -71,7 +87,7 @@ describe('E2eBackupService.unlock', () => {
         { passcodeAuthHash: authHash, wrappedKey: 'wk', failedAttempts: 2 },
       ]),
     );
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     const err = await service.unlock('u1', 'wrong').catch((e: unknown) => e);
     expect(err).toBeInstanceOf(BadRequestException);
@@ -96,7 +112,7 @@ describe('E2eBackupService.unlock', () => {
         ]),
       )
       .mockReturnValueOnce(updateReturning([], sets));
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     const err = await service.unlock('u1', 'wrong').catch((e: unknown) => e);
     expect((err as BadRequestException).getResponse()).toMatchObject({
@@ -120,7 +136,7 @@ describe('E2eBackupService.unlock', () => {
         },
       ]),
     );
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     const err = await service
       .unlock('u1', 'right-auth-key')
@@ -140,7 +156,7 @@ describe('E2eBackupService.unlock', () => {
         { keyCheck: 'kc', wrappedKey: null, passcodeAuthHash: null },
       ]),
     );
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     await expect(service.unlock('u1', 'x')).rejects.toThrow(NotFoundException);
   });
@@ -150,7 +166,7 @@ describe('E2eBackupService.setPasscode', () => {
   it('409s when the caller holds a different backup key', async () => {
     const db = makeDb();
     db.update.mockReturnValueOnce(updateReturning([]));
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     await expect(
       service.setPasscode('u1', {
@@ -168,7 +184,7 @@ describe('E2eBackupService.setPasscode', () => {
     const db = makeDb();
     const sets: Record<string, unknown>[] = [];
     db.update.mockReturnValueOnce(updateReturning([{ userId: 'u1' }], sets));
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     await service.setPasscode('u1', {
       keyCheck: 'kc',
@@ -188,7 +204,7 @@ describe('E2eBackupService.setPasscode', () => {
     const db = makeDb();
     const sets: Record<string, unknown>[] = [];
     db.update.mockReturnValueOnce(updateReturning([{ userId: 'u1' }], sets));
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     await service.setPasscode('u1', {
       keyCheck: 'kc',
@@ -206,7 +222,7 @@ describe('E2eBackupService.setPasscode', () => {
     // The guarded UPDATE matches nothing when the proof hash differs.
     const db = makeDb();
     db.update.mockReturnValueOnce(updateReturning([]));
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     const err = await service
       .setPasscode('u1', {
@@ -229,6 +245,9 @@ describe('E2eBackupService.init', () => {
   it('stores keyCheck and the proof hash, never the raw proof', async () => {
     const db = makeDb();
     const values: Record<string, unknown>[] = [];
+    db.select
+      .mockReturnValueOnce(limitQuery([{ id: 'd1' }])) // assertOwnDevice
+      .mockReturnValueOnce(limitQuery([{ keyCheck: 'kc' }])); // getStatus
     db.insert.mockReturnValueOnce({
       values: (v: Record<string, unknown>) => {
         values.push(v);
@@ -239,10 +258,13 @@ describe('E2eBackupService.init', () => {
         };
       },
     });
-    db.select.mockReturnValueOnce(limitQuery([{ keyCheck: 'kc' }]));
-    const service = new E2eBackupService(db as never);
+    const service = new E2eBackupService(db as never, pubsub as never);
 
-    const res = await service.init('u1', 'kc', 'secret-proof');
+    const res = await service.init('u1', {
+      deviceId: 'd1',
+      keyCheck: 'kc',
+      keyProof: 'secret-proof',
+    });
 
     expect(values[0]).toEqual({
       userId: 'u1',
@@ -252,6 +274,56 @@ describe('E2eBackupService.init', () => {
     expect(res).toMatchObject({ created: true, keyCheck: 'kc' });
     // getStatus must never leak the hash
     expect(res).not.toHaveProperty('keyProofHash');
+  });
+
+  it("404s a device that is not one of the caller's active devices", async () => {
+    const db = makeDb();
+    db.select.mockReturnValueOnce(limitQuery([])); // assertOwnDevice
+    const service = new E2eBackupService(db as never, pubsub as never);
+
+    await expect(
+      service.init('u1', {
+        deviceId: 'foreign-device',
+        keyCheck: 'kc',
+        keyProof: 'kp',
+      }),
+    ).rejects.toThrow(NotFoundException);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('E2eBackupService.listSegments', () => {
+  it("404s a device that isn't the caller's active device", async () => {
+    const db = makeDb();
+    db.select.mockReturnValueOnce(limitQuery([])); // assertOwnDevice
+    const service = new E2eBackupService(db as never, pubsub as never);
+
+    await expect(
+      service.listSegments('u1', { deviceId: 'foreign-device' }),
+    ).rejects.toThrow(NotFoundException);
+    // The paging query must never run.
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('pages the caller device backlog and returns an opaque latest cursor', async () => {
+    const db = makeDb();
+    const createdAt = new Date('2026-10-24T00:00:00.000Z');
+    db.select
+      .mockReturnValueOnce(limitQuery([{ id: 'd1' }])) // assertOwnDevice
+      .mockReturnValueOnce(
+        listQuery([{ id: 's1', ciphertext: 'c1', messageCount: 2, createdAt }]),
+      );
+    const service = new E2eBackupService(db as never, pubsub as never);
+
+    const page = await service.listSegments('u1', { deviceId: 'd1' });
+
+    expect(page.items).toEqual([
+      { id: 's1', ciphertext: 'c1', messageCount: 2 },
+    ]);
+    expect(page.nextCursor).toBeNull();
+    expect(
+      JSON.parse(Buffer.from(page.latestCursor!, 'base64').toString('utf8')),
+    ).toEqual({ createdAt: createdAt.toISOString(), id: 's1' });
   });
 });
 
@@ -263,37 +335,51 @@ describe('hashKeyProof', () => {
   });
 });
 
-describe('E2eBackupService.approve', () => {
-  it('409s when the request is no longer pending', async () => {
-    const db = makeDb();
-    db.select.mockReturnValueOnce(limitQuery([{ id: 'd-old' }])); // own device
-    db.update.mockReturnValueOnce(updateReturning([]));
-    const service = new E2eBackupService(db as never);
+describe('E2eBackupService realtime hints', () => {
+  function insertReturning(rows: unknown[]) {
+    return {
+      values: () => ({
+        onConflictDoNothing: () => ({ returning: () => Promise.resolve(rows) }),
+        returning: () => Promise.resolve(rows),
+      }),
+    };
+  }
 
-    const err = await service
-      .approve('u1', 'r1', {
-        approverDeviceId: 'd-old',
-        header: { v: 1, dh: 'dh', pn: 0, n: 0 },
-        wrappedKey: 'wk',
-      })
-      .catch((e: unknown) => e);
-    expect((err as ConflictException).getResponse()).toMatchObject({
-      code: 'E2E_REQUEST_NOT_PENDING',
+  it('announces an uploaded segment by device id only, never its ciphertext', async () => {
+    const db = makeDb();
+    db.select.mockReturnValueOnce(limitQuery([{ id: 'd1' }]));
+    db.insert.mockReturnValueOnce(insertReturning([{ id: 's1' }]));
+    const service = new E2eBackupService(db as never, pubsub as never);
+
+    await service.addSegment('u1', {
+      deviceId: 'd1',
+      ciphertext: 'SECRET-CIPHERTEXT',
+      messageCount: 3,
     });
+
+    expect(pubsub.publish).toHaveBeenCalledWith({
+      targetUserId: 'u1',
+      type: 'notification',
+      payload: { type: 'e2e.backup_updated', data: { deviceId: 'd1' } },
+    });
+    expect(JSON.stringify(pubsub.publish.mock.calls)).not.toContain(
+      'SECRET-CIPHERTEXT',
+    );
   });
 
-  it("404s when the approver isn't one of the caller's active devices", async () => {
+  it('does not fail the write when the push itself fails', async () => {
     const db = makeDb();
-    db.select.mockReturnValueOnce(limitQuery([]));
-    const service = new E2eBackupService(db as never);
+    db.select.mockReturnValueOnce(limitQuery([{ id: 'd1' }]));
+    db.insert.mockReturnValueOnce(insertReturning([{ id: 's1' }]));
+    pubsub.publish.mockRejectedValueOnce(new Error('redis down'));
+    const service = new E2eBackupService(db as never, pubsub as never);
 
     await expect(
-      service.approve('u1', 'r1', {
-        approverDeviceId: 'someone-elses',
-        header: { v: 1, dh: 'dh', pn: 0, n: 0 },
-        wrappedKey: 'wk',
+      service.addSegment('u1', {
+        deviceId: 'd1',
+        ciphertext: 'c',
+        messageCount: 1,
       }),
-    ).rejects.toThrow(NotFoundException);
-    expect(db.update).not.toHaveBeenCalled();
+    ).resolves.toEqual({ id: 's1' });
   });
 });

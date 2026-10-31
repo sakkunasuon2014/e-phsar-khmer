@@ -862,6 +862,88 @@ export async function seedAttributes(db: DbClient): Promise<void> {
       );
   }
 
+  // Car colour Khmer names (captain's file, 2026-10-23). Colours are
+  // seed-owned — they are not in the admin attribute UI — so this map is
+  // authoritative and overwrites existing rows on every re-seed.
+  const CAR_COLORS_KM: Record<string, string> = {
+    beige: 'ពណ៌ត្នោតខ្ចី',
+    black: 'ពណ៌ខ្មៅ',
+    blue: 'ពណ៌ខៀវ',
+    brown: 'ពណ៌ត្នោត',
+    gold: 'ពណ៌មាស',
+    gray: 'ពណ៌ប្រផេះ',
+    green: 'ពណ៌បៃតង',
+    orange: 'ពណ៌ទឹកក្រូច',
+    purple: 'ពណ៌ស្វាយ',
+    red: 'ពណ៌ក្រហម',
+    silver: 'ពណ៌ប្រាក់',
+    white: 'ពណ៌ស',
+    yellow: 'ពណ៌លឿង',
+    other: 'ផ្សេងៗ',
+  };
+  for (const [slug, nameKm] of Object.entries(CAR_COLORS_KM)) {
+    await db
+      .update(attributeOptions)
+      .set({ nameKm })
+      .where(
+        and(
+          eq(attributeOptions.type, 'colors'),
+          eq(attributeOptions.slug, slug),
+        ),
+      );
+  }
+
+  // Camera & camcorder Type Khmer names (captain's mock, 2026-10-23).
+  // `types` is admin-managed, so this gap-fills only nulls — an admin-entered
+  // Khmer name is never overwritten by a re-seed. `Lens & Filters` stays
+  // English (the mock shows no Khmer name); the shared `other` row gets its
+  // km label in the TV map below.
+  const CAMERA_TYPE_KM: Record<string, string> = {
+    'digital-cameras': 'កាមេរ៉ាឌីជីថល',
+    camcorders: 'ម៉ាស៊ីនថតវីដេអូ',
+    'flashes-flash-acc': 'ភ្លើង និងគ្រឿងបន្លែម',
+    'lighting-studio': 'ពន្លឺ និងស្ទូឌីយ៉ូ',
+    'cases-bags': 'ស្រោម និងកាបូប',
+    'batteries-chargers': 'ថ្ម និងឆ្នាំងសាក',
+  };
+  for (const [slug, nameKm] of Object.entries(CAMERA_TYPE_KM)) {
+    await db
+      .update(attributeOptions)
+      .set({ nameKm })
+      .where(
+        and(
+          eq(attributeOptions.type, 'types'),
+          eq(attributeOptions.slug, slug),
+          isNull(attributeOptions.nameKm),
+        ),
+      );
+  }
+
+  // TV, Videos & Audio Type Khmer names (captain's mock, 2026-10-23). Same
+  // null-only rule. `speakers` and `microphones` are shared rows, so their
+  // km labels also serve the other families that use those `types` rows; the
+  // shared `other` row gets `ផ្សេងៗ` here, which applies to every Type picker.
+  const TV_TYPE_KM: Record<string, string> = {
+    televisions: 'ទូរទស្សន៍',
+    speakers: 'អូឌីយ៉ូ',
+    'audio-interfaces': 'ឧបករណ៍អូឌីយ៉ូ',
+    microphones: 'មីក្រូហ្វូន',
+    remotes: 'រីម៉ូត',
+    other: 'ផ្សេងៗ',
+  };
+  for (const [slug, nameKm] of Object.entries(TV_TYPE_KM)) {
+    await db
+      .update(attributeOptions)
+      .set({ nameKm })
+      .where(
+        and(
+          eq(attributeOptions.type, 'types'),
+          eq(attributeOptions.slug, slug),
+          isNull(attributeOptions.nameKm),
+        ),
+      );
+  }
+
   // Car body-type icons are the web app's local /sub-img design assets —
   // interim until they move to Supabase storage. Gap-fills only null icons
   // (admin-uploaded images are never overwritten); the insert-only loop

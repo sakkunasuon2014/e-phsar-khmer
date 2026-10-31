@@ -41,7 +41,7 @@ export default function AddAddress() {
           <SettingSidebar />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm">
-              <h1 className="text-2xl font-medium text-foreground mb-4 mt-4 px-4">
+              <h1 className="type-page-title text-foreground mb-4 mt-4 px-4">
                 {t("addTitle")}
               </h1>
               <div className="mt-2 px-4 space-y-4">
@@ -177,7 +177,7 @@ export default function AddAddress() {
                   }}
                   className="flex items-center justify-between p-3 bg-card border border-muted-foreground/20 rounded-sm cursor-pointer"
                 >
-                  <FieldLabel className="px-1 text-muted-foreground text-sm cursor-pointer">
+                  <FieldLabel className="px-1 text-muted-foreground cursor-pointer">
                     {t("setAsDefault")}
                   </FieldLabel>
 

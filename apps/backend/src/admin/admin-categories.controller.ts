@@ -17,7 +17,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/categories')
 export class AdminCategoriesController {

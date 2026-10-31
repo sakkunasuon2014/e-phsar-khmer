@@ -16,6 +16,7 @@ import { ListingsService } from './listings.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { QueryListingsDto } from './dto/query-listings.dto';
+import { QueryTrendingDto } from './dto/query-trending.dto';
 
 @ApiTags('listings')
 @Controller('listings')
@@ -27,6 +28,15 @@ export class ListingsController {
   @ApiOperation({ summary: 'Browse active listings feed (cursor-based)' })
   getFeed(@Query() query: QueryListingsDto) {
     return this.listingsService.findFeed(query);
+  }
+
+  @Get('trending')
+  @Public()
+  @ApiOperation({
+    summary: 'Trending listings (engagement-ranked over a rolling window)',
+  })
+  getTrending(@Query() query: QueryTrendingDto) {
+    return this.listingsService.findTrending(query);
   }
 
   @Get('me/all')
@@ -43,7 +53,7 @@ export class ListingsController {
   @Public()
   @ApiOperation({ summary: 'Get listing by ID' })
   getOne(@Param('id') id: string) {
-    return this.listingsService.findById(id);
+    return this.listingsService.findPublicById(id);
   }
 
   @Post()

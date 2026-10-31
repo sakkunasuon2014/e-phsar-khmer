@@ -18,7 +18,9 @@ export type UploadScope =
   | "subcategory"
   | "brand"
   | "model"
-  | "attribute";
+  | "product"
+  | "attribute"
+  | "advertisement";
 
 export interface SignUploadResponse {
   signedUrl: string;

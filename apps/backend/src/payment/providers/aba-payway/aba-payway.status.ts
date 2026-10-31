@@ -1,21 +1,18 @@
 import type { PaymentAttemptOutcome } from '../payment-gateway.types';
 
-/** ABA PayWay returns "00" on `status.code` when the API call itself succeeded. */
+/** `status.code` on an ABA response: the API call worked (not the payment). */
 export const ABA_PAYWAY_API_OK = '00';
 
-/** ABA PayWay returns 0 on `payment_status_code` when the payment was approved. */
+/** `payment_status_code` for an approved payment. */
 const PAYMENT_APPROVED_CODE = 0;
 
 const APPROVED_TEXT = ['APPROVED', 'SUCCESS', 'COMPLETED'];
 const PENDING_TEXT = ['PENDING', 'PRE-AUTH', 'PREAUTH', 'PROCESSING'];
 
 /**
- * Maps an ABA PayWay payment outcome (from check-transaction or the webhook
- * body) onto our own `payment_attempts.status` values. `paymentStatusCode`
- * is authoritative when present; the textual `paymentStatus` is the
- * fallback because not every endpoint returns the code. Anything
- * unrecognised stays `pending` — an attempt is only marked `failed` on an
- * explicit rejection, never on an ambiguous response.
+ * Maps check-transaction's status onto `payment_attempts.status`. The code
+ * wins; the text is the fallback. `failed` only on an explicit non-zero code —
+ * anything ambiguous stays `pending`.
  */
 export function toPaymentAttemptOutcome(
   paymentStatusCode?: number | null,
@@ -30,8 +27,29 @@ export function toPaymentAttemptOutcome(
   if (APPROVED_TEXT.includes(normalized)) return 'succeeded';
   if (PENDING_TEXT.includes(normalized)) return 'pending';
 
-  // A non-zero code is an explicit rejection from PayWay.
   if (typeof paymentStatusCode === 'number') return 'failed';
 
   return 'pending';
+}
+
+/**
+ * Maps the callback's `status` (a number in practice, `0` = approved; a
+ * string is accepted too). Only a plain non-negative integer is a code —
+ * anything else (`""`, `null`, `false`, `"abc"`, missing) is `unknown`.
+ * Don't use `Number()` here: it turns `""`/`null`/`false` into `0`, an
+ * approval the payload never made.
+ */
+export function webhookStatusToOutcome(
+  status: unknown,
+): PaymentAttemptOutcome | 'unknown' {
+  let code: number;
+  if (typeof status === 'number') {
+    code = status;
+  } else if (typeof status === 'string' && /^\d+$/.test(status.trim())) {
+    code = Number(status.trim());
+  } else {
+    return 'unknown';
+  }
+  if (!Number.isInteger(code) || code < 0) return 'unknown';
+  return toPaymentAttemptOutcome(code, null);
 }

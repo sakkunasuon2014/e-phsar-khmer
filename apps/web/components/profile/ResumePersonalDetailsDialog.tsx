@@ -107,7 +107,7 @@ function ChoiceButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "h-11 flex-1 cursor-pointer rounded-sm border text-base transition-colors",
+        "h-11 flex-1 cursor-pointer rounded-sm border type-body transition-colors",
         selected
           ? "border-[#00a0e9] bg-[#00a0e9]/5 text-[#00a0e9]"
           : "border-input hover:bg-muted/40",
@@ -434,14 +434,14 @@ export function ResumePersonalDetailsDialog({
         className="flex h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[950px]"
       >
         <div className="flex shrink-0 items-center justify-between border-b px-6 py-4">
-          <DialogTitle className="text-2xl font-semibold">
+          <DialogTitle>
             {mode === "edit"
               ? t("form.titles.personalEdit")
               : t("form.titles.personalAdd")}
           </DialogTitle>
           <div className="flex items-center gap-4">
             {mode === "wizard" && (
-              <span className="text-lg font-semibold text-[#00a0e9]">
+              <span className="type-nav text-[#00a0e9]">
                 {t("form.step", { current: 1, total: 8 })}
               </span>
             )}
@@ -486,7 +486,7 @@ export function ResumePersonalDetailsDialog({
                       strokeWidth={1.5}
                       className="text-gray-400"
                     />
-                    <span className="text-base text-gray-500">3 x 4</span>
+                    <span className="type-body text-gray-500">3 x 4</span>
                   </div>
                 )}
                 <input
@@ -575,7 +575,7 @@ export function ResumePersonalDetailsDialog({
                     <button
                       type="button"
                       id="rpd-dob"
-                      className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
+                      className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9]"
                     >
                       {dob ? formatDob(dob) : ""}
                     </button>
@@ -707,7 +707,7 @@ export function ResumePersonalDetailsDialog({
                     setLocationSession((session) => session + 1);
                     setLocationOpen(true);
                   }}
-                  className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
+                  className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9]"
                 >
                   <span
                     className={place.province ? "" : "text-muted-foreground"}
@@ -763,7 +763,7 @@ export function ResumePersonalDetailsDialog({
                     <button
                       type="button"
                       id="rpd-education"
-                      className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
+                      className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9]"
                     >
                       <span
                         className={education ? "" : "text-muted-foreground"}
@@ -872,7 +872,7 @@ export function ResumePersonalDetailsDialog({
               type="button"
               onClick={handleNext}
               disabled={saving}
-              className="h-12 w-full cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 w-full cursor-pointer rounded-sm bg-[#00a0e9] type-nav text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.nextSummary")}
             </button>
@@ -883,7 +883,7 @@ export function ResumePersonalDetailsDialog({
               type="button"
               onClick={handleNext}
               disabled={saving}
-              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 type-nav text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.save")}
             </button>

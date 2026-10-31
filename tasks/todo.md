@@ -1,3 +1,94 @@
+# Ship log
+
+Running log of in-flight work: what is changing, how it was verified, and open decisions. Append a
+dated entry per ship (`## YYYY-MM-DD — <title>`). Once an entry has shipped, fold its outcome into
+`CHANGELOG.md` and delete it from here.
+
+The full history up to 2026-10-24 (5,364 lines, every ship since 2026-08-17) was rolled into
+`CHANGELOG.md` on 2026-10-24. The original text is in git: `git show fd824a0:tasks/todo.md`.
+
+## Open items carried over from the old log
+
+Long-standing gaps are tracked in CLAUDE.md under **Known gaps**. These are the newer open items
+from the most recent ships that aren't recorded there.
+
+### Payments
+
+- **Possible second outbox consumer.** The Vercel `phsar-backend` shares the Supabase DB and runs
+  the same in-process outbox worker, so it may claim rows and publish into its own Redis (the
+  suspected cause of the lost Bakong poll on 2026-10-14). Set `OUTBOX_WORKER_ENABLED=false` there,
+  or give dev and prod separate databases. Consider storing the claiming `instanceId` on
+  `markPublished`.
+- Bakong `reconcile()` trusts `responseCode 0 + data`; amount, currency and receiver aren't
+  cross-checked against the transaction.
+- The ABA webhook ack is wrapped by `ResponseInterceptor` (`{success,data:{code:0}}`), but ABA
+  reads a top-level `code`.
+- Failures and expiry aren't pushed to the checkout page; it relies on the post-expiry read
+  window.
+- Set `ABA_PAYWAY_WEBHOOK_URL` (`…/api/v1/payments/webhooks/aba-payway`) and
+  `ABA_PAYWAY_LIFETIME_MINUTES` in every environment. Drop the old `/webhooks/aba-payway` alias
+  once no unresolved ABA attempt predates the switch.
+- No `payment.failed` event. Payment use-case tests are blocked on ESM `effect` under Jest.
+  Failed `outbox_events` and `idempotency_keys` have no retention.
+
+### Subscriptions
+
+- Nothing marks a purchase `failed` on its own (only lazily on checkout retry). A late payment for
+  a purchase already `failed` lands as "needs manual review".
+- `autoRenews` and `videos` are stored but not enforced.
+- Dev data: the old test group "Auto 8137" covers nothing (its 3 subscribers get free limits), and
+  most admin-owned demo listings are restricted by the free caps.
+- Entitlement checks re-read config on every call (5 small queries, two checks per publish).
+  Cache if it shows up in profiling.
+
+### Moderation / audit (2026-10-23)
+
+- Migration `0040_moderation_feedback` has not been applied to the shared dev DB. Mind the
+  migration-watermark gotcha.
+- No browser run yet of the moderation, report and feedback pages and dialogs, or of a live upload
+  through the per-user folders.
+- The owner's My Ads page doesn't explain a removal. Manage Advertisement Ads and an admin
+  Payments page are not built (product decisions).
+- Dead mock files: `apps/web/lib/feedbacks.ts`, `apps/web/lib/report.ts`.
+
+### Admin backoffice audit (2026-10-24)
+
+From `docs/admin-backoffice-audit-2026-10-24.md`, re-checked against code the same day. None of
+these is fixed yet.
+
+- **C1, check first:** the `DEV_OTP_TOKEN` SMS bypass isn't environment-gated
+  (`config.validation.ts` accepts it in every `NODE_ENV`), and `apps/backend/.env.prod` sets it.
+  Verify the Vercel production env, reject the variable when `NODE_ENV=production`, and rotate it.
+- **C2:** `PATCH /payments/:id` changes status without a ledger entry, status history or actor.
+- **C3:** deleting a subscription category (`removeCategory`) silently drops every subscriber in
+  that group to the free plan, and doesn't reconcile their ads.
+- **H1:** no audit trail for any privileged action. This is super-admin Phase 3
+  (`docs/super-admin-todo.md`).
+
+### Chat
+
+- See CHANGELOG **Unreleased → Known issues**: the attachment quota uses `declaredSize`; v2
+  envelopes aren't bound to the target device key; there are no safety numbers.
+- **E2E multi-device Phase 3 cutover** (`tasks/plan-e2e-multi-device.md`) is not started.
+  Still to do:
+  - reject v1 `e2eHeader` sends (426 `E2E_CLIENT_OUTDATED`);
+  - remove the v1 bundle endpoint and `user_e2e_identities`;
+  - wire `components/setting/Devices.tsx` (still a mock) to a device list + revoke API.
+
+### Web
+
+- Filter-bar sort labels and chips are English-only.
+- Pages scroll horizontally by about 395px at 390px width (navbar + card component).
+
+---
+
+## v1 ship log (2026-08-17 → 2026-10-23, preserved on merge)
+
+The entries below are the v1 branch's historical ship log, kept verbatim when
+origin/prod was merged on 2026-10-24. They cover v1-only work (resume, job
+applications, insights, login devices, localization) that predates the
+CHANGELOG roll-up.
+
 # Ship: user OTP verification page after phone registration (web)
 
 Feature request (verbatim): "after normal user login by phone number, we need to set otp to
@@ -5845,7 +5936,7 @@ A successful login from a device the account has never used now writes a durable
 
 **Backend** — migration `0041_goofy_stryfe` extends `user_login_devices` with client/browser/OS/model/build-stamp metadata, raw UA, `session_id` (revocation epoch) and `revoked_at`, plus a unique `(user_id, session_id)` index. A new `user-agent.util.ts` (no dependency) parses browser/version/OS/Android model; `x-device-info` (URL-encoded JSON: browser UA + build stamp, or app-supplied model/OS/version) is validated and capped by `readClientDevice`. `recordLogin` now returns `{isNewDevice, sessionId}`; it records **before** tokens are signed, clears a previous revoke, and never rotates the session id on login (only a revoke does, so concurrent tabs cannot invalidate each other). `issueTokens` adds `sid` to both JWTs; `JwtStrategy` joins the active device row when `sid` is present; `refresh` rejects a revoked/mismatched sid, binds a legacy token via `x-device-id`, and touches `last_seen_at`. New JWT routes: `GET /auth/devices` (active rows + `isCurrent` + heartbeat touch), `DELETE /auth/devices/:id` (owner-scoped, current refused, idempotent), `POST /auth/devices/revoke-others`, `POST /auth/logout`. Chat WS tickets carry `sid`; the gateway checks it on connect and before every send, closing a revoked socket.
 
-**Web** — `lib/device.ts` mirrors the localStorage id into the non-httpOnly `psa_device_id` cookie; `lib/auth/session.ts` exposes `getUserDeviceId`/`setUserDeviceId`; both refresh clients forward `x-device-id` so a legacy session binds on its first refresh. Login/OTP actions send `x-device-info` built from the browser UA and `NEXT_PUBLIC_APP_VERSION` (a `YYYY.MM.DD` build stamp injected through `next.config.ts`). The real page is an RSC fetch (`lib/api/devices.ts`) rendered by `components/setting/device-list.tsx` (relative/absolute times, per-row revoke, confirm dialog, empty/error/legacy states) with server actions in `actions/devices.ts`. A legacy row with no metadata renders as **Unknown** (laptop icon, no client line), and older absolute dates use the mock's "30, Dec 2025" style. Sign-out calls `/auth/logout` best-effort before clearing cookies.
+**Web** — `lib/device.ts` mirrors the localStorage id into the non-httpOnly `phsar_device_id` cookie; `lib/auth/session.ts` exposes `getUserDeviceId`/`setUserDeviceId`; both refresh clients forward `x-device-id` so a legacy session binds on its first refresh. Login/OTP actions send `x-device-info` built from the browser UA and `NEXT_PUBLIC_APP_VERSION` (a `YYYY.MM.DD` build stamp injected through `next.config.ts`). The real page is an RSC fetch (`lib/api/devices.ts`) rendered by `components/setting/device-list.tsx` (relative/absolute times, per-row revoke, confirm dialog, empty/error/legacy states) with server actions in `actions/devices.ts`. A legacy row with no metadata renders as **Unknown** (laptop icon, no client line), and older absolute dates use the mock's "30, Dec 2025" style. Sign-out calls `/auth/logout` best-effort before clearing cookies.
 
 **Verified** — backend 51 suites / 708 tests, ESLint, `nest build`, `db:generate` = no drift; web ESLint + `next build`; prettier clean. Live API (throwaway user): first device silent, second `newDevice:true`; list showed `Chrome 154` / `Browser 2026.10.20` and `iPhone 18` / `App 2026.10.20`; per-row revoke → the other token 401; revoke-others → other 401, current 200; re-login of a revoked row → `newDevice:false`, old token still 401; logout → 401. Headless CDP (Chrome 154): the real page showed THIS DEVICE `Chrome 154` / `Browser 2026.10.20` / `Created: 7 seconds ago · Last used: 1 second ago`, the other row `iPhone 18` / `App 2026.10.20`; per-row revoke removed it; the confirm dialog revoked a second browser; sidebar Sign Out redirected to `/en/login` and the DB row's `revoked_at` was set. Throwaway user/devices deleted afterwards.
 
@@ -6024,3 +6115,850 @@ Body Type (and every other attribute set) only had an English `name`. Added `att
 **Verified** — backend `nest build`, migration applied, `db:seed` populated the 9 names; web lint + `next build` + prettier clean. CDP: the Cars For Sale Body Type picker lists `សេដាន/Sedan` … `ផ្សេងៗ/Other`; the admin Body Types page shows the **Khmer Name** column (`សេដាន`) and the add/edit dialog has the Khmer Name input.
 
 **Left open** — only the 9 car body types are seeded; the other body-type rows and attribute sets stay English until an admin fills them. The public browse grids and listing-detail specs still show the stored English attribute values.
+
+## 2026-10-23 — Car detail localization (location, specs, colours)
+
+The km car detail still printed the stored English `location` and raw spec values (`Tax Paper`, `Hatchback`, `Diesel`, `Auto`, `Beige`), and the street address sat flush left under the map pin. `buildRealDetailData` now resolves the listing's province/district/commune ids to `nameKm` (overriding only the display location) and builds a `valueLabels` map from the linked attribute rows' `nameKm` plus the hard-coded tax/engine/transmission labels; `ListingSpecs` renders those labels while `/en` keeps the stored English. The address row is indented `ml-[26px]` to align with the location text.
+
+The colour set got Khmer names (`ក្រាម`, `ខ្មៅ`, `ខៀវ`, …, `ផ្សេងៗ`) through the same null-only seed gap-fill, and the post form's colour `SearchPicker` now shows the Khmer name only (`showOnlyKm`) — body type stays bilingual (`សេដាន/Sedan`).
+
+**Verified** — web lint/build + prettier; CDP on the `car lang` listing: `បន្ទាយមានជ័យ, ម៉ាឡៃ, ម៉ាឡៃ`, address margin-left `26px`, and `ក្រដាសពន្ធ` / `កញ្ជី` / `ម៉ាស៊ូត` / `ស្វ័យប្រវត្តិ` / `ក្រាម`; the km colour picker lists all 14 Khmer names; `/en` detail and pickers keep English. Backend build passes; migration unchanged.
+
+## 2026-10-23 — Year filter is a flexible min/max range (cars / motorcycles)
+
+The vehicle subcategory bar (`LSPYCEHeader`) offered eight fixed single years plus an "& older" bucket. It now uses a `YearFilter` chip modeled on `PriceFilter`: a popover with **Minimum** and **Maximum** selects (options from the generated `years` set, current year + 1 → 1980) and one **Apply Filter** button. The chip shows `2020–2024`, `2020+` or `2019 & Older` and carries the X clear control; the draft syncs from the URL on open. Inverted picks (min > max) are swapped before writing, matching `parseFeedParams`; out-of-list 4-digit URL bounds stay selectable, garbage is ignored, and only `year_min` / `year_max` are touched. No backend change — the feed already filters `attributes->>'year'`. Added `Filters.year.min|max|remove` in en/km.
+
+**Verified** — web lint, `next build`, prettier clean. CDP on `/en/category/cars-and-vehicles/cars-for-sale`: the popover renders Year / Minimum / Maximum / Apply Filter; Apply sets `year_min=2020&year_max=2024` (chip `2020–2024`, 1 seeded car), min-only (`2024+`), max-only (`2024 & Older`), equal (`2024`), inverted (2026/2024 → `2024–2026`, 3 cars), X clears, MoreFilters badge counts it and Clear all removes it, a brand drill-down keeps the params, and `/km` shows `ឆ្នាំ` / `អប្បបរមា` / `អតិបរមា` / `អនុវត្តតម្រង`. API check: `?subcategorySlug=cars-for-sale&yearMin=2020&yearMax=2024` returns only the 2024 listing.
+
+**Follow-up (captain's mock)** — active chips now use the bar's `Label :value` format: `Year :2021-2027` (hyphen, label-prefixed), min-only `Year :2024+`, max-only `Year :2024 & Older`, single `Year :2024`; Condition/Engine are prefixed too (`Condition :New`, `Engine Type :Petrol`), and cars-for-sale's price chip reads `Sale Price` (`តម្លៃលក់`). Verified in CDP on the full active bar (`loc_com=boeng-keng-kang-ti-bei&sort=price-asc&min_ad_price=10000&max_ad_price=100000&year_min=2021&year_max=2027&condition=new`): `Boeng Keng Kang Ti Bei`, `Sort :Price: Low to High`, `Sale Price :10,000-100,000`, `Year :2021-2027`, `Condition :New`; `/km` reads `តម្លៃលក់`, `ឆ្នាំ :2021-2027`, `លក្ខខណ្ឌ : ថ្មី`. Web lint/build/prettier clean.
+
+**Follow-up (km engine labels)** — the Engine Type chip's options and active value were still English on `/km`. They now resolve through the existing `PostForm.options.*` messages (`ម៉ាសូត`, `អគ្គិសនី`, `កូនកាត់`, `LPG`, `សាំង`) while the URL param and feed value stay the English name (`?engine=Diesel`). Verified in CDP: km dropdown and chip `ប្រភេទម៉ាស៊ីន : ម៉ាសូត`, 2 diesel cars; `/en` still reads `Engine Type :Diesel` with English options. Web lint/build/prettier clean.
+
+**Follow-up (km engine spellings)** — the captain's mock uses `ហាយប្រីត/Hybrid` and `ហ្គាស/LPG` (not `កូនកាត់` / `LPG`). Updated `PostForm.options.*` (the sell form + the filter chip) and the detail's `DETAIL_VALUE_KM` map. Verified in CDP: the km Engine Type dropdown lists `ម៉ាសូត`, `អគ្គិសនី`, `ហាយប្រីត/Hybrid`, `ហ្គាស/LPG`, `សាំង`; `/en` unchanged. Web lint/build/prettier clean.
+
+## 2026-10-23 — More Filters: boxed Discount / Free Delivery toggles
+
+The More Filters dialog's Free Delivery row was a plain label with a switch on the right. It now matches the captain's mock: a bordered box under a section label, with the switch and its state word ("No"/"Yes", via `PostForm.yes/no`) inside; the same row design is used for a new **Discount** toggle above it. Both sit after Price, and the footer gained its divider. Discount is a real feed filter: `hasDiscount` on `GET /listings` (`discount_value > 0 and discount_type is not null` — the same rule as the generated `effective_price`), mapped from `?discount=1` by `parseFeedParams`; the dialog's active count and Clear all include it.
+
+**Verified** — backend build + `listings.service` Jest (54 tests, incl. the new condition), web lint/build, prettier clean. CDP: the dialog shows Discount/No and Free Delivery/No in the mock's boxed rows; toggling both and Apply gives `?delivery=1&discount=1`, badge 2, 2 discounted+free-delivery cars; `/km` reads `បញ្ចុះតម្លៃ` / `ការដឹកជញ្ជូនឥតគិតថ្លៃ` with `មាន`; Clear all removes both params. API: `hasDiscount=true` returns 12 of 34 active listings; `deliveryFree` + `hasDiscount` combine.
+
+## 2026-10-23 — Khmer labels for the post form's range pickers
+
+The km post form's Storage / Screen Size / RAM / VGA pickers showed the inline `field_schema` options in English (those keys map to `null` in `PICKER_ATTR_TYPES`, so the resolver always returns `nameKm: null`). `SearchPicker` now localizes the range words at display time via `PostForm.options.andAbove` / `andBelow` / `integrated`: `1TB ឡើងទៅ/1TB & Above`, `64GB ចុះក្រោម/64GB or below`, `128GB ចុះក្រោម/…`, `2TB ឡើងទៅ/…`, `10.9" ចុះក្រោម/…`, `17" ឡើងទៅ/…`, `2GB ចុះក្រោម/…`, `64GB ឡើងទៅ/…`, `រួមបញ្ចូល/Integrated`. Numeric-only options are untouched, the km text is searchable, and the stored value stays the English option name. Browse grids and detail specs still render the stored English values (known gap).
+
+**Verified** — web lint/build + prettier clean. CDP on `/km/post` (Computers → Laptops, then Phones → Phones): Screen Size `10.9" ចុះក្រោម/10.9" & Under` … `17" ឡើងទៅ/17" & Larger`; computer Storage `128GB ចុះក្រោម/…` … `2TB ឡើងទៅ/…`; RAM `2GB ចុះក្រោម/…` … `64GB ឡើងទៅ/…`; VGA `រួមបញ្ចូល/Integrated` … `16GB ឡើងទៅ/…`; phone Storage `1TB ឡើងទៅ/1TB & Above` and `64GB ចុះក្រោម/64GB or below`. Typing `ឡើងទៅ` filtered the VGA list and selecting `16GB ឡើងទៅ/16GB & Larger` set the trigger label. `/en/post` storage still reads `128GB & Under` / `2TB & Larger`.
+
+**Follow-up (captain's mock)** — the English half was redundant on these pickers. `storage`, `screenSize`, `ram` and `vga` now pass `showOnlyKm`, so km reads `1TB ឡើងទៅ` / `64GB ចុះក្រោម` / `រួមបញ្ចូល` with no `/1TB & Above` (numeric-only options unchanged). Verified in CDP on `/km/post` → Laptops: Storage `128GB ចុះក្រោម`, `250GB - 256GB`, `2TB ឡើងទៅ`; VGA `រួមបញ្ចូល`, `16GB ឡើងទៅ`; selecting `16GB ឡើងទៅ` sets the trigger to that text. Web lint/build/prettier clean.
+
+**Follow-up (captain's wording)** — the range words are now `{value} និងធំជាង` / `{value} និងតូចជាង` (`1TB និងធំជាង`, `64GB និងតូចជាង`), replacing `ឡើងទៅ` / `ចុះក្រោម`; VGA `Integrated` stays `រួមបញ្ចូល`. Verified in CDP on `/km/post` → Laptops: Storage `128GB និងតូចជាង`, `250GB - 256GB`, `2TB និងធំជាង`; VGA `រួមបញ្ចូល`, `2GB និងតូចជាង`, `16GB និងធំជាង`. Web lint/build/prettier clean.
+
+**Follow-up (VGA label)** — per the captain's mock, `Integrated` keeps its English clarifier and is the one bilingual VGA option: `រួមបញ្ចូល - Integrated`; VGA ranges stay Khmer-only (`2GB និងតូចជាង` … `16GB និងធំជាង`). Verified in CDP on `/km/post` → Laptops. Web lint/build/prettier clean.
+
+## 2026-10-23 — Camera & Camcorders Type km names
+
+The Type picker for `cameras-and-camcorders` was English on km (the managed `types` rows had no `nameKm`). Seeded the captain's Khmer names as a null-only gap-fill (admin edits survive): Digital Cameras `កាមេរ៉ាឌីជីថល`, Camcorders `ម៉ាស៊ីនថតវីដេអូ`, Flashes & Flash Acc. `ភ្លើង និងគ្រឿងបន្លែម`, Lighting & Studio `ពន្លឺ និងស្ទូឌីយ៉ូ`, Cases & Bags `ស្រោម និងកាបូប`, Batteries & Chargers `ថ្ម និងឆ្នាំងសាក`. `Lens & Filters` stays English and `Other - ផ្សេងៗ` keeps its shared name, exactly as the mock. The Type picker now passes `showOnlyKm`, so km shows the Khmer name only; no other `types` row has a `nameKm`, so every other Type picker is unchanged. The stored value remains the English option name.
+
+**Verified** — seed ran; backend + web builds, web lint, prettier clean. CDP on `/km/post` → Electronics & Appliances → Cameras & Camcorders → Type: `ស្រោម និងកាបូប`, `កាមេរ៉ាឌីជីថល`, `ម៉ាស៊ីនថតវីដេអូ`, `Lens & Filters`, `ភ្លើង និងគ្រឿងបន្លែម`, `ពន្លឺ និងស្ទូឌីយ៉ូ`, `ថ្ម និងឆ្នាំងសាក`, `Other - ផ្សេងៗ`. Note: `Cases & Bags` sorts first because the shared `cases-bags` row's sortOrder (9) is owned by the computer-parts declaration — the seed's documented "a shared row cannot hold two orderings at once" limitation.
+
+## 2026-10-23 — TVs, Videos & Audio Type km names
+
+Same treatment as the camera Type rows: null-only Khmer names on the managed `types` rows — Televisions `ទូរទស្សន៍`, Speakers `អូឌីយ៉ូ`, Audio Interfaces `ឧបករណ៍អូឌីយ៉ូ`, Microphones `មីក្រូហ្វូន`, Remotes `រីម៉ូត`. The shared `other` row now carries `ផ្សេងៗ`, so every Type picker's Other reads Khmer-only on km (the camera list's Other changes from `Other - ផ្សេងៗ` to `ផ្សេងៗ`). The Type picker already passes `showOnlyKm`, so km shows the Khmer names; stored values stay English.
+
+**Verified** — seed ran; backend/web builds, web lint, prettier clean. CDP on `/km/post` → Electronics & Appliances → TVs, Videos & Audio → Type: `អូឌីយ៉ូ`, `ទូរទស្សន៍`, `ឧបករណ៍អូឌីយ៉ូ`, `រីម៉ូត`, `មីក្រូហ្វូន`, `ផ្សេងៗ`. The list order differs from the mock for shared rows (Speakers first, Remotes before Microphones) — the same shared-row ordering limitation.
+
+## 2026-10-23 — Home welcome title stays regular weight
+
+The new typography scale's `.type-page-title` (600, the captain's bold page-title role) was applied to the home hero h1, making the welcome line bold. The home h1 now adds `font-normal`, so it renders 400/24px while every other `type-page-title` stays 600.
+
+**Verified** — computed styles in CDP: `/km` welcome h1 = 400/24px (`type-page-title font-normal text-foreground`); `/km/insight` page title = 600 (`type-page-title`). Web lint/build/prettier clean.
+
+## 2026-10-23 — Listing card location + time localized
+
+The cards still printed the stored English `district, province` and a 12-hour `03:54 PM`. `getListingsFeed` now batch-resolves the page's unique province ids once, fetches each province's districts once, and stamps `locationKm` (`district, province` in `nameKm`) on the rows; `toCardPost` uses it (falling back to the stored `shortLocation`). The `GridCardPost` / `ListCardPost` time drops `hour12` on km (24-hour `15:54`), while `/en` keeps `Banan, Battambang` and `03:54 PM`.
+
+**Verified** — CDP on the Phones feed: the `test` card shows `15:54` and `បាណន់, បាត់ដំបង`, no `Battambang`/`Banan`/`PM`; `/en` is unchanged. Web lint/build + prettier pass.
+
+**Left open** — `/me/likes` and `/me/saved` reaction cards still show the stored English location (that endpoint bypasses `getListingsFeed`); the home page/feed/category/search/profile cards are localized.
+
+## 2026-10-23 — 14-role type scale across `apps/web`
+
+Introduced the captain's 14-role type scale as the web app's typography system. `styles/globals.css` now owns a `@theme` retune of the two divergent ladder steps (`--text-xs` line-height 18px, `--text-sm` 21px; base/lg/xl/2xl already matched), 13 `@layer components` role classes (`type-page-title`, `type-section-title`, `type-card-heading`, `type-body`, `type-body-sm`, `type-meta`, `type-price`, `type-photo-badge`, `type-discount`, `type-nav`, `type-button-sm`, `type-footer-heading`, `type-footer-link`) with the exact px/weight/line-height, and base element defaults for `body` (16/400/24) and `h1/h2/h3`.
+
+Role classes are `type-*` rather than `@theme --text-*` because `cn()`'s tailwind-merge@3.6 treats unknown `text-*` as a text COLOR and silently drops it (`twMerge("text-meta text-red-500")` → `"text-red-500"`); `type-*` passes through untouched. Being in the components layer means a utility can override a role, so no role class is paired with a text-size/font-weight/leading utility; two different role classes are never stacked (same-layer rules resolve by stylesheet order, not class order).
+
+Swept: shared UI primitives (Button/Dialog/Card/Table/Input/Label/Badge/Tabs/Dropdown/Select/Sheet/Drawer/Command/Tooltip/Popover/Empty/Field/Sidebar), navbar/footer/search, grid + list cards (title 16/400, meta 13, price 18/700, old price 15, photo badge 12/700, discounts 11/400), ad detail (h1 24/600, section h2 20/600, card headings 18/500, specs 15, description 16/24), category/subcategory headers + filter bars + dialogs, home sections, all-ads/search, auth, settings/profile/resume/post forms/feedback/chat, and all 15 admin dashboard pages (page titles 24/600, table headers 14/500, cells 13/19.5, badges 12/500). All 9–11px arbitrary text sizes were replaced with the nearest role; the only `text-[20px]` left is Bootstrap icon glyph sizing.
+
+**Verified** — web lint + `next build` (type gate) + prettier check pass. CDP computed styles on `/en`, `/en/category/cars-and-vehicles`, a live ad detail, `/en/all-ads`, `/en/login`, `/km`, and (with a minted read-only session) `/wanderer/dashboard/users`: h1 24/600/32, h2 20/600/28, card title 16/400/24, card meta 13/400/19.5, price 18/700/28, old price 15/400/22.5, photo badge 12/700/18, discount 11/400/16.5, buttons 14/500/21, small button 12/500/18, footer heading 16/600/24, footer link 14/400/20, table head 14/500/21, table cell 13/400/19.5. Signed-in check (`/en/me`, `/settings`, `/post`, `/me/resume`, `/me/about`) with a minted user session. Before/after screenshots: page heights moved +2…+27px, no clipping/overflow (en + km). Admin session minting: existing admin row + HS256 JWT in `admin_access_token`.
+
+**Captain override (same day)** — page titles are 600, not the scale's 400 (the category page read too light). `type-page-title` and the base `h1` both carry 600; the role is the single source, so every page title follows. Discounts remain 11/400 (visibly lighter than before); Khmer at 13/19.5 and 11/16.5 renders without clipping in the checked pages. Mobile app is out of scope.
+
+## 2026-10-23 — Rebrand: psakhmer / PSA-NPIC / psa → Phsar
+
+Renamed the product to **Phsar** (`phsar.com`) across the working tree: web metadata, page titles, legal/404 copy, navbars, admin sidebar, share links and contact email; mobile Expo name/slug/scheme/package (`com.phsar.app`), auth/account/promo copy, mock emails and the old PSA-NPIC / Global Link / Khmer24 leftovers; backend Swagger title, Effect DI tags and the BullMQ prefix default (`phsar`); root/mobile package names (`phsar-monorepo` / `phsar`); docs and Docker comments.
+
+Device identity keeps existing browsers: `phsar_device_id` is read first, the legacy `psa_device_id` localStorage/cookie is migrated and expired. Verified in headless Chromium — the legacy id was preserved, the new cookie/localStorage were written, and the old key was cleared.
+
+**Preserved on purpose** — E2E crypto/IndexedDB labels (`npic-*`) are frozen protocol identities; renaming them would make existing encrypted history/backups unreadable. Historical logs keep quoted evidence, branch names, task IDs and absolute paths. Category icons still hotlink `images.khmer24.co` (asset-migration follow-up), and the raster app icon/splash/favicon still need Phsar artwork.
+
+**Verified** — `pnpm install` (lockfile unchanged), backend build/lint + 54 suites / 733 tests, web build/lint, mobile `tsc --noEmit` + `expo lint`, `pnpm lint`, `pnpm format:check`. Runtime: `/en` title `Phsar…`, page titles no longer double-suffix, Swagger `Phsar API`, Expo config `name/slug/scheme = Phsar/phsar/phsar`, `com.phsar.app`. New BullMQ `phsar:*` keys are live; old `psa:*` keys (116, including 2 delayed `attachments-cleanup` repeats and 3 failed jobs) are orphaned — clean them only after confirming no old-version instance remains.
+
+## 2026-10-23 — Phsar logo wired into the site
+
+The captain supplied `public/icon/phsar-logo.png` + `phsar-logo-dark.png` (1024² with ~58% transparent padding; artwork 592×444). Derived one-off crops with ImageMagick (originals untouched): `phsar-lockup{,-dark}.png` (600×452, identical crop box so a theme switch cannot shift a pixel), `phsar-mark{,-dark}.png` (320² storefront mark). No runtime/build dependency added.
+
+Wired: the navbar now renders the 44px stacked lockup in place of the `Phsar` text (light/dark variants switched by CSS `dark:` classes, one `preload`; `Link` carries `aria-label="Phsar"` since a `display:none` copy leaves the a11y tree); `/wanderer/login` gets an 80px lockup above the card; the admin sidebar's letter tile became the real mark (text kept, `SidebarHeader` gains `group-data-[collapsible=icon]:px-2` — `p-4` in the 48px icon rail clipped the 32px mark); `app/favicon.ico` rebuilt (16/32/48/256 PNG frames, 22 KB) with `app/apple-icon.png` (180², opaque white); `app/[locale]/opengraph-image.png` (1200×630, light lockup + Liberation-Sans tagline on white) with `opengraph-image.alt.txt`.
+
+Next 16 note: `next/image` `priority` is deprecated — use `preload` (`fetchPriority` alone does not preload). Only the light variant preloads; the dark one is decorative.
+
+**Verified** — web lint, `next build` (type gate), prettier clean. CDP (light + dark, 1440/945): exactly one navbar image visible (58.7×44 px, nav 65 px, identical rects in both themes), no horizontal overflow; login lockup 106.7×80; dashboard sidebar mark 32×32 expanded and collapsed (no clipping) with the text hidden when collapsed. Head emits one `rel="icon"` (`sizes="256x256"`), `rel="apple-touch-icon"` 180×180, `og:image` 1200×630 + `og:image:alt`, `twitter:card=summary_large_image` on `/en` and `/km`.
+
+**Left open** — the mark uses the storefront alone: the bag and wordmark are interlocked (the `h` ascender overlaps the bag's bottom), so a bag-only square crop cannot avoid wordmark remnants without masking the artwork.
+
+## 2026-10-23 — Navbar logo resized to the captain's 148×36 target
+
+The captain set the logo slot at **width 148, height 36, `mt-1`** (4px top margin). The supplied artwork is a stacked lockup (1.33:1), so a 4.11:1 slot needed a horizontal composition: `phsar-lockup-wide{,-dark}.png` (592×144 = 4× the target) place the bag+store icon (260×144) beside the `phsar` wordmark (292×96, 16px right padding), built from **connected-component extracts** of the original art — the wordmark glyphs (`p h s a r`) and the icon are separate components, so neither the bag's bottom edge nor the `h` ascender contaminates the other; the original alpha is multiplied back so the glyph counters stay transparent.
+
+NavBar: `width={148} height={36} sizes="148px"` + `mt-1 h-9 w-37` (`w-37` = 148px in Tailwind v4), light/dark pair unchanged. The 44px stacked asset stays in use on `/wanderer/login` (80px) and as the icon source for the sidebar mark.
+
+**Verified** — CDP: element computes **148 × 36** with `margin-top: 4px` at 1440 and 945, identical rects in light/dark (`top 15`, `left 72.5` at 1440), one image visible per theme, `currentSrc` through `/_next/image`; nav height back to **63px** (exactly the pre-logo height); no horizontal overflow 785–1425px. Web lint, prettier, `next build` clean. Light/dark screenshots checked.
+
+**Update (same day)** — the captain supplied purpose-built horizontal logos (`public/icon/phsar.png` + `phsar-dark.png`, 2096×512 = 4.09:1, dark variant with a cream wordmark). The navbar now points at those directly (`width={148} height={36} sizes="148px" mt-1 h-9 w-37`); the composed `phsar-lockup-wide{,-dark}.png` files were deleted as superseded. The stacked `phsar-lockup{,-dark}.png` stay in use on `/wanderer/login` (80px) and as the sidebar-mark source.
+
+## 2026-10-26 — Superadmin-managed advertisement banners
+
+The captain scoped the superadmin side to four capabilities; three already shipped and were verified real in code (dashboard stats, the two report queues, Team & roles). The fourth — "manage advertisement", meaning the promo banners rather than classified listings — did not exist: both banners were bundled files hardcoded into five places (`/ads/flag-animation.gif` on home and `/all-ads`, `/ads/landforsale.jpg` on category, subcategory and listing detail).
+
+Shipped a standalone backend module (`src/advertisements/`, the same reasoning as feedback/attributes: a public read must sit next to the super_admin CRUD, and a controller inside `AdminModule` would inherit its class-level admin guard), migration `0042_omniscient_cloak`, the staff-only `advertisement` upload scope, a fail-soft server-fetch helper, the embla-based `AdvertisementCarousel`, and `/wanderer/dashboard/advertisements` (sidebar entry hidden for regular admins, exactly like Team).
+
+**Verified** — backend build + lint; 71 suites / 942 tests; web lint + `next build` (route present); prettier clean on every touched file. Runtime: signed upload of the two real assets; `admin` → 403 on `/admin/advertisements`; super_admin create/list/patch/delete; public reads return one banner per slot shaped `{id, placement, imageUrl, linkUrl, altText, sortOrder}` with no storage path or active flag; `?placement=nope` → 400; deactivating a banner empties its slot (1 → 0) and restoring refills it. CDP at 1440×1100: the dashboard lists 5 rows with 5 thumbnails and the Add banner action; home renders the slot with 2 dots and rotates (content transform 0 → −1732 px after ~7 s). The temporary super_admin promotion was reverted (0 rows left), and the dev DB keeps the five banners.
+
+**Left open** — (1) The `listings` bucket rejects `image/gif` (`invalid_mime_type`), so the animated flag had to be re-uploaded as a static PNG; preserving the animation needs a bucket MIME decision. (2) The dev DB's migration watermark sits at `0040` while `0041`'s objects already exist there, so `db:migrate` still aborts on 0041's bare `CREATE TYPE`; `0042` was applied directly and is not recorded in `drizzle.__drizzle_migrations`. Production is unaffected — `0041` and `0042` apply in order on a DB that never saw the consolidated objects.
+
+## 2026-10-26 — Subscriptions tab is its own list page again; Membership restored
+
+Prod's `d7235b2` ("fold Membership into Subscriptions") made `/me/subscriptions` render the Membership plan screen and turned `/me/membership` into a redirect. The captain rejected it: the Subscriptions tab must be its own page, not the Membership screen.
+
+Shipped the un-fold (recorded in `tasks/plan-membership-checkout.md` Phase 4):
+
+- **`/me/subscriptions`** — new `components/profile/Subscriptions.tsx`, back **inside** the `(profile)` group so `MyProfileHeader` renders above it. Title + Type/Status/Sort bar over the viewer's real `getMySubscriptions()` rows; card = image tile, Service (package − term), Account ID (username — there is no account-id field), Service (group), Valid Until, Price, status word bottom-right. Empty state is the v1 mock's "No Result!" card with Subscribe Now → `/premium-account?id=me`. Filters are client-side: **Type = the real subscription groups** (the reference's Ads/Addons/Account split has no backing field and would misfile every row), Status = All/Expired/Nearly (active ending ≤ 30 days), Sort = start old-new / start new-old / end old-new.
+- **`/me/membership`** — renders `<Subscription />` (the plan screen) again, standalone, with its own `Breadcrumbs` and a new `Me.metadata.membership` title.
+- Links: profile-header "Upgrade Account" and the footer "Membership" go to `/me/membership`; the Subscriptions tab, Settings' "Subscription & Plan" and the three-dot menu stay on `/me/subscriptions`.
+- Locales: `Me.subscriptions` gained `active`/`superseded`/`revoked`, `service`/`accountId`/`validUntil`/`price`, `loadError`/`retry` (en + km).
+
+**Verified** — web lint, `tsc --noEmit`, `prettier --check` and `next build` clean (both routes in the build). Headless Chromium with a real dev session: `/en/me/subscriptions` = profile tab bar + Subscriptions title + three selects + empty state; `/en/me/membership` = Membership heading + Free sheet with real limits, no tab bar; "Upgrade Account" clicks through to `/en/me/membership`; footer link href checked. The populated card was screenshotted with a temporary two-row fixture (removed afterwards).
+
+**Left open** — `Nearly Expiry` is defined as ≤ 30 days on an active subscription (one constant, `NEARLY_DAYS`); the captain may want a different window.
+
+## 2026-10-26 — Home Top Ads replaced by engagement-ranked Trending
+
+The captain picked Plan C for the last mock surface on the home page: rank real listings by buyer engagement rather than selling or curating placement (a promotion-entitlement decision is deferred). The strip is labelled "Trending" until that decision lands.
+
+Backend: `GET /api/v1/listings/trending` → `ListingsService.findTrending` (weights live in `src/listings/trending.ts`). Derived-table aggregates over `listing_events` (view 1, chat 3, call 3, show_contact 3, apply_job 5; impressions deliberately excluded), plus likes/saves at 2 each with owner self-reactions excluded, joined to live listings and scored `> 0`; the tail fills with the newest live ads so the carousel never empties. No cursor (the score moves as events land), 5-minute per-process cache. Web: `components/ads/TrendingAds.tsx` + `getTrendingListings`; `TopPosts` (10 mocks) and the unused `HighLightAds` deleted; the home label renamed `topads` → `trending` (en "Trending", km "កំពុងពេញនិយម").
+
+**Verified** — backend build + lint; 72 suites / 948 tests (new: ranked output/score stripping/photos, newest-tail fill, cache reuse, and a compiled weight assertion); web lint + `next build`; endpoint live on :3000 returns real rows with photos + `sellerUsername` and `meta {limit, windowDays}`, while `limit=0|99` and `windowDays=99|abc` → 400. Headless Chromium at 1440×1100: `/en` shows "Trending" with 10 real UUID cards between Browse By Category and Latest Ads; `/km` shows "កំពុងពេញនិយម" with 10 cards.
+
+**Left open** — (1) `listing_events` has no `created_at` index; add one (or a daily rollup) before the event table grows. (2) The weights and 7-day window are constants — tune them against real traffic. (3) Mobile still has the placeholder "Top ads → Promote your ads to the top" button; paid placement is the deferred decision.
+
+## 2026-10-26 — Type scale trimmed: h1 20, h2 16 (homepage keeps 24/20)
+
+The captain found the 2026-10-23 14-role scale too big away from the landing page. In `apps/web/styles/globals.css`, `.type-page-title` goes 24/600/32 → **20/600/28** and `.type-section-title` 20/600/28 → **16/600/24**; the base `h1`/`h2` element defaults mirror them. The homepage keeps the display sizes through a `home-type` context class on its `<main>` (`.home-type .type-page-title` 24/32, `.home-type .type-section-title` 20/28) — a context override rather than a second role class, so no element stacks two roles.
+
+Also normalized ten page-title `h1`s that still hard-coded `text-2xl` (24px) — the prod-merged `/wanderer/dashboard/subscription/{packages,plans,terms,free-plan}`, `/wanderer/dashboard/{listings,feedback,users-subscription}`, `/feedback`, `/settings` and `/me/membership` — to `type-page-title`, so no non-home page title exceeds 20px. The three `font-medium` ones move 500 → 600, the scale's page-title weight. Remaining `text-xl` h1s (profile name, premium-account, manage-ads) are already 20px and left alone; the notifications header stays `type-section-title` on purpose (it is a compact card header).
+
+**Verified** — web lint, `next build` and `prettier --check` clean on every touched file. Headless Chromium (1440×945, own port/profile): `/en` h1 **24/32/400** (`font-normal` retained) and all four section h2s **20/28/600**; `/en/category/cars-and-vehicles` and `/en/all-ads` page titles **20/28/600** (the breadcrumb h1 stays 16/24 `type-body`); `/en/feedback` 20/28/600 with its Photo h2 at 16/24; `/en/login` 20/28/600; `/km` and `/km/category/cars-and-vehicles` identical with no horizontal overflow. Dev servers on :3000/:3001 still healthy after the build.
+
+**Left open** — signed-in surfaces (`/settings`, `/me/membership`, the admin dashboard) were verified by lint + `next build`, not by a browser pass; every other surface inherits the role classes automatically.
+
+## 2026-10-26 — Broken fallback avatars replaced with a local initials circle
+
+The captain's screenshot showed the navbar account menu printing "usr 02" inside the avatar circle instead of showing an image. Root cause: an account with no uploaded photo fell back to `https://ui-avatars.com/api/?name=…`, and that service now answers `image/svg+xml`. Next's optimizer rejects SVG unless `images.dangerouslyAllowSVG` is on (`"url" parameter is valid but image type is not allowed`, 400), so the `<img>` had no src to render and the browser painted the alt text. Every surface that used the same fallback was broken the same way.
+
+Fix: `apps/web/components/common/UserAvatar.tsx` — the one avatar component. It renders the photo through `DbImage` (Storage-object URLs only, failure degrades) and always paints a brand-blue initials circle behind it, so a missing/dead photo shows initials, never a broken image or a third-party request. Wired into `SocialBar` (navbar trigger + menu), `MyProfileHeader` (also: clicking an empty avatar on your own profile opens the upload picker, like the cover), `PublicProfileHeader`, `FollowListCard`, `Profile-Sidebar` (listing seller card) and `AccountIdentity` (its local helper is gone). `toProfileUser`/`toFollowRow`/`toSellerView` and the `/me` layout now map a missing photo to `""`, and `ui-avatars.com` is out of `next.config.ts` remotePatterns. `JobApplicationRow` already had its own initials branch and chat's Radix avatars already fall back, so both were left alone.
+
+**Verified** — web `tsc --noEmit`, `eslint`, `prettier --check` and `next build` clean; dev servers :3000/:3001 healthy after the build. Headless Chromium: `/en/usr02` (no photo) shows the "U0" initials circle and no `_next/image` request for a foreign host; a temporary account's navbar trigger and account menu show "AC" with `imgs: []` in the open menu; `/en/qwer` (uploaded photo) still renders the Storage image with its ring and status dot. The temporary account was soft-deleted and the headless browser killed; the captain's own browser was not touched.
+
+**Left open** — initials are text-sized per call site (`text-sm` … `text-4xl`); a name in Khmer will render with the system Khmer font, which is the intended fallback. Old `ui-avatars` URLs cached in a browser tab disappear on refresh.
+
+## 2026-10-26 — Browse filter selection + navbar search scope follow the page
+
+Captain: "I click brand (e.g. mg), the filter is not select the brand I just click yet" and "if user click, car for sale, then tell navbar on search also change to car for sale".
+
+**Brand.** `SubcategoryContent` hid the Brand grid as soon as a brand was applied (`{!selectedBrand && …}`), so the clicked brand vanished and `OptionGrid`'s `isSelected` brand branch was dead code. The grid now stays mounted with its models below; the applied tile wears a `ring-2 ring-[#00a0e9]` accent ring (plus the existing blue label), and clicking the applied brand toggles it off (`ad_field` + `ad_model` cleared). Only the brand key toggles — an applied attribute set still steps aside per the 2026-09-10 rule, so `?ad_type=sedan` still shows Brand alone.
+
+> **Superseded 2026-10-27 (captain):** "it show get into the brand (not taps to show active, and then click again to not active) … it should work like bodytype." The Brand grid steps aside again on selection and the tile toggle/ring is gone; the applied brand shows in the More Filters dialog (Brand select + badge) instead. See the 2026-10-27 entry.
+
+**Search.** `SearchBar` mirrored the URL only when `pathname === "/search"`; everywhere else it hardcoded "All Categories". It now reads `categorySlug`/`subcategorySlug` from `useParams()` — never the pathname: **next-intl's `usePathname()` returns the route template** (`/category/[categorySlug]/[subcategorySlug]`), which a first attempt parsed into literal `[categorySlug]` slugs. A category/subcategory page scopes the chip (and enables the lazy category fetch that names it), and a submit from there goes to `/search?q=…&category=…&sub=…`; `/search` still mirrors the URL, every other page stays "All Categories". The text effect was split from the scope effect so route changes never reset a typed keyword.
+
+**Verified** — web `eslint`, `next build` and `prettier --check` clean. CDP (1440×1200, own port/profile): `/en/category/cars-and-vehicles/cars-for-sale` chip reads "Cars For Sale" (`/km`: "រថយន្តសម្រាប់លក់"); clicking MG keeps the Brand grid (20 tiles, MG ringed) and adds Model (14 tiles), a second click clears both, MG → Toyota moves the ring (2 models), `?ad_type=sedan` + MG keeps `ad_type`; `/en/category/cars-and-vehicles` reads "Cars and Vehicles"; submit from cars-for-sale lands on `/en/search?q=mg&category=cars-and-vehicles&sub=cars-for-sale` with the chip mirroring it; home, `/all-ads` and a listing detail stay "All Categories".
+
+**Left open** — a listing detail page still reads "All Categories" (its category is only known through the listing, not the route; not part of this request). The model grid's `ad_model` still isn't sent to the feed (pre-existing gap, unchanged).
+
+## 2026-10-26 — Listing detail: "Message seller" becomes "Chat", with an owner note
+
+Captain: "message seller, change to 'Chat', and for owner: This is your own ads - buyers will see 'Chat' here".
+
+`Chat.messageSeller` — the default label of `components/chat/contact-seller-button.tsx`, used by the listing detail's `ProfileSidebar` (the job-applications page passes its own label, so it is unaffected) — is now "Chat"; the km value "ជជែក" already read that way. The owner branch already existed (`Profile-Sidebar` swaps the button for `Post.ownAdNote` when `viewerId === sellerId`), so only its copy changed, to the captain's exact wording — "This is your own ads - buyers will see 'Chat' here" — and the km note now quotes 'ជជែក' instead of 'ផ្ញើសារទៅអ្នកលក់'. Two doc comments in the button component updated to the new label.
+
+**Verified** — web `eslint` and `next build` clean; dev servers :3000/:3001 healthy after the build. Headless Chromium (1280×1000, own port/profile), real listing `2833f581…` viewed as its owner (minted JWT, no user row created) and as a visitor: visitor's button reads "Chat" with no own note; the owner sees no button and the note "This is your own ads - buyers will see 'Chat' here"; `/km` shows "ជជែក" and the km note. Browser killed afterwards.
+
+**Left open** — none.
+
+## 2026-10-27 — Subscriptions empty state returns to the mock's narrow column
+
+Captain: the "No Result!" card on `/me/subscriptions` is "too long" — it had been right before. Root cause: the 2026-10-26 ship's `components/profile/Subscriptions.tsx` renders every state inside the page's full `max-w-7xl` column, while the v1 mock (`git show 8ad153a:apps/web/components/profile/Subscription.tsx`) puts the list area in `max-w-2xl mx-auto`. Measured at a 1732-wide viewport: the card had grown from the mock's **672 px** to **1248 px** wide (height was unchanged at 450 px) — a full-width white slab.
+
+Fix: the loading skeleton, error box, empty card and filtered-empty box now carry `mx-auto max-w-2xl`; the empty card also regains the mock's `shadow-sm`. Height stays `min-h-[450px]` as in the mock, and the populated row cards stay full width (their width was not part of the complaint).
+
+**Verified** — headless Chromium (minted read-only session, 1732×1117): card measures 672×450, centered (288 px margins), matching the mock's proportions; screenshot reviewed. Web `eslint`, `prettier --check` and `next build` clean; dev servers :3000/:3001 healthy; browser killed afterwards.
+
+**Left open** — populated rows remain full width; if the reference shows those narrow too, that is a separate decision.
+
+## 2026-10-27 — More Filters: the mock's vehicle block, wired end to end
+
+Captain: "when i click [a] bodytype, the filter should show number, and filter in more filter on body type field there … look at picture 2-4 … there is more field in this more filters. make it look like that, including the design."
+
+**Why the badge was empty:** `countActiveFilters` never counted the grid drill-down, so a body-type pick left the badge at zero; the dialog also had no Body Type field to reflect the pick.
+
+**The dialog** (`components/filter/MoreFilters.tsx`) now renders the mock's vehicle block on vehicle subcategories, in the mock's order: Brand, Model (disabled until a brand is picked), Year (minimum/maximum), Tax Type (All | Tax Paper | Plate Number), Condition (All | Used | New), Colour, Transmission (All | Auto | Manual), Engine Type, Body Type. Every field is gated on the subcategory's own `field_schema` (a jobs page never offers a Body Type) and sourced exactly like the grid/form — brands from the subcategory link, the same linked `bodytypes` rows the grid renders (slug = `ad_type`), colours through the form's managed/global rule, `enginetypes`, the generated `years`. A new server action `getBrowseFilterOptions` (in `actions/listings.ts`) supplies them lazily on first open; models load per brand via the existing `getBrandModels`. All fields edit the URL params the grids/chips already use (`ad_field`/`ad_model`/`ad_type`, `year_min`/`year_max`, `engine`, `condition`, plus new `tax_type`/`color`/`transmission`), so both views stay one state: a grid pick appears in the dialog and on the badge; a dialog pick updates the grid/chip labels and the feed. Clear now clears the brand/model/type selects on vehicle pages (it still leaves a non-vehicle page's Type grid alone). Design: header per the mock (✕ left, centred title, Clear right), 608 px wide, h-11 controls, segmented groups in the sampled mock colours (`#00a0e9` / `#707685`), and the Price label reads "Sale Price" on cars via the header's existing `priceLabel`.
+
+**Backend:** `GET /listings` gains four additive optional filters — `model`, `taxType`, `color`, `transmission` — each `attributes->>'<literal key>'` equality with the value bound as a parameter, mirroring `brand`/`bodyType` (no migration; existing clients unaffected). The subcategory page now resolves `ad_model` (slug) to the stored model name and sends `model`. Two new unit tests compile the WHERE and assert the keys/values.
+
+**Verified** — backend build + lint, 72 suites / 950 tests; web `eslint`, `prettier --check`, `next build`. Live API: `taxType=Plate Number` → 2, `color=Red` → 2, `model=3` → 3, `transmission=Manual` → 0. CDP (1440×1300): clicking the Sedan tile sets `?ad_type=sedan`, the badge reads 1, and the dialog's Body Type reads `sedan`; applying Brand MG + Model 3 + Tax Paper + Used + Auto + Red + Petrol lands `?condition=used&ad_field=mg&ad_model=3&tax_type=Tax+Paper&color=Red&transmission=Auto&engine=Petrol`, badge 7, chips "Condition :Used" / "Engine Type :Petrol", feed 2 cards; reopening the dialog restores every value; Clear empties the URL and the badge; Year 2020–2024 through the dialog becomes `year_min/year_max` + chip "Year :2020-2024"; a jobs page shows no vehicle block; a house-for-sale Type pick (`ad_type=flat`) survives Apply; `ad_model=3` narrows 5 → 3 cards and `ad_model=zs` → 0; `/km` renders the whole block in Khmer (Body Type still `sedan`).
+
+**Left open** — the vehicle block only appears on subcategory pages (a category-level page has no single schema to gate on). The dialog's overlay blur stays the app-standard Dialog overlay, not the mock's heavy backdrop blur. No listing currently has `transmission=Manual`, so that filter has no positive-result case in the dev data (its SQL is unit-tested).
+
+## 2026-10-27 — Profile tabs: a populated tab is a full-width list, empty stays centred
+
+Captain: "use list style... all of them in profile... jobs, like, save, subscription, manage ads... when has it full not center anymore. only if it has data. if not, show the center one." The reference row: thumbnail left, title over the location, price at the bottom, the reaction control on the right.
+
+- **New row** — `components/profile/ProfileListingRow.tsx`: 112px `DbImage` tile, title (`line-clamp-2`), location, price (`text-red-500 type-price`, "Negotiable" when null), optional trailing control; the whole row links to the listing (the control sits above the overlay).
+- **Likes/Saved** (`reaction-ads-panel.tsx`) — the `grid-cols-2 md:grid-cols-3 lg:grid-cols-4` `GridCardPost` grid is gone; full-width rows render in a `space-y-3` column. The trailing control is the bookmark (saves) or heart (likes) wired to `useReactions`, so unsaving drops the row live and the centred empty card takes over.
+- **Manage Ads** (`Manage-Ads.tsx`) — same rows replace the grid, no trailing control.
+- **Jobs** (`Apply-Jobs`, `Job-Applications`) and **Subscriptions** already met the rule (full-width list on data, `max-w-2xl` centred card on empty) — untouched.
+
+**Verified** — CDP with minted read-only sessions: `/en/me/saved` and `/en/me/likes` (user with 1 save / 1 like) render one 1280px-wide row each, parent display `block` (no grid), toggle present; `/en/me` (11 active ads) renders 11 rows × 1248px inside the panel; the empty user shows Saved's centred 672×500 card and Manage Ads' centred "No Result!" block. Clicking the Saved row's bookmark removed the row and revealed the empty card; the save was then restored through the API. Web `eslint`, `prettier --check`, `next build` clean; dev servers :3000/:3001 healthy; browser killed.
+
+**Left open** — Manage Ads' empty state is centred inside the page panel rather than a separate narrow card like the other tabs; the rows carry no owner actions (renew/edit/share) — none existed on the grid card either, and the previous card's save/share/report menu is gone from your own ads. Dev-only: the first `/me` load per user can take 25–40 s while Next compiles the Manage Ads server action (the page sits on "Loading…"); the backend calls themselves answer in <0.4 s.
+
+## 2026-10-27 — Manage Ads: list out of the controls card, three-dot actions per row
+
+Captain's screenshot: "the listings here, it should not wrap under the same parent as active... this listing, show but it don't have button to do something with it. for example: three dot button, and this button what we plan to let user do here."
+
+- **Structure** — `Manage-Ads.tsx` keeps the header/search/filter, plan stats and Active/Expired tabs in their own white card; the ad rows (and the loading/empty states) now render in a separate section below, with only the grey page background between them (measured 24 px). The empty state is now the same centred `max-w-2xl` card the other tabs use instead of a block inside the panel.
+- **Actions** — new `ManageAdActions.tsx`: a three-dot menu on every row with **View ad**, **Renew ad**, **Share** and **Delete ad**, the set the backend actually supports. Renew = `POST /listings/:id/publish` (30 more days; an ad that has been live spends one plan renewal, and `PLAN_LIMIT_RENEWS` / `PLAN_LIMIT_ADS` come back as their message). Delete = soft-delete. Both go through a confirm dialog; a success reloads the current tab and the plan summary (`reloadKey`). Share is the feed cards' copy-link dialog. Two thin server actions were added to `actions/my-ads.ts` (`renewMyListing`, `deleteMyListing`).
+- **Deliberately absent** — Edit (the post form has no edit mode; `PATCH /listings/:id` exists but no web flow), "mark as sold" (no such status), promote/boost (no backend). Those are the follow-up decisions.
+- **i18n** — the page had read as hardcoded English since the merge even though `Me.manageAds` already existed in en + km; it now uses the namespace, and the menu's 14 new keys were added to both locales.
+
+**Verified** — CDP (minted read-only session, 1732×1117): controls card bottom 853 → first ad row top 877 = 24 px gap, rows not descendants of the controls card; the menu opens (pointerdown) with Ad actions → View ad / Renew ad / Share / Delete ad; the renew and delete confirm dialogs open and cancel cleanly; the share dialog shows `http://localhost:3001/test-1-adid-c2bdd82e-…`; a real renew ran end-to-end — Renews went 0/15 → 1/15 and the list reloaded (this spent one renewal on dev account `testtest001`); `/km` menu reads មើលការផ្សាយ / ធ្វើអោយថ្មី / ចែករំលែក / លុបការផ្សាយ. Web `eslint`, `prettier --check`, `next build` clean; dev servers :3000/:3001 healthy; browser killed.
+
+**Left open** — Delete was exercised to its confirm step only (same server-action pipeline as renew; the row action itself is a one-line `DELETE /listings/:id`). Edit, sold and promote are the open product decisions. The search box and Filter button on the controls card are still non-functional (pre-existing).
+
+## 2026-10-27 — Admin catalogue tables: shared kit, no raw UUIDs, correct category data
+
+Captain's screenshot of `/wanderer/dashboard/models`: "it seems not user friendly. admin side (does all of them not user friendly?)". I audited all 14 dashboard table pages, then — on the captain's scope choice — fixed the catalogue cluster first: Models, Brands, Categories, Subcategories.
+
+- **A data bug under the ugly column.** `getAdminModels` built a global `subcategory → category` map from **brands**, taking each brand's first linked category (no ordering). Brands span categories, so later brands overwrote shared subcategory ids and phones rendered under "Computers & Accessories" — exactly the screenshot. It now derives from `/admin/subcategories` (`subcategories.categoryId`), the only unambiguous source. The same ambiguity made the Brands page show one arbitrary category per brand; it now lists every category the brand's subcategories span.
+- **Shared kit** — `components/dashboard/admin-table.tsx` (`AdminTable` column config + sorting + pagination + loading/empty state, `RowActions`, `AdminSearch`, `AdminFilter`, `DateCell`, `EntityChip`/`ChipList`, `PrimaryCell`) and `admin-page.tsx` (`AdminPage` shell). `colSpan` is derived from the column list, so the old off-by-one empty states cannot recur; page one resets on a filter change without an effect (keyed page state — the repo's `react-hooks/set-state-in-effect` rule is enforced).
+- **The four pages** now carry no raw UUID column (Copy ID moved into each row's menu), a logo/initial + name primary cell, category and sub-category chips, one formatted Updated date ("01 Aug 2026"), click-to-sort headers, wider search (name, slug, brand, category, sub category), category filters (brand too on Models), and the row menu Edit / Copy ID / Delete. Models/Brands/Subcategories paginate at 20; Categories shows all 12. Fixed "Delete Brand" on the Models delete dialog and "Delete Category" on the Subcategories one.
+- **Verified** — web `eslint`, `prettier --check`, `next build` (exit 0). The kit was smoke-tested through a temporary public preview route (deleted afterwards; it now 404s) with headless Chromium + raw CDP at 1440 and 1024: five columns, no page horizontal overflow, 20 + 17 rows across 2 pages, sort asc→desc (Model 1 → Model 37), search "Honor" → 9 rows and page 1 of 1, and the row menu opening with Edit / Delete / Copy ID.
+- **Left open — the real admin pages are not visually verified.** There is no admin credential in this environment (the `admin` row's password is unrecoverable), so `/wanderer` redirects this session; the captain's own browser session is the verification path. Users/Team, Subscriptions, Reports, Feedback and Users-subscription still carry the old pattern (raw UUID IDs, 9–15 columns) — the next wave.
+
+## 2026-10-27 — Admin Users page: same kit, phone and View-link bugs fixed
+
+Captain's screenshot: "users seems not user friendly and look well yet". Rebuilt `users/UserClient.tsx` on the shared admin kit (the page stays a client component fed by the `users/page.tsx` RSC's `initialData`).
+
+- **Two real bugs under the layout.** The phone column rendered `+{primaryPhone}` while `toUiUser` already stores E.164 — every row read `++855…`. And the row menu's **View** pushed `/{locale}/{username}{userId}` (username and UUID concatenated with no separator) — a guaranteed 404; it now pushes `/{locale}/{username}`, which `[slug]/page.tsx` resolves through `getPublicProfile`.
+- **Table** — 10 columns → 7: ID dropped (Copy ID lives in the row menu), Role dropped (the adapter asks for `role=user`, so it was a constant), Created + Updated collapsed into one **Joined** date. The first cell is a round avatar + name + email ("No email" when absent instead of an empty line), username reads `@handle`, phone is the single normalized E.164 value, and Verified/Account keep their badges. Click-to-sort on every column, pagination at 20 (was 10), search still covers name/username/email/phone/ID (now also the formatted phone and account type). The All / Premium / Normal tabs and their counts stay.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). CDP against a temporary harness that mounts the real `UserClient` with 47 mock users (deleted afterwards; the route now 404s): 7 columns, no page overflow at 1440 or 1024, 47 rows over 3 pages, Premium tab via real pointer events → 3 rows / page 1 of 1, search "captain" → 10 rows / page 1 of 1, sort desc → "Verif B4828 44" first, row menu View / Delete / Copy ID, and zero `++` phone cells.
+- **Left open** — the live page still needs an admin session (none here), so the captain's refresh is the end-to-end check; Delete was exercised only to its dialog (unchanged mutation). Team, Subscriptions, Reports/Feedback and Users-subscription remain on the old tables.
+
+## 2026-10-27 — Admin report queues rebuilt: real timestamps, real reviewers, working links
+
+Captain's screenshots of Report Users and Report Posts. Both pages moved onto the shared kit; the two queues now share one status badge (`components/dashboard/report-status-badge.tsx`).
+
+- **Bugs, not just layout.** Report Users' Created column printed the raw ISO string (`"…".toLocaleString()` is a no-op on a string); both pages showed the reviewer's **UUID** (`reviewedById`) while the adapter already carried `reviewerName`; and Report Users' View Profile built `/{locale}/{targetName-hyphenated}{targetUserId}` — the same name+UUID concatenation that 404s on the Users page. It now opens `/{locale}/{targetUsername}` (the adapter field, unused until now) and is disabled when the target has no username.
+- **Both tables: 9–10 columns → 7.** Drop the report UUID (Copy ID is in the row menu), drop the reviewer column (the status cell reads "by {reviewer}"), merge description + evidence thumbnails into one **Detail** cell (2-line clamp, full text in the title, evidence through `DbImage` — the old raw `<img>` is gone), and format Created through `DateCell`. The Action cell's three inline buttons (which the page width clipped) became the shared row menu: Report Users → View profile / Approve / Reject / Copy ID; Report Posts → View post / Approve / Reject / Copy ID. Approve/Reject disable themselves at their current status; the confirm prompts are unchanged.
+- **Page width fixed** — the old pages let the table push the document wider than the viewport (the window-level scrollbar under the card). With the kit the document is 1425/1425 at 1440 and 1024/1024 at 1024, and the table never scrolls sideways at those widths.
+- **Kit additions** — `AdminRowAction` gains `disabled` and a `success` tone; `PrimaryCell` gains `shape="round"` (used by Users and the user-report target).
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). CDP through two temporary harnesses that mount the real pages with a seeded QueryClient (deleted afterwards; both routes 404): Report Users 23 rows over 2 pages, tabs Pending 8 · Approved 8 · Rejected 7, no raw ISO in the first row; the Pending tab (real pointer events) → 8 rows all Pending, page 1 of 1; row menu View profile (disabled for a username-less target) / Approve / Reject / Copy ID. Report Posts 9 rows, 7 columns, menu View post / Approve / Reject / Copy ID, no overflow at 1440 or 1024.
+- **Left open** — live pages still need an admin session; approve/reject were not executed (their server actions are unchanged). Feedback, Team, the four Subscription pages and Users-subscription remain on the old pattern.
+
+## 2026-10-27 — Admin header: storefront flag picker + a real review-queue bell
+
+Captain: "navbar admin, change language use concept like user use image and change like that. notification on admin side".
+
+- **Language** — `components/dashboard/locale-switcher.tsx` now mirrors the storefront `components/LocalSelector`: the trigger is the current locale's flag (`/flag/uk.png` / `/flag/khmer.png`) in a round ghost button, and the menu is a "Language" label + separator + radio group of flag + name. The cookie behaviour is unchanged (`updateAdminLocale` → `router.refresh()`); it deliberately does not navigate like the storefront selector because admin routes carry no locale prefix.
+- **Notifications** — `components/dashboard/notifications.tsx` was seven hardcoded mock entries with a dead "Mark all as read" button. It is now the moderation review queue: it reads the same two report lists the queues use (`["admin","reports","users"]`, `["admin","reports","listings"]` — same react-query keys, so a queue page visit and the bell share one fetch, and approving/rejecting invalidates both), keeps only `pending` rows, sorts newest first (cap 20), and renders a right-side drawer of report cards (target, reason — reporter, time-ago) that navigate to the owning queue. The badge is the pending count (0 ⇒ no badge). Styling moved from hardcoded zinc/dark classes to theme tokens, and the dead button is gone.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). CDP against a temporary harness mounting both controls with seeded data (deleted; route 404s): the trigger shows the UK flag; the menu lists English (checked) + ខ្មែរ with their flags; the badge reads 4 from four pending rows while an approved and a rejected row are excluded; the drawer header reads "4 reports waiting for review." with the four items newest-first and their correct queue links.
+- **Left open** — the bell costs two admin list calls per dashboard page load until a count/summary endpoint exists; the live header still needs an admin session to eyeball; the language switch itself was not exercised (its server action is unchanged).
+
+## 2026-10-27 — Admin sidebar logo: the collapsed rail was clipping it
+
+Captain's screenshots: the expanded sidebar logo ("P" tile + PhsarKhmer wordmark) was fine, but collapsed to the icon rail it rendered as a black blob clipped at the right edge.
+
+- **Cause** — the icon rail is 48 px (`--sidebar-width-icon`), but `SidebarHeader` kept its expanded `p-4` (16 px side padding), leaving 16 px of content for a 32 px tile inside an `overflow-hidden` link. The tile was cut at the 47 px border.
+- **Fix** — the header takes `p-[7px]` in the icon state (48 − 1 px border − 14 = 33 px, enough for the tile with a hair of slack) and the link switches to `justify-center`; the wordmark keeps its `group-data-[collapsible=icon]:hidden`. Measured in a temporary harness mounting the real `AppSidebar` (deleted; route 404s): collapsed tile 32×32 at x = 8–40 inside the 47 px header, `scrollWidth == clientWidth` (no clipping), centre offset ≤ 1 px; expanded header keeps its 16 px padding, the tile at 16–48 and the wordmark visible.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0), plus screenshots in both states.
+
+## 2026-10-27 — Collapsed sidebar groups open in a dropdown
+
+Captain: "collapsed has issues, like attribute has child, when collapsed this not work".
+
+- **Cause** — the shadcn sidebar primitive hides `SidebarMenuSub` in the icon rail (`group-data-[collapsible=icon]:hidden`), so the four group triggers (Attributes, Manage Users, Subscriptions, Reports) expanded content that rendered nowhere; clicking did nothing visible.
+- **Fix** — `AppSidebar` reads `useSidebar()` and, when `state === "collapsed"` and not mobile, renders each group through a new `CollapsedGroupItem`: a `DropdownMenuTrigger`-wrapped `SidebarMenuButton` opening a right-side menu labelled with the group and its child links (Radix `DropdownMenuItem asChild` → real `<Link>`s). Expanded mode keeps the existing inline `Collapsible` + `SidebarMenuSub` unchanged. The collapsed trigger uses the native `title` attribute rather than `SidebarMenuButton`'s `tooltip`: a Radix dropdown trigger cannot nest inside a Radix tooltip trigger via `asChild` — the tooltip wrapper swallows the trigger props.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0; one type fix: `subscriptionSubItems` is a readonly tuple, so the prop is `readonly SubMenuItem[]`). CDP through a temporary harness mounting the real `AppSidebar` (deleted; route 404s): the collapsed rail reports all four triggers (Attributes, Manage Users, Subscriptions, Reports); the Attributes menu lists Brands / Models / Body Types / Accessories / Types / Job Types / Networks / Years, Subscriptions lists Categories / Plans / Packages / Terms / Free Plan, Reports lists Report Users / Report Posts; expanding the rail leaves zero title-attributed triggers and the old inline collapsible still shows the Attributes children.
+- **Left open** — mobile (sheet) mode keeps the inline collapsible by design; the group parent still has no destination page of its own (it never did).
+
+## 2026-10-27 — Job applications: the poster's row is résumé + chat, no hire/reject
+
+Captain's screenshot of `/me/job-applications`: "after user it should not have hire or reject… user after apply will send to chat right? so this should have only 'View Resume' … and message. IF they want interview or not, it depend on recruiter or interviewers".
+
+- **Removed** the Hire (green) and Reject (red) buttons from the poster's application rows, plus the `decide()` handler, its busy state, and the now-unused `setApplicationStatus` / `toast` / `Loader2` imports. The row now offers only **View Resume** and **Message** — the thread already exists because applying _was_ the first chat message (`ChatService.sendMessage` at apply time), so the conversation is where the interview/no-interview decision belongs. The label also lost its accent: `viewResume` now reads "View Resume" in en (km unchanged).
+- **Kept** the status pill (existing rows can still be `hired`/`rejected` from before) and the status filter/sort. The backend `PATCH /users/me/applications/:id` and the web `setApplicationStatus` action are untouched — the route remains for a future recruiter/interviewer surface — and the `hire`/`reject` i18n keys are left in place for the same reason.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). Not exercised visually: `/me/job-applications` needs a signed-in poster, so the captain's refresh is the end-to-end check.
+
+## 2026-10-27 — Job applications follow-up: the status pills went too
+
+Captain, on the same screen: "why keep view, and hired". The pills were the same dead state machine, so they are gone on both sides.
+
+- `JobApplicationRow` lost its `status` prop and the `StatusBadge` (New/Viewed/Hired/Rejected), and both lists (`/me/job-applications`, `/me/applied-jobs`) lost their status filter — each keeps only its Sort select, and the fetches no longer pass a status. Opening the résumé still flips `pending → viewed` server-side; nothing displays it any more.
+- Backend statuses and the `PATCH /users/me/applications/:id` route stay (parked for a future recruiter/interviewer surface), and the `status*` i18n keys are left in place with them.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0).
+
+## 2026-10-27 — Body Types admin: the attribute manager joins the shared kit
+
+Captain: "bodytype need design for user friendly". The generic `AttributeManager` (which serves all six attribute pages) was still the old hand-rolled table.
+
+- **Table** — 10 columns → 6: the sliced UUID ID and Created are gone, Name carries the icon tile (or the initial when there is no loadable image) with the Khmer name as its second line, Slug stays its own muted column, Category is a chip, Sub Categories a chip list (3 + count), Updated one formatted date, and the row menu is Edit / Delete / Copy ID. Click-to-sort on every column, the shared search (name, Khmer name, slug, category, sub category), pagination at 20, and the loading/empty states now come from the kit. The Add/Edit dialog and its fields (image, Khmer name, category → subcategory checkboxes) are unchanged, as is the Years read-only mode (no Add button, `—` instead of a menu).
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). CDP against a temporary harness seeding 22 body types (deleted; route 404s): 6 columns, 20 rows over 2 pages, search "pickup" → 1 row / page 1 of 1, descending sort → Wagon first, row menu Edit/Delete/Copy ID, Add dialog opens with every field, and no page overflow at 1440 or 1024.
+- **Left open** — body-type images are mostly the bundled `/sub-img` paths the catalog-images decision leaves unrendered, so real rows show the initial tile; the live page needs an admin session to eyeball.
+
+## 2026-10-27 — Attribute edit 500: update() trimmed a null Khmer name
+
+Captain's backend log: `PATCH /api/v1/admin/attributes/bodytypes/:id` → `TypeError: Cannot read properties of null (reading 'trim')` at `attributes.service.ts:144`.
+
+- **Cause** — the web action sends `nameKm: input.nameKm || null`, so editing a body type whose Khmer name was empty sent `nameKm: null`; `@IsOptional()` lets null through `@IsString()`, and `update()` did `dto.nameKm.trim()`. Create was already null-safe (`dto.nameKm?.trim() || null`); only update was not. Every edit with an empty Khmer name 500'd — the new admin page made it easy to hit.
+- **Fix** — `attributes.service.ts` uses the same null-safe form (null clears the Khmer name), and the update DTO's types state `string | null` for `nameKm` / `image` (the runtime already accepted null). The identical unguarded trim in `admin-categories.service.ts` and `admin-subcategories.service.ts` update paths is hardened the same way (their forms send strings, so no behavior change).
+- **Regression test** — new `src/attributes/attributes.service.spec.ts` (null clears; a real name is trimmed) with a stubbed Drizzle client.
+- **Verified** — backend suite 74 suites / 968 tests, `eslint`, `nest build` (exit 0). The dev backend's watch process restarted at 18:12:16 and `dist/src/attributes/attributes.service.js` carries `dto.nameKm?.trim() || null`; the captain's retry of the same edit is the end-to-end check.
+
+## 2026-10-27 — Team admin page: kit conversion (built alongside a parallel session)
+
+Captain's screenshot of `/wanderer/dashboard/team`: "make it design user friendly and clean".
+
+- **Table** — 10 columns → 7: the raw UUID ID and the separate Profile/Name/Username/Created/Updated columns collapse into Member (round avatar + name + email), Username (`@handle`), Phone (first + "+N more"), Role ("Super Admin"/"Admin" badge), Status, Joined date, and the shared row menu (View / Edit / Delete / Copy ID). Click-to-sort, search across name/username/email/phone/role, tabs keep All/Online/Offline with counts, pagination 20 instead of 10, loading/empty states from the kit. The View/Add/Edit/Delete dialogs and their forms are untouched.
+- **Concurrent work** — another session was editing the same file (staff-only role handling: the "Add Member" label, TEAM_ROLES in both role pickers). It paused; I landed the conversion and replied that the file was stable; the combined tree (my list + their role work) passes `eslint` and `next build`.
+- **Verified** — web `eslint`, `prettier --check`, `next build` (exit 0). CDP against a temporary harness mounting `TeamClient` with 4 staff users (deleted; route 404s): 7 columns, tabs Online 2 / Offline 2, the Offline tab filters to 2 rows, row menu View / Edit / Delete / Copy ID, no page overflow at 1440 or 1024.
+- **Left open** — one staff row stores a local number (`087666777`), which the row renders as `+087666777`; the stored value should be E.164. The live page needs a super_admin session.
+
+## 2026-10-27 — Advertisements: the admin page joins the kit, storefront dots take the theme accent
+
+Captain: "advertisment, the design not well design yet. espcially the color, it's not use our theme color yet".
+
+- **Admin page** — `/wanderer/dashboard/advertisements` was the last sidebar page outside the kit: a bare `p-6` shell with a default (near-black) "Add banner" button and a hand-rolled six-column table. It now uses `AdminPage` (title + explanation line, Add banner in the same sky-500 as every other page) and `AdminTable`: Banner (4:1 thumbnail + alt text + Live/Hidden), Placement chip, Link (truncated), Order, the Active switch in the brand blue (`data-checked:bg-[#00a0e9]`), and the row menu Edit / Delete / Copy ID. Search over alt text / placement / link, click-to-sort, pagination at 20. The add/edit and delete dialogs are unchanged.
+- **Storefront carousel** — the dots were plain `bg-white` with an opacity swap; the active dot is now the theme accent `#00a0e9` with a white ring, inactive `bg-white/70` plus a hairline ring so it stays visible over any banner. Autoplay/pause behaviour is unchanged.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). CDP against a temporary harness seeding three banners and rendering the carousel with them (deleted; route 404s): 6 columns, 3 rows, three switches, row menu Edit / Delete / Copy ID, active dot computed `rgb(0, 160, 233)`, inactive white/70, no page overflow at 1440.
+- **Left open** — real banner images are Supabase Storage objects; the harness's fake URLs fall back to the no-image state, so the live page needs a super_admin session to eyeball.
+
+## 2026-10-27 — Admin dialogs: viewport-capped with a pinned footer; neutral Cancel, blue primary
+
+Captain's screenshots of the Add banner and Add Body Types dialogs: "color.... when the content is too long the card is getting long too".
+
+- **Height (global)** — `DialogContent` caps at `max-h-[calc(100svh-2rem)]` with `overflow-y-auto` + `overscroll-contain`, so a long form scrolls inside the dialog instead of stretching past the viewport. `DialogFooter` is a normal in-flow bar at the end of the form — divider inset to the dialog's padding, `bg-popover` so it shares the dialog surface, and symmetric spacing (16 px above the line, 16 to the buttons, 16 below them). The earlier sticky attempt was removed: nested in a form it floated mid-dialog with dead space below (captain's screenshot), and `[&>form]:contents` made content scroll underneath it — an in-flow footer has neither failure mode. The Team add/edit forms' old `max-h-[85vh]`/inner-scroll wrappers were dropped so the dialog is the only scroller. Applies to every dialog in the app, user surfaces included.
+- **Colour** — one rule for admin dialogs now: primary = the theme blue (`bg-sky-500`, matching the pages), Cancel = the neutral outline, Delete = destructive. Twenty Cancel buttons across the Attributes pages (models/brands/categories/subcategories), Users, Team, Feedback and the attribute manager lost their red/blue fills; the Advertisements footer's default black "Add banner" is now the blue primary. Subscription dialogs keep their old styling (that wave has not been rebuilt yet).
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). CDP at 1000×720 against a temporary harness mounting the real attribute manager and advertisements page (deleted; route 404s): the Body Types dialog is 688 px tall (viewport − 32), scrollHeight 810 → internal scroll, footer bottom 688 (visible), Cancel background white/outline, Save computed sky-500; the banner dialog likewise caps and scrolls with a blue "Add banner".
+
+## 2026-10-27 — Trusted product specs (admin catalogue + phone-form requirement)
+
+Captain: search "iphone 18" should surface a trusted, in-house spec page (GSMArena-style); the phone post form must link one, and the listing detail links back to it. Nothing scraped or externally linked.
+
+- **Data** — `product_specs` (migration `0044_rapid_skaar`): one row per existing `models` row (`model_id` unique, `ON DELETE CASCADE`), `spec_groups` JSONB (`[{ title, rows: [{ label, value }] }]`, display order preserved), `is_published` (DB default false; the admin create defaults true). `listings.product_model_id` (FK → models, `SET NULL`) + index.
+- **Backend** — new `src/products/` module following the attributes precedent (public + admin controllers in one module). `GET /products?q=&limit=` (public; published + active brand/model only; every token ILIKEs brand/model name and slug) and `GET /products/:brandSlug/:modelSlug`; `GET/POST/PATCH/DELETE /admin/products` (`@Roles('admin')`, `ParseUUIDPipe` on `:id`, `modelId` immutable via the DTO, 23505 → 409 "already exists for this model", 23503 → 400). Listings create/update call `assertPublishedModel` (400 `productModelId must reference a published product spec`) and `findById` embeds the published `product` ref (null once unpublished). Additive contracts only.
+- **Post form** — `phones` field_schema gains `{ key: 'productSpec', type: 'product', required: true }`; `getListingFormConfig` loads up to 200 published products only when the key is declared. The picker searches by "Brand Model"; pasting `/en/product/<brand>/<model>` (full URL, locale-prefixed or relative) resolves locally and selects it via `SearchPicker`'s new optional `resolveInput`/`onPaste` hook. Selecting fills Brand + Model when empty; changing either clears the link; submit refuses an empty picker with "Choose the product spec for this phone".
+- **Web surfaces** — `/product/[brand]/[model]` (RSC; grouped specs + active ads via the feed's brand/model filters), a Product specs section above `/search` results when `q` is present, and "View full specs" in the listing detail's title block. Admin page `/wanderer/dashboard/products` (Attributes group) uses the shared `AdminPage`/`AdminTable` kit with a dynamic group/row editor; the create dialog excludes models that already have a page and points at Attributes → Models when one is missing.
+- **Verified** — backend `nest build`, eslint, **75 suites / 992 tests** (new products spec + 6 new listing cases), web `next build` (includes the new route + dashboard page), web eslint, `prettier --check` all clean; `db:generate` produced 0044, `db:migrate` applied it (watermark checked before/after; `product_specs` + `product_model_id` verified), `db:seed` refreshed the phones schema (`productSpec` present). Live API on the dev stack: create 201, duplicate 409, search returns Apple iPhone 16, slug page 200 (Display/Camera), unknown slug 404, invalid listing attach 400, valid attach + publish + detail product ref 200, cleanup 200. Browser (CDP, production build on :3002, session tokens minted in-process by the app signer — never printed): admin table renders the row Published; search renders the product card linking `/en/product/apple/iphone-16`; product page renders Display/OLED/Camera/48 MP + active ads; post form Phones shows the required Product Spec, a pasted URL selects "Apple iPhone 16" and auto-fills Brand Apple + Model iPhone 16, re-picking the brand clears it, and Submit shows the required toast; a temporary published ad rendered "View full specs" → `/en/product/apple/iphone-16` and appeared in the product page's active-ads section (ad deleted after; the iPhone 16 spec page is left published as demo data on the dev DB).
+- **Left open** — the required field is form-level only (the DTO stays optional, consistent with every other per-form rule), so direct API/mobile clients may create phone ads without a product; no server-side match between the attached product and the ad's brand/model attributes (the form keeps them consistent); the picker/resolver is capped at 200 published products; product-page active ads use display-name filters, so spelling/casing drift can hide ads; catalog images are usually absent, so the page shows the brand initial; the admin phone-form field only appears after a seed / targeted `field_schema` update (never run the full seed on prod); full seed was run on the dev DB only.
+
+## 2026-10-27 — Signal-model key availability (Plans.md K0.1, K0.2, K2.1)
+
+### K0.1 — device census (dev DB, read-only)
+
+Run 2026-10-27 inside `BEGIN READ ONLY`, counts only (no row content read). Non-deleted accounts
+only. "Active listing" = `listings.status = 'active'`; "in a conversation" = either side of any
+`chat.conversations` row. Buckets are evaluated in order, so each account lands in exactly one.
+
+| Bucket                                         | All accounts | With active listings | In a conversation |
+| ---------------------------------------------- | -----------: | -------------------: | ----------------: |
+| never registered (no device row)               |           36 |                   11 |                 8 |
+| all revoked                                    |            0 |                    0 |                 0 |
+| stale only (non-revoked, none seen in 30 days) |            1 |                    0 |                 1 |
+| targetable (≥ 1 non-revoked, seen in 30 days)  |           14 |                    7 |                14 |
+| **total**                                      |       **51** |               **18** |            **23** |
+
+**Production: unknown** — not read (owner decision D4 not taken). Before K2.1, the 1 stale-only
+account got "not set up yet"; after K2.1 it is targetable through the newest-two fallback. The 36
+never-registered accounts (8 of them already in a conversation) are the hold-and-send case (K3.x).
+
+```sql
+with acct as (
+  select u.id,
+    case
+      when not exists (select 1 from chat.user_e2e_devices d where d.user_id = u.id) then 'never_registered'
+      when not exists (select 1 from chat.user_e2e_devices d where d.user_id = u.id and d.revoked_at is null) then 'all_revoked'
+      when not exists (select 1 from chat.user_e2e_devices d where d.user_id = u.id and d.revoked_at is null
+                       and d.last_seen_at > now() - make_interval(days => 30)) then 'stale_only'
+      else 'targetable'
+    end as bucket,
+    exists (select 1 from listings l where l.user_id = u.id and l.status = 'active') as has_active_listing,
+    exists (select 1 from chat.conversations c where c.user_a_id = u.id or c.user_b_id = u.id) as in_conversation
+  from users u
+  where u.deleted_at is null
+)
+select bucket, count(*)::int as all_accounts,
+  count(*) filter (where has_active_listing)::int as with_active_listings,
+  count(*) filter (where in_conversation)::int as in_a_conversation
+from acct group by bucket order by bucket;
+```
+
+### K2.1 — a registered account is never untargetable
+
+- `loadTargetDevices` (`apps/backend/src/chat/e2e/e2e-devices.util.ts`) is now the only place
+  that decides the device set: per user, the non-revoked devices seen within
+  `DEVICE_STALE_DAYS`; if none, the `STALE_FALLBACK_DEVICES = 2` most recently seen non-revoked
+  ones (ties broken by id). `activeDeviceCondition` is gone.
+- Routed through it: `GET` devices (`listActiveDevices`), `loadActiveDevices`, the bundle fetch
+  (`getDeviceBundle` — otherwise a listed fallback device would 404 on its bundle) and both send
+  checks in `ChatService` (fast-fail read and locked in-transaction re-read).
+- Verified: new specs failed first (17 red: missing exports / old query shape), then pass.
+  Backend jest 62 suites / 811 tests green; `nest build` and eslint on the touched files clean.
+  `tsc --noEmit` over specs still reports 2 errors at `e2e-keys.service.spec.ts:180,191` that are
+  already on HEAD (untouched lines).
+- Review: independent `harness:reviewer` pass returned **APPROVE** (minor notes only). Its one
+  follow-up — the `fresh` column is the backend's first `sql<boolean>` and every spec mocks the
+  DB — was checked on the dev DB through `postgres-js` (read-only): the expression arrives as a
+  real JS `boolean` (`true`/`false`), not a string.
+- Known, accepted (owner decision D3): a user with 3+ non-revoked devices that are all stale has
+  only the newest two targetable; sending from an older one gets `E2E_DEVICE_INACTIVE`, which the
+  client already recovers from by re-registering (strictly narrower than before K2.1).
+
+### K0.2 — does each sign-in bootstrap the E2E device without a reload?
+
+- **Telegram: no web flow.** The "Sign in or register with Telegram" buttons in
+  `components/auth/LoginForm.tsx` and `RegisterForm.tsx` have no handler; nothing to measure.
+- Password, phone-OTP login and OTP registration all end identically: a server action
+  (`actions/login.ts` `login`, `actions/otp.ts` `verifyOtp`) calls `setUserSession`, then the
+  client does `router.push("/me")` inside the same `(user)` layout that hosts
+  `E2eBackupProvider`.
+- **Password: bootstrapped without reload** (2026-10-27, headless Chrome 152, fresh profile, test
+  account A, before K1.1). A `window` marker set before submit survived (same document; the only
+  top-level navigation was the initial `/en/login`). `npic-e2e-identity` appeared ~4 s after
+  submit and a new `chat.user_e2e_devices` row ~6 s after, without visiting `/chats`. Side
+  effect: A was at the 5-device cap, so its least recently seen device (Firefox, last seen
+  Oct 6) was revoked by the eviction rule.
+- **OTP login and OTP registration: not run** (no OTP bypass token read, no new account
+  created). Same mechanism as the password flow, so expected to behave the same; K1.1 covers
+  them regardless.
+- **Telegram: N/A** (no web flow).
+
+### K1.1 — registration is part of authentication
+
+- `lib/e2e/bootstrap-after-auth.ts` `bootstrapE2eAfterAuth(userId)` (fire-and-forget
+  `getE2eEngine` with 2/5/10 s retries) is called on success in `LoginForm` (password) and
+  `OtpVerifyForm` (OTP login and registration). The provider stays the safety net; the
+  engine promise cache means it reuses this bootstrap.
+- Verified (password, test account B, fresh profile): the device row was created **0.75 s
+  after submit, before the redirect to `/me`** (vs ~6 s from the layout in the K0.2
+  baseline); same document, no reload, `/chats` never visited. OTP flows not run in a browser
+  (same call site, `OtpVerifyForm`). `AdminLoginForm` is deliberately not wired (staff
+  dashboard, no chat).
+
+### K1.2 — visible-tab heartbeat
+
+- `lib/e2e/heartbeat-schedule.ts` (pure; 6 h window persisted in localStorage, recorded before
+  the run so concurrent callers never double-fire) + `engine-provider.ts`
+  `reheartbeatE2eDevice` (re-runs `ensureDevice`: heartbeat + prekey top-up) +
+  `hooks/use-e2e-engine.ts`: a `startVisiblePoller` per signed-in device checks every 15 min
+  (Web Locks leader, visible tabs only, catches up on focus).
+- Verified: `heartbeat-schedule.test.ts` red (module missing) then 8/8 green. **Not verified**:
+  the browser half (`last_seen_at` advancing on a tab left open past 6 h).
+- Known nits: a fresh browser's first page load heartbeats twice (bootstrap + first tick); a
+  failed heartbeat waits a full window before retrying.
+
+### K1.3 — storage persistence and visible bootstrap failure
+
+- `lib/e2e/bootstrap-health.ts` counts consecutive bootstrap failures and classifies them
+  (storage / server / unknown); `engine-provider.ts` records success/failure and asks once per
+  page load for `navigator.storage.persist()` (result logged). `E2eBootstrapNotice` in the chat
+  thread column shows one dismissible notice after 2 consecutive failures; `Chat.e2eSetup`
+  strings in all 6 locales. 3 unit tests.
+- Verified in headless Chrome (signed in as test account B): with `window.indexedDB` hidden
+  before page scripts, `/en/chats` shows "Secure chat isn't available in this browser" with the
+  storage text; with normal storage no notice, and `[e2e] persistent storage not granted` is
+  logged (headless Chrome grants by engagement). A real private window was not tried (modern
+  Chrome/Firefox private windows do have IndexedDB, so they no longer trigger this).
+
+### K3.1 — held-send core
+
+- `lib/e2e/held-sends.ts` (+ `held-sends-store.ts` IndexedDB adapter): `hold`, `release`,
+  `releaseAll`, `cancel`, `list`; states `held` / `sending` / `expired`; 14-day lifetime; per-
+  recipient Web Lock + re-read before each send; a non-"no devices" error is rethrown, not
+  held. `held-sends.test.ts` red (module missing) then 9/9 green.
+
+### K3.4 — content-free nudge
+
+- `POST /chats/e2e/nudge/:userId` (`e2e-nudge.controller.ts` / `.service.ts`, optional
+  `listingId`): 404 unknown user → 403 blocked either way → no-op `{ sent: false }` if a
+  `chat.e2e_nudge` notification from this sender exists in the last 24 h (jsonb
+  `data->>'senderId'` on `notifications`, no migration) → `NotificationsService.notify()` with
+  no body, a fixed title or the listing's own title. Web action `actions/e2e-nudge.ts`.
+  `ChatModule` ↔ `NotificationsModule` now use `forwardRef` on both sides.
+- Verified: 5 specs red (stub) then green; backend 63 suites / 827 tests; `nest build` clean;
+  the running dev backend rebooted cleanly with the new module graph.
+- **Gap vs the task text:** no Telegram delivery. The codebase has no Telegram messaging
+  channel at all (Telegram is login-only), so "plus Telegram when linked" needs a new channel.
+
+### Location picker 6.1–6.5
+
+- 6.1: nothing assumes `accuracyMeters` (`chat-content.ts` validates it only when present;
+  `location-card.tsx` never reads it; the composer chip guards it).
+- 6.2: `LocationMapCanvas` gained an optional `flyTo { lat, lng, zoom?, nonce }` that pans the
+  existing map (no rebuild); the post form never passes it.
+- 6.3/6.4: `components/chat/location-picker-dialog.tsx`; the composer's Location tile opens it
+  (no geolocation call outside it; `git grep geolocation apps/web/components/chat` hits only the
+  dialog). 6.5: 6 keys added, `locationReady`/`locationError` removed, parity across 6 locales.
+- Browser checks (6.6) pending.
+
+## 2026-10-27 (later) — verification run, held sends wired, H-plan hunks
+
+### Corrections to the entries above
+
+- The two browser profiles: **`qwer` is on port 9333, `asdf` on 9334** (the K1.1 sign-in replaced
+  the original `asdf` session on 9333). So the held-send and location runs below were sent **as
+  `qwer`** (the K3.4 nudge row's `senderId` is `qwer`'s id). The K0.2 baseline and K1.1 numbers
+  above are unaffected (A = `asdf` before K1.1, B = `qwer` after).
+- "K1.3 — notice in a real private window" was not tried; the check hides `window.indexedDB`
+  instead (see K1.3 above).
+
+### K3.2 / K3.3 — hold and retry, verified in the browser (sender `qwer`, recipient `booksverify`, a never-registered QA account)
+
+- Send → bubble "Waiting for booksverify to join secure chat. It will send automatically." with
+  Cancel, no error toast; `npic-e2e-held-sends` holds 1 item (`held`, text, 13 chars).
+- Reload → the bubble is still there. Cancel → bubble and store entry gone.
+- 85 s with one item held: it stays `held` (never stuck in `sending`), no toast, retry ticks show
+  up only as ordinary server-action POSTs; the dev log has no new "held send failed" lines.
+- Server side (read-only SQL): one `chat.e2e_nudge` notification for `booksverify`, title
+  "Someone wants to chat with you", `body` null, `data` = sender id only; **0 messages** exist
+  from the sender in that conversation.
+- **Not verified: release on registration** (a recipient registering a device while a message is
+  held, then exactly-one delivery and decryption). I tried to get a recipient I could sign in as
+  by revoking `qwer`'s device rows on the shared dev DB; the auto-mode classifier refused the
+  write (shared resource) and I did not work around it. Covered by `held-sends.test.ts` (9 tests:
+  holds, releases, race on `clientMessageId`, 14-day expiry, order, error surfaced) only.
+  To close it: sign in on a fresh profile as an account whose devices are all revoked/missing,
+  then check the sender's tab delivers the held message once within ~2 min.
+- First attempt hit a bug in my own probe, not the app: opening `npic-e2e-held-sends` without a
+  version created an empty v1 DB and the app then failed with "object store not found". A store
+  that tolerates an externally created empty DB would be sturdier (same pattern in
+  `catch-up-store.ts`); not done.
+
+### Bug found and fixed on the way
+
+- `/chats` returned 500 (`ReferenceError: window is not defined`): `location-picker-dialog.tsx`
+  imported `DEFAULT_CENTER` as a value from the Leaflet module, defeating `dynamic(ssr:false)`.
+  The earlier picker check had passed on a stale dev-server module graph. Fixed in `a071cb6`
+  (`lib/map/default-center.ts`). `LocationMapPicker.tsx` (post form) has the same import pattern
+  and was left alone.
+- The web dev server had been wedged by a broken stdout pipe (`write EPIPE`) after its background
+  task was stopped; restarted detached with file logging.
+
+### 6.6 — location picker (sender `qwer`, receiver `asdf`)
+
+- Opening the dialog makes 0 geolocation calls; "Use current location" with permission granted
+  makes 1 and moves the pin (emulated Siem Reap fix, receiver's card shows 13.36330, 103.85640);
+  a hand-picked point (Phnom Penh default) arrives as 11.55640, 104.92820.
+- Permission denied: inline "Location access is blocked. Change the site's location permission to use this."; the map and "Send location" stay usable.
+- 390x844 dark: confirm button fully on screen (bottom 721 of 844, right 358 of 390), 0 px
+  horizontal overflow.
+- **Escape**: a CDP key event does not close either the picker or the existing ad picker in
+  headless Chrome, while a synthetic `keydown` closes the picker, so it is the harness rather than
+  the picker; a real-keyboard check is still open.
+
+### K4.1 — browser matrix, honest status
+
+| Scenario                                                                | Result                                                                                                                                                                                                                                                               |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. New account: device row before any other page                        | **Not run** (registration needs an OTP). Password sign-in covered by K1.1.                                                                                                                                                                                           |
+| 2. Buyer messages a no-device seller; seller signs in; one copy arrives | **Half**: hold, persistence, cancel, nudge verified; release-on-registration **not verified** (see above).                                                                                                                                                           |
+| 3. Seller's device older than 30 days: buyer's message accepted         | **Verified** with the existing stale-only account `testtesttest12` (one device, last seen 2026-09-24): sent as `qwer`, accepted, tick shown, no toast, 5 envelopes incl. exactly 1 to that account's device, no `E2E_DEVICES_MISMATCH` loop. No DB write was needed. |
+| 4. Private window: notice shown                                         | **Simulated** with `window.indexedDB` hidden (K1.3); real private window not tried.                                                                                                                                                                                  |
+
+### H-plan hunks (uncommitted: they sit on top of the owner's staged WIP)
+
+- **H1.2** (owner's WIP): verified. `asdf` parked on `/en`, `qwer` sent 3 messages; the three
+  plaintexts appeared in `asdf`'s `npic-e2e-v2` `decrypted` store with `/chats` never opened.
+  (First probe counted the wrong DB, `npic-e2e`.) The backup upload that should follow was not checked.
+- **H3.1** `lib/chat/group-unavailable.ts` (+ test, red then green), **H3.2** state-aware text,
+  **H3.3** passcode re-prompt with a session "Not now", **H1.3** flush backup on
+  `visibilitychange`/`pagehide` (leader tab only): written by a worker, merged by the lead, gates
+  green (web 64 tests, tsc, eslint, 6-locale key parity). Browser (locked device, `asdf` thread
+  with qwer): runs collapse into counted notice rows ("...see these 11 messages." plus an inline
+  "Enter backup passcode" button, no per-bubble notes left); the prompt opens when the thread opens,
+  returns after a plain dismiss and reload, "Not now" sets `chat:e2e-restore-snoozed` and the prompt
+  stays away after a reload; the inline button reopens it. **Not verified**: the "ready" and
+  "locked, no passcode" notice states, and H1.3's flush in a browser (`pagehide` can be killed
+  mid-request on a real close; `visibilitychange` is the dependable trigger).
+- These cannot be committed separately until the staged WIP is committed.
+
+### Not done in this run, and why
+
+- Backend audit plan 0.1/0.2/1.1/3.x, Vercel usage plan 0.1/2.1/3.x, push plan P0.1/P2.2/P3.1:
+  need production access, a deploy or an owner decision (marked blocked/needs-browser in Plans.md).
+- H2.1/H2.2 (backup reset): owner decision D1. H4.1/H4.2: need the WIP committed first and a
+  two-profile restore run.
+
+### Independent review (harness:reviewer)
+
+- K2.1 (earlier): APPROVE. Key-availability + location picker + H-plan hunks: **REQUEST_CHANGES**
+  with two majors, both fixed test-first and re-reviewed to **APPROVE** (no critical/major left):
+  (1) a held text send stranded in `sending` by a dead tab was never retried or expired
+  (`7ae00b9`, 3 tests); (2) the nudge echoed the title of any listing id, including drafts,
+  moderated ones and other people's (`8752a6f`, 7 specs). Minor items left open on purpose: the
+  nudge 24 h dedupe is select-then-insert (two simultaneous calls can both pass; cosmetic), held
+  rows can render out of order next to unrelated pending sends, Cancel cannot recall a send
+  another tab has in flight, and two independent retry schedules run after sign-in during an outage.
+
+### /harness-work all — 2026-10-30 (what was and was not possible)
+
+- **Gates on the committed tree** (clean working tree at `b6df114`): web `tsc --noEmit` clean, `pnpm --filter web test` 67/67, backend jest (chat, notifications, outbox, payment) 28 suites / 409 tests.
+- **H4.2** closed: `docs/e2e-encryption.md` §9b (key availability) and §9c (history availability), `apps/backend/src/chat/README.md` (nudge, device-set rule), `CHANGELOG.md` `Unreleased`; independent review APPROVE after `8752a6f` / `7ae00b9`.
+- **Not done, and why** (nothing was guessed or simulated):
+  - K4.1 scenario 2 (release on registration), scenario 1 (new signup, needs an OTP), scenario 4 (real private window), H1.2 backup upload, H3.2 "ready" and "locked, no passcode" states, H1.3 flush, K1.2 6 h advance, H4.1 two-profile restore: all need a signed-in browser. The dev test-account logins are not in the repo or these notes, and I did not read the env file or reuse a browser session.
+  - H2.1 / H2.2: owner decision D1 (backup reset) is still open.
+  - Backend audit 0.1 / 0.2 / 1.1 / 3.x / 5.1, Vercel usage 0.1 / 2.1 / 3.x / 4.1, push plan P0.1 / P2.2 / P3.1: need production access or a deploy.
+
+## 2026-10-28 — Product Spec paste feedback + price > 0 (captain's test ad)
+
+Captain tested listing `16C514C8` ("test", iPhone 16): "the price is 0 here" and "the spec say, search or paste product link, but it's not allow to paste link".
+
+- **Price 0** — not a display bug: `price = 0.00` was stored. The price input was `min={0}` and submit only rejected `priceNum < 0`, so 0 passed. Now `min=0.01` and submit rejects `<= 0` ("Enter a price greater than 0") on every subcategory that declares a price. The existing test ad keeps its stored `$0` until edited or deleted. The backend `CreateListingDto` still has `@Min(0)`, so direct API clients can still send 0 — form-level rule, like every other required-ness decision.
+- **Paste** — the picker resolves only our published product URLs; a URL-shaped paste that did not match (an external GSMArena link, or an unpublished product page) fell through silently to "No match found", which reads as "paste is not allowed". A non-resolving URL paste now toasts "That link isn't a published PhsarKhmer product…"; the placeholder names the source ("Search specs or paste a PhsarKhmer product link"); and the focused field accepts a keyboard paste before the panel opens (the resolver is wired to the trigger too, not just the panel's search input).
+- **Verified** — `next build`, web eslint, `prettier --check` clean (backend untouched). CDP against the rebuilt production bundle on :3002: a GSMArena URL paste shows the toast; `/en/product/apple/iphone-16` pasted on the closed, focused field selects "Apple iPhone 16"; price `0` + Submit shows "Enter a price greater than 0". Real OS-clipboard Ctrl+V could not be exercised in headless (the clipboard does not reach the page), so the paste paths were driven with clipboard-shaped `paste` events — the real-keyboard path still needs the captain's retry on :3001.
+
+## 2026-10-28 — Zero-discount badge + number fields changing on scroll
+
+Captain's second report (listing `7508F36F`, plus two older "test" ads): "$1 $1 0%" on a detail page with no discount entered, and "the last two which has price 0, I clearly input 1, but show 0".
+
+- **Data** — the newest row stores `price 1.00, discount_value 0.00, discount_type percent`; it is the ONLY listing in the DB with `discount_value = 0`. The two older rows store `price 0.00` with no discount. So the display faithfully rendered stored values — the bug is how those values got in and how a zero discount renders.
+- **Root cause** — Chrome edits a focused `type="number"` input on wheel. Scrolling the long form with the cursor over the just-focused price/discount field walked `1` → `0` (price) and an untouched discount → `0`. The form then sent `discountValue: 0`, and both display mappings treated any non-null discount as real (`"0.00"` is a truthy string): `oldPrice = price` → strikethrough + `-0%` / `$0 OFF` badge.
+- **Fixes** — `TextInput` (number mode) and the discount input blur on wheel, so the wheel scrolls the page instead of editing the value; the payload only includes a discount when `Number(discountValue) > 0`; `toCardPost` (`lib/api/categories.ts`) and `toPostView` (`Post-Detail.tsx`) require a positive discount before setting `oldPrice`/the percentage label, so existing zero-discount rows render clean too.
+- **Verified** — `next build`, web eslint, `prettier --check` clean (backend untouched). CDP on :3002: the `7508F36F` detail page has no `0%` text and zero `.line-through` elements (only `$1`); search cards have no `-0%` / `$0 OFF` badges; in the phones form, price `1` and an empty discount both survive a wheel over the focused fields (values stay `1` / `` instead of changing).
+- **Left open** — the three "test" rows keep their stored values ($0 / zero discount) until deleted or edited; nothing renders them as a discount anymore. The backend still accepts `discountValue: 0` from direct API clients (display and effective price both ignore it); a data normalization (`UPDATE listings SET discount_value = NULL, discount_type = NULL WHERE discount_value <= 0`) would clean the one row if desired.
+
+## 2026-10-28 — Users Subscription rebuilt on the kit
+
+Captain's screenshot of `/wanderer/dashboard/users-subscription`: "it seems not user friendly". The 15-column table overflowed the window (Status/Action off-screen) and its rows were raw UUIDs plus eight separate numeric columns.
+
+- **15 columns → 8**: Subscriber (round avatar + name + email), Phone, Plan (name + "$price · payment" line), Category chip, Usage ("N ads · N renews" + "Auto renew N"), Period ("17 Oct 2026 → 17 Nov 2026"), Status badge (Active / Expired / Revoked / Upgraded), Action menu (Revoke on active rows + Copy ID). The UUID and Account ID columns are gone (Copy ID lives in the menu); every column sorts; search covers name / email / phone / category / plan / status.
+- The Current/History select and the six group tabs keep their behaviour and counts; the Grant Subscription dialog is unchanged apart from its red Cancel going neutral and the now-redundant `max-h-[90vh]` wrapper.
+- **Verified** — `eslint`, `prettier --check`, `next build` (exit 0). CDP against a temporary harness seeding nine subscriptions (deleted; route 404s): 8 columns, 9 rows, tabs Auto 2 / Food 2 / General 2 / Property 2 / Services 1, row menu Revoke / Copy ID, no page overflow at 1440 or 1024.
+
+## 2026-10-28 — Users Subscription: category tabs are data-driven (and counting again)
+
+Captain's screenshot: the category chip read "Auto 8137", every tab badge read 0, clicking a tab showed nothing — and "if subscription_categories grow? what should we do… right now has 5 but if we add more than 5?"
+
+- **Why** — the tabs were hardcoded to the literal words auto/food/general/property/services and matched `sub.group` **by name**. The real category name is free text ("Auto 8137"), so no row ever matched → zero counts and empty filters, and a sixth category would have been invisible under every tab but All.
+- **Fix** — the admin user-subscriptions view now returns the row's `subscriptionCategoryId` alongside the display `group` (additive field, backend + web adapter); the page fetches `GET /admin/subscriptions/categories` always (same query key the Grant dialog uses) and builds All + one tab per category, counting and filtering by id. New categories appear automatically; `TabsList` wraps (`h-auto flex-wrap`) so eight-plus tabs stay on screen. A row whose category was deleted has no id and shows under All only, chip "—".
+- **Verified** — backend spec 3/3, backend build + lint, web `eslint` / `prettier --check` / `next build`. CDP against a temporary harness seeding 8 categories (including "Home & Garden Extra Long Category") and 12 subscriptions (deleted; route 404s): 9 tabs with counts 2/2/2/2/1/1/1/1, clicking "Auto 8137" filters to its 2 rows, and no page overflow at 1440 or 1024 (the strip wraps).
+
+## 2026-10-28 — Admin Listings rebuilt on the kit, with category filters
+
+Captain: "work on listings one, design and filters".
+
+- **Design** — 9 columns → 8 on the shared kit: Listing (thumbnail + title, with the red moderation line beneath when removed), Seller (`@handle`), Category (names resolved from the slugs: "Phones & Tablets / Phones"), Price (Negotiable when null), a soft status badge (Active / Expired / Restricted / Removed), a red open-reports count, one Created date, and the row menu — View listing / Remove on live ads, Restore on removed ones, Copy ID always. The yellow View / red Remove / green Restore buttons are gone.
+- **Filters** — the status tabs stay (All / Active / Over plan limit / Removed) and gained two selects: **Category** and **Sub-category** (sub-category options follow the chosen category). They ride two **additive** `GET /admin/listings` params, `categorySlug` + `subcategorySlug` (DTO `@IsString @MaxLength(120)` + `eq(categories.slug / subcategories.slug)` in the service); the web adapter forwards them. Title search stays Enter-to-search and resets the page.
+- **Kit** — `AdminTable` gained a `serverPagination` mode: rows are pre-paged by the API, and the footer (total, page X of Y, first/prev/next/last) drives the caller's page state; client-side sorting still works within the page.
+- **Tab counts** — each tab now carries a badge (`All 45 · Active 38 · Over plan limit 4 · Removed 3`); the numbers come from one `pageSize=1` `GET /admin/listings` call per preset **under the current search/category filters** (so a tab's count matches what it opens), batched into one cached query that refreshes only when the filters change — not the page. The four calls use `Promise.allSettled`, so one failed preset can't zero the other badges, and every count renders through the new shared `formatCount` (`99+` past 99, `…` while unknown) — also wired into the Users, Team and Users Subscription tab badges.
+- **Badge colours** — the captain spotted green pixels on the Restricted pill. Reproduced and isolated: Tailwind's **alpha colours** (`border-orange-500/30 bg-orange-500/10`) render pure-teal fringe pixels (`#00D9C0`, R=0) along the rounded corners in Chrome — 36 teal px at 1×, 131 at 4× — while the same badge with **solid tints** (`border-orange-500 bg-orange-50 text-orange-700`) renders **zero**. Not the Badge primitive (a plain span with the same classes shows it) and not the radius (`rounded-lg` too). Listings' status/report badges and the Users Subscription status badges now use solid tints.
+- **Backend process** — the dev backend was still running a build from before today's changes (started 15:36) and a failed EADDRINUSE restart left it down briefly; it is now running the fresh `dist` (started 15:59:43, health 200, log `/tmp/backend-dev2.log`).
+- **Verified** — web `eslint` / `prettier --check` / `next build`, backend build + 75 suites / 992 tests. CDP against a temporary harness seeding 20 of 45 listings (deleted; route 404s): 8 columns, tabs, two filter selects, footer "Page 1 of 3", active-row menu View listing / Remove / Copy ID, removed-row menu Restore / Copy ID, no page overflow at 1440 or 1024.
+
+## 2026-10-28 — Subscription catalog collapsed to group → tier → term
+
+Captain: "the subscription seems confuse... especially plan, and package", asking for fixed pickers (Bronze/Silver/Gold, 3/6/12 months) on one admin page. Approved plan: `~/.claude/plans/zippy-wondering-bengio.md` (session-local).
+
+- **Schema/migration** — `0045_collapse_subscription_plans`: `subscription_plans` dropped; `subscription_packages` gains `category_id` (FK cascade) + `tier` (`subscription_tier` enum `bronze|silver|gold`), unique on `(category_id, tier)`, with `sort_order` backfilled by tier. Terms: year rows normalized to 12 months; every term outside active 3/6/12 months retired (`is_active = false`, rows kept). A guard block runs before any DDL and aborts the whole batch on unmapped plan names or duplicate (group, tier) mappings — the applied run passed it.
+- **Backend** — catalog/`mine`/checkout joins go categories → packages → terms (no plan); checkout requires an active group (closes audit M8); activation resolves the group from `packages.category_id`; admin config exposes group/tier/term CRUD only (derived tier name + order, duplicate tier → 409, duplicate active term → 409, retired durations cannot be reactivated, inactive terms refused for grants); deleting a group now enqueues the reconciliation sweep. Seed rewritten (Property Bronze/Silver/Gold; Auto's 1-month offer dropped from the seed).
+- **Web** — the four dashboard pages (Categories/Plans/Packages/Terms) are replaced by three pages under `/wanderer/dashboard/subscription`: **Subscriptions** (groups + coverage), **Tiers** (limits) and **Terms** (prices), each on the shared `AdminPage`/`AdminTable` kit with search, filters and row menus; Free Plan keeps its own page and the sidebar section is now **Premium**. Grant dialog is category → tier → term (active only); the Users Subscription table's Plan column is now Term. Customer surfaces: catalog/`/me` types lose `planId`/`planName`, checkout/profile pages use `packageName`, 12-month terms render "1 Year" on tiles, and the unenforced Videos/Auto-Renews rows are gone from pricing, checkout and membership sheets. Deleted the dead legacy types and `lib/Subscriptions.ts`.
+- **Verified** — backend `nest build`, eslint, **75 suites / 996 tests** (4 new); web `next build`, eslint; after splitting the admin into Subscriptions/Tiers/Terms pages, `next build` lists all three routes and `eslint`/`prettier --check` stay clean; `db:generate` no-drift; `db:migrate` applied 0045 on the shared dev DB (guard passed); `db:seed:subscriptions` idempotent (0 new groups); catalog API returns 19 rows with no plan fields across 6 groups (incl. the legacy `Auto 8137` fixture, now Bronze), 1-year terms read `durationValue 12 / month`, and the 1-month Auto term is absent from the catalog. The stale `node dist` backend holding :3000 was replaced with the fresh build (log `/tmp/backend-subscription-collapse.log`). Public browser check (headless Chromium DOM dumps on :3001): `/en/premium-account` lists the groups with no Videos/Auto-Renews; `/en/premium-account/auto` renders Bronze + 3/6/12 terms ("1 Year −20% $100 → $80") with only Photos/Ads/Renews; `/en/checkout?termId=…` renders "Bronze - 3 Months / Bronze · Auto / Runs for 3 Months" with no Videos/Auto-renewals.
+- **Left open** — the authenticated admin walk (new `/wanderer/dashboard/subscription` page + grant dialog); the duplicate-term check is service-level (no DB unique index); `Auto 8137` still covers no subcategory; deploy order (migrate before backend) leaves a brief window where the old backend 500s on subscription reads; `videos`/`autoRenews` remain unenforced but editable in admin.
+
+## 2026-10-29 — Free plan: one account-wide total with category sub-limits
+
+Captain: "0/5 is the great number here … car 2 equal 5, and foods 50 equal 5"; then: with a Property plan (1000 ads) "car still limit at 2", and the Manage Ads card should show 1005 (free 5 stays for everything outside the group).
+
+- **Model** — `free_plan_settings.other_ads` is now the free plan's account-wide cap on live ads outside held groups (relabeled "Total Ads" on the member sheet and in admin). `free_plan_ad_limits` rows are sub-limits inside it (`scopeCapOf`): at most the cap's ads of the pool in that subcategory, else its whole category; the effective limit is `min(cap, total)`, so Foods 50 / Fashion 50 behave as 5. Held groups keep their own package pool — a Property (1000) plan does not lift the car cap. No migration.
+- **Allowance** — `allowance.ts`: free ads collapse into one `free` pool; `partitionByAllowance` is a newest-first greedy pass over the pool total and the scope cap (an over-cap ad does not consume a pool slot). `EntitlementsService.view()` overview limits = free total + every held group's package; `usage` gains `hidden` (the restricted subset) so the card reads active-only while restricted ads are reported separately. `assertCanHoldAnotherAd` checks pool + scope; `assertCanRenew` spends renews from the pool (one plan's `renews` shared by its ads), not per ad, on a rolling 30-day window — migration `0046_noisy_wolverine` adds `listing_renewals` (one row per renewal, cascading with its listing/user) and `publish` writes it in the same transaction as the extension.
+- **Lifecycle** — owner delete reconciles immediately (a restricted ad comes back as soon as a slot frees); a restricted ad whose 30-day window lapsed reads as expired and is renewable; the public detail 404s a restricted ad (its Manage Ads row no longer links).
+- **Post flow** — the allowance is checked at `POST /listings` too, so an over-limit post is refused there (403, nothing inserted); if a publish is refused after all, the web deletes the created ad and shows the backend's reason on the form. The server action no longer reports an invisible "saved as a draft" success, and the one orphan draft on the dev DB (`dagdhsa`) was removed.
+- **Web** — Manage Ads cards read `active/(free total + held groups)` and `renews/limit`; a **Hidden** tab (only rendered when something is hidden) lists restricted ads with "Hidden — over your limit" badges, a delete-only row menu plus Upgrade plan, and an explanatory banner; the Active/Expired/Hidden strip is a segmented control (grey track, white raised selected pill) instead of the inverted white-on-white / grey-block pair. The free membership sheet reads Total Ads before its caps.
+- **Verified** — backend `nest build`, eslint, **75 suites / 1007 tests** (allowance + entitlements rewritten; new lapsed-restricted publish and renewal-log cases); web `eslint`, `next build` (type gate) clean; migration `0046` generated and applied (watermark checked), `db:generate` now reports no drift; live API read `usage.renews 0`, then `1` with one `listing_renewals` row inserted, then `0` after cleanup.
+- **Left open** — the shared-dev free plan needs an admin save to take the new reading (seed defaults only); the dev demo owner's ads will drop to the newest 5 live with the rest restricted on the next sweep; the sheet still prints the configured 50s even though the total binds first; the post form's pre-check can miss a full pool when the chosen scope has room — the publish refusal plus rollback covers it.
+
+## 2026-10-29 — "Update this contact to your ads" now carries location + address
+
+Captain: "tick it mean user want to update... so it exist every form. auto fill, user can change. phone number, location, address... will auto fill after tick."
+
+- **Backend** — `UsersService.copyContactToAds` (`src/users/users.service.ts`) now also writes `provinceId`/`districtId`/`communeId`/`address` from the updated user row onto every non-deleted listing the user owns, in the same transaction as the profile write. The map pin travels only when the profile has one — an account that never dropped a pin must not wipe the pin an individual ad carries. No web change: the settings form already made Phone/Location/Address required while the box was ticked and already sent them in the PATCH; only the backend skipped them.
+- **Post form prefill** — captain follow-up: "also prefill location and address in the post form." `getListingFormConfig` (`apps/web/actions/listings.ts`) now returns a `location` block next to `contact`: the same `/auth/me` read feeds `resolvePlaceSelection` (the helper `/settings/edit-profile` and `/me/about` already use), and the form's mount effect applies it. Each half is gated on the subcategory's own `field_schema` (`cfg.fields`), so a form that never declares Location/Address does not get them sent in the payload. The map pin is deliberately **not** prefilled — the ask was location + address.
+- **Docs** — the `UpdateProfileDto.updateAdsContact` comment and the method doc now describe the full copy instead of "contact trio only".
+- **Verified** — backend `nest build`, `eslint`, **75 suites / 1009 tests**; the copy test now asserts the cascade/address/pin, plus a new pinless case that pins "no latitude/longitude keys at all", and the existing off-switch test still proves an unticked box never touches listings. Web `tsc --noEmit`, `next build`, `eslint`, `prettier --check` all clean. The browser walk of the post form was **not** driven this pass.
+- **Left open** — no ad-edit surface exists in the web yet (`ManageAdActions` says so), so "user can change" an ad afterwards is only true at the API level (`PATCH /listings/:id`), not through a screen.
+
+## 2026-10-29 — "résumé" → "resume" in the UI
+
+Captain (apply dialog card): "résumé, why still has? use normal word 'resume'."
+
+- **Change** — the 10 user-facing strings in `apps/web/messages/en.json` lose the accents: "Your resume will be sent", "You haven't built a resume yet", "Review your resume", "Build your resume", the `Resume` chip, "No resume", `{name}'s resume`, the applicant-dialog title/description and "This application carried no resume." Khmer (`km.json`) had no accented occurrences. Code comments and backend test names keep the accented spelling — developer-facing, never rendered.
+- **Verified** — `en.json` parses, `prettier --check` clean, and a repo-wide grep leaves no accented text in any message file or JSX string (only comments/test titles).
+
+## 2026-10-30 — Job apply now sends a client-encrypted (E2E) chat message
+
+Captain: "when apply job, 'Encrypted messages are required.' why i can't? check it"; root cause: the encrypted-only chat change (`5f1d1b6`) left job apply as the one producer still composing plaintext server-side. Captain confirmed "encrypt is correct… apply job is the one not support", and chose option (b) for posters with no devices: "option b, go ahead and implement".
+
+- **Backend** — `CreateApplicationDto` gains the chat E2E fields (`body` ciphertext + v2 `e2e` or v1 `e2eHeader`/`recipientIdentityKey`); `ApplicationsService.apply` forwards them to `ChatService.sendMessage` and returns `ApplyResultView.chat = { conversationId, message } | null` so the browser can commit its ratchet session. `buildApplicationBody` is gone — the server never composes or reads the message. A half payload is a 400; a plaintext-only body can never reach the DB. With no payload (poster has zero encrypted-chat devices) the application is recorded without a chat message, and `isBlockedEitherWay` runs in the service so a blocked pair still 403s.
+- **Web** — `ApplyJobDialog` composes `Application for "<title>"` + note in the browser, pre-reads the poster's devices, and either runs `sendE2eText` with `applyToJobEncrypted` as its send callback (same device lists, bundles, lock, mismatch retry and session commit as the chat composer) or falls back to the plain `applyToJob` when there is nobody to encrypt to. `ApplyJobButton`/`Post-Detail` pass `viewerId` + `posterId`; the E2E engine bootstraps only when the dialog opens. Two new `Post.apply` strings (en/km) explain the fallback and an unavailable browser.
+- **Verified** — backend `nest build`, `eslint`, **75 suites / 1013 tests** (applications spec rewritten: E2E passthrough, returned chat ids, no-payload path, block check, half-payload 400s). Web `next build` (type gate), `eslint` clean. Full browser walk on the dev stack with two throwaway accounts: (a) poster with no device → dialog closed into the "Applied" state, application row created, zero conversations/messages; (b) poster with a registered device → application row plus a `messages` row with `e2eVersion: 2`, `clientMessageId: apply:<listing>:<applicant>` and a ciphertext body, and the poster's browser **decrypted** `Application for "Smoke Test Baker 2" / Hello via encrypted apply`. Test listings soft-deleted; test accounts `+85510000001/2` and their application/conversation remain for the captain to inspect or purge. The dev backend watch had wedged (a file touch did not restart it) and was restarted detached: `nohup pnpm --filter backend start:dev > /tmp/psa-backend-dev.log`.
+- **Left open** — the applicant registers an E2E device on first apply-dialog open (same side effect as opening chat); a poster who registers a device later gets no back-filled message (the application row is the record); the web has no automated test for the dialog orchestration (CDP walk only); existing plaintext application messages stay readable.
+
+## 2026-10-30 — Product Specifications (family-scoped spec pages)
+
+Captain: rename "Product Spec" to "Product Specifications", make it a sidebar parent with one child per family (Cars, Motorcycles, Phones, Tablets, Smart Watches), give each family its own fixed template from the reference sites (autospecshub cars, ultimatespecs motorcycles, gsmarena phones/tablets/watches), and require a published spec on all five listing forms.
+
+- **Design** — `docs/superpowers/specs/2026-10-30-product-specifications-design.md`; plan `docs/superpowers/plans/2026-10-30-product-specifications.md`.
+- **Backend** — `product_specs.family` (enum `product_spec_family`, migration `0047_luxuriant_earthquake`, derived backfill from the model's family subcategory with a phone fallback); templates and family maps in `src/products/spec-templates.ts`; `listPublished`/`listAdmin` take `family`; `GET /admin/products/template/:family`; create validates the model's family link and template groups, update grandfathers stored legacy groups (`INVALID_SPEC_SECTION` otherwise); `assertPublishedModel(modelId, subcategoryId?)` rejects a cross-family spec; listing create/update pass the subcategory id.
+- **Web** — sidebar parent plus five children; `/wanderer/dashboard/product-specifications/[family]` renders the template fields, keeps unmatched legacy groups under Additional details, and creates/edits/deletes through the existing admin kit; `/wanderer/dashboard/products` redirects to Cars. Post form: `productSpec` added to the four new schemas, picker scoped by family, label reads "Product Specification".
+- **Verified** — backend `nest build`, `eslint`, products+listings suites 106/106; web `next build` (type gate) and `eslint` clean. The browser walk is the final verification task.
+- **Open** — one page per model, not per trim; production needs targeted `UPDATE subcategories SET field_schema = …` for the four newly-required forms, and staff must create specs before those categories can be posted.
+
+## 2026-10-30 (later) — Car & Motorcycle spec input switched to freeform
+
+Captain: "how about we do the car and motor input and add field like phone we use to do before ... the old one?"
+
+- **Backend** — `ProductSpecTemplate` gains `mode: 'template' | 'freeform'`; Cars and Motorcycles are freeform (`sections: []`, their fixed field lists removed), Phones/Tablets/Smart Watches stay templated. `assertTemplateGroups` skips validation for freeform families; the model→family link check still applies.
+- **Web** — the admin create/edit dialogs branch on `mode`: freeform renders the old group/row editor (add/remove group and row, label + value); templated families keep the template fields and the Additional-details split.
+- **Verified** — backend products + spec-templates suites 34/34, `nest build`; web `eslint` + `next build`. Browser walk of the Cars dialog pending (staff session).
+- **Parked** — the variant/powertrain architecture; freeform pages hold ICE or BEV fields as label/value rows, and one page per model remains the limit.
+
+## 2026-10-30 (later) — Product image upload
+
+Captain: "no image for upload, i want to upload for each product too."
+
+- **Backend** — `product_specs.image` (migration `0048_lucky_harrier`, nullable varchar 500); `CreateProductDto`/`UpdateProductDto` accept `image` (empty string clears); the public/admin detail returns `image` resolved (`coalesce(product_specs.image, models.image)`) plus the raw `specImage`; the picker/search summary uses the same coalesce. New staff-only `product` upload scope (`STAFF_SCOPES` + `/files/sign` enum).
+- **Web** — the Product Specifications create/edit dialogs include the shared `ImageUpload` (scope `product`); the edit form seeds from `specImage`; the public page and admin table keep using `image` (now spec-first, model fallback).
+- **Verified** — backend products suite 30/30 (new image create/clear tests), full suite 1031/1031, `eslint`, `nest build`; web `eslint` + `next build`; `db:generate` no drift. Browser upload walk pending (staff session).
+
+## 2026-10-30 (later) — Product spec page redesign
+
+Captain: "this design seems a little awkward. the font too small. plan the design here with font and make it look attractive."
+
+- **Type scale** — new scoped `product-type` context in `styles/globals.css` (same pattern as `home-type`): h1 32/40 (28/36 ≤640px), h2 22/30, section h3 14/20/700 uppercase with tracking. Fixes the inverted hierarchy (16px h2 vs 18px h3) and lifts spec values from 15px to 16px (`type-body`).
+- **Layout** — hero card with a 4:3 contain image panel (`md:grid-cols-[minmax(320px,420px)_1fr]`), brand eyebrow, Trusted-specs badge (`BadgeCheck`), family + fuel chips (fuel read from an exact `Fuel Type`/`Fuel` row), and the trusted note. Specs render as two-column bordered cards on desktop / one on mobile, with an accent bar per section and `grid-cols-[minmax(120px,40%)_1fr]` rows.
+- **i18n** — new `Product.trustedBadge` key in en/km.
+- **Verified** — web `eslint` + `next build`; the dev server serves `/en/product/apple/iphone-16` 200 with the new classes and badge.
+
+## 2026-10-30 (later) — Membership free sheet reads like the captain's reference
+
+Captain (Membership screenshots): "bug... this can hover. make don't write like currently we have, [reference] write this... the concept is keep, and admin side about free-plan have no change right?"
+
+- **Rows** — `freeRows` (`components/profile/Subscription.tsx`) now lists Photos, Videos, the per-category caps, Other Ads, Renews, Auto-Renews. "Total Ads" becomes "Other Ads" and moves below the caps (those rows are sub-limits inside that pool), "Renews (30 days)" drops the parenthetical, and the new Videos / Auto-Renews rows read the existing `videos` / `autoRenews` fields (0 → "None"). PlanSheet itself is untouched — "the concept is keep".
+- **Hover regression** — the 2026-10-11 rule ("plan rows are display-only and shouldn't read as clickable") had been re-added by a later ship; `hover:bg-muted transition-colors` is gone from the shared `PlanSheet`, so premium sheets stop highlighting too.
+- **Admin unchanged** — `/wanderer/dashboard/subscription/free-plan` already edits photos / renews / videos / autoRenews / otherAds and the category caps; every row of the new sheet reads those existing values, so no admin work is needed. Only its field label still says "Total ads" where the sheet says "Other Ads".
+- **Follow-up (same day)** — captain on the label column: "this is not bold" — the row label is now `font-semibold` (values stay regular at weight 400), verified in the browser as computed `600` vs `400`; the "Free" sheet title keeps its `font-medium` unless the captain wants that heavier too.
+
+## 2026-10-30 (later) — Checkout success UX + Verified Account badge (planned)
+
+Captain: after the $0.20 payment the checkout page "not say it success yet" and has no back-to-profile button; paid accounts should carry a "Verified Account" tag like the khmer24 reference (profile header, ad cards, ad detail seller card, `/me` header).
+
+- **Plan** — `docs/superpowers/plans/2026-10-30-checkout-success-verified-account.md`.
+- **Decisions (captain)** — any active paid plan grants the badge (free plan never); shown on the four surfaces; badge lasts while the plan is active; the payment did activate later, so the defect is the checkout screen's end state and its read window, not the settlement chain.
+- **Shape** — verification is derived from `user_subscriptions` (active, not superseded) with no schema change; additive `verifiedAccount` on the public/self profiles and `sellerVerifiedAccount` on feed/detail/trending rows; checkout gains an explicit success card with Back to profile and keeps a slow status read through late confirmations.
+- **Status** — implemented 2026-10-30. Backend `verified-account.util.ts` + `sellerVerifiedAccount` on feed/detail/trending; web type/mapper plumbing, `VerifiedAccountBadge`, the four surfaces, and the checkout success/polling rework. Verified: backend build/lint, 77 suites / 1042 tests, web lint + `next build`, and a headless-browser check of a public profile (renders no badge for an unpaid account; the old unconditional rosette is gone). The positive badge case needs a paid account's profile — the captain's `/me` header is the first real check.
+- **Verified** — web `eslint`, `tsc --noEmit`, `prettier --check`, `next build` all clean. Headless Chromium against the dev stack (read-only JWT session — no user row written): the Free sheet renders `Photos 8 / Videos None / Cars For Sale 2 / Motorcycles For Sale 2 / Vehicles For Rent 2 / Fashion & Beauty 50 / Foods 50 / Other Ads 5 / Renews 5 / Auto-Renews None`, and a hovered row's computed background stays `rgba(0, 0, 0, 0)` like its neighbour. Screenshot `/tmp/membership-free-sheet.png`.
+- **Left open** — category caps render in catalog order (Cars → Motorcycles → Vehicles for rent); the reference lists Cars → Vehicles for rent → Motorcycles. Matching that permutation needs an order field on `free_plan_ad_limits` — the public sheet sorts by catalog `sort_order`, not by how the caps were added.
+
+## 2026-10-30 (later) — Web mock data removed
+
+- **Deleted** — the mock web data modules (`lib/post-ad.ts`, `lib/categories.ts`, `lib/location.ts`, `lib/data.ts`, `lib/users.ts`, `lib/subcategoryGroups.ts`, `lib/brands.ts`, `lib/subcategories.ts`), `components/post/PostForm.tsx`, the five mock display components (`components/ads/{AdsPhoto,ListAd,NormalAd}.tsx`, `components/Card/TabsCard.tsx`, `components/all-ads/AllAdsHeader.tsx`), and the mock `posts`/`users` arrays. The legacy `/sell` form is gone; `/sell` now redirects to `/post`, and numeric `-adid-` detail URLs 404.
+- **Web** — feed cards no longer resolve province/seller from mock data; listing detail is real-data only; the `Post`/`User` types stay.
+- **Verified** — web `eslint` + `next build` green; `/en/sell` → `/en/post` and `/km/sell` → `/km/post` 307; a numeric `-adid-` URL 404; client chunks 4,983 → 4,698 KB raw (1,438 → 1,390 KB gzip).
+
+## 2026-10-30 (later) — Car product-spec field missing from the post form (seed-data sync)
+
+Captain: "car, we have implement product spec for car, but the form not having field for this product spec yet".
+
+- **Root cause** — the form is schema-driven (`getListingFormConfig` reads `subcategories.field_schema`), and the dev DB's `cars-for-sale` schema predated `productSpecField`. The seed source already declares the key on all five family subcategories; live data carried it only on `phones`.
+- **Fix** — a targeted `field_schema` sync from `categoriesSeed`, matched by category id + slug, for `cars-for-sale`, `motorcycles-for-sale`, `phones`, `tablets`, `smart-watches`. No code change; the one-off sync script was removed after the run.
+- **Verified** — live `GET /categories/cars-and-vehicles` now reports `productSpec` on cars-for-sale and motorcycles-for-sale; `GET /products?family=car` returns the published BYD Atto 2 45 page the picker needs.
+- **Production** — the same targeted `UPDATE subcategories SET field_schema = …` still has to be applied per environment; the seed remains its only writer.
+
+## 2026-10-30 (later) — Seller-card email now hides until revealed
+
+Captain (seller card): "the email is not hiding, and btn is not work".
+
+- **Root cause** — `Profile-Sidebar` rendered `user.email` in clear text and the "Show Email Address" button's handler only fired `trackEvent(show_contact)`; there was no reveal state, unlike the phone row.
+- **Fix** — new `emailRevealed` state and a local `maskEmail` helper (`c***@gmail.com`, domain kept readable); the masked value plus the button is one click target, and the revealed state renders the real address as a `mailto:` link. Expired ads still hide the row.
+- **Verified** — headless Chromium against the live BYD Atto 2 listing: before the click `c***@gmail.com` is visible and `chi@gmail.com` is absent; clicking "Show Email Address" reveals `chi@gmail.com`, exposes the `mailto:` link, and removes the button. Web `eslint` + `next build` green.
+
+## 2026-10-30 (later) — Detail spec values now filter the feed
+
+Captain: "not work yet these filter… year, tax type, condition, body_type, engine type, color… and don't forget to check another filter on another post_detail on other category or subcategory."
+
+- **Root cause** — `ListingSpecs` linked every Description row to `browseHref` with no query; only Brand/Model carried `ad_field`/`ad_model`. The backend feed already supported every filter.
+- **Change** — `lib/search-params.ts` gains `attrs` (a JSON object of attribute key → value, validated and in `FILTER_PARAMS` + the More Filters badge count); the subcategory page merges the `ad_type` drill-down into that object instead of clobbering it; `ListingSpecs` attaches a query per row — `year_min`+`year_max` for an exact year, `condition`, `tax_type`, `engine`, `color`, `transmission` for the filter-bar dimensions, and `attrs` for every other key, always using the stored English value (not the Khmer display label).
+- **Impact audited** — `parseFeedParams` is shared by search, category, subcategory and all-ads; the new optional `FeedQuery.attrs` flows through all of them and the backend accepts it additively. Generic filters deliberately do not enter `isFiltered` (its breadcrumb has no label for them) but do count in the Filter badge and are cleared by Clear. A grid click's key/value merges into the same object.
+- **Verified** — web `eslint` + `next build` green. Browser hrefs on BYD: year/`tax_type`/condition/`attrs={"bodyType":"SUV"}`/`engine`/`color`/`transmission` all correct; clicking SUV → URL + BYD-only feed; clicking Year → 2 results (BYD + "car lang"); phones storage → 3 (API total), jobs jobType=Part-time → 1; `/km` shows Khmer labels while the hrefs carry English values; Clear removes `attrs`; More Filters badge reads 1.
+- **Superseded by** the schema-driven More Filters ship below (the pair became the multi-attribute `attrs` object).
+
+## 2026-10-31 — More Filters follows each subcategory's schema (phones etc.)
+
+Captain (phones dialog): "in phones, filter is still lacking (our current)..."
+
+- **Root cause** — the dialog's entire attribute block was gated on `isVehicle = hasField("bodyType") || hasField("vehicleType")`, so only vehicle subcategories saw Brand/Model/Year/…; a phone page had no Brand, Model or Storage, and a laptop had none of its five attributes. It also could not apply more than one generic attribute (one `attr_key`/`attr_value` pair).
+- **Backend** — new additive `attrs` query param on `GET /listings`: a JSON object of attribute key → value, each entry AND-ed on `listings.attributes` with the key bound as a parameter. `parseAttributeFilters` (`src/listings/attribute-filters.ts`) validates and caps it; malformed input applies nothing. Util + feed specs added.
+- **Web** — `attrs` becomes the single multi-attribute URL vocabulary (`parseAttrsParam`, `FILTER_PARAMS`, badge count); detail spec links write a one-entry `attrs` object; `getListingsFeed` forwards the JSON. `getBrowseFilterOptions` returns every schema `select` field that has no dedicated control, and More Filters renders one select per entry for every family, with Brand/Model and the vehicle controls; condition is segmented inside the block on subcategory pages and stays a select where there is no subcategory (search/all-ads).
+- **Verified** — backend 78 suites / 1050 tests, build + eslint; web eslint + `next build`. Browser: phones dialog shows Brand, Model, Storage, Condition (segmented); Storage=128GB → URL `attrs={"storage":"128GB"}`, 0 cards (API total 0), reopening preselects it, Clear removes it; laptops show five generic selects (Screen Size, Storage, RAM, CPU, VGA), selecting two applies `attrs={"screenSize":"14\" & 14.9\"","storage":"250GB - 256GB"}`; the cars dialog keeps the vehicle field order; the BYD "SUV" detail link now writes `attrs={"bodyType":"SUV"}` and narrows to BYD only; `/search` keeps its Condition select.
+- **Known gap** — dynamic select labels are English unless the key has a `Specs.attributes` translation, and the inline option names have no Khmer variants.
+
+## 2026-10-31 — Multi-value product-spec fields (phone band lists)
+
+Captain (phone product spec): "home field has more than one row… then we should have thing to handle that."
+
+- **Root cause** — a template field was one single-line `<input>` with a 500-character value cap, and `isTemplateGroup` rejected repeated labels; a phone's per-model band lists (8+ lines) could not be entered.
+- **Backend** — template fields gained `multi?: boolean` (initially the four network bands; now also Build, SIM, Internal, both camera `Modules` lists, Sensors and Charging), and `isTemplateGroup` now accepts repeated labels inside a section while still rejecting unknown labels and duplicate section titles. Rows stay `{label, value}` (500 chars each); no schema change or migration. The phone/tablet Misc template was aligned with the reference — **Colors / Models / SAR / SAR EU, no Price**; a stored Price row is preserved as Additional details (legacy grandfathered). Body also gained an explicit **IP rating** field for the reference's unlabelled IP68 note. Tests: duplicate labels accepted, the multi flags pinned, Misc/Body labels pinned, service create test.
+- **Runtime note** — the dev backend's watch did not restart after the first template edit, so the admin dialog kept serving the old template (no Build add-value). The watch restarted on the later edit; the running server now serves the new template. Refresh the admin page after a template change.
+- **Web** — the admin editor's draft values became arrays per section+field (`splitProduct` collects repeats, `composeGroups` emits one row per value); multi fields render one input per value with add/remove, other fields are unchanged. The public page folds consecutive same-label rows into one entry with a block span per value.
+- **Verified** — backend `spec-templates` + `products` suites 38/38, full suite green, build + eslint; web eslint + `next build`. A temporary phone spec (iPhone 16 Pro) with two `4G bands` rows rendered on `/en/product/apple/iphone-16-pro` as one label with two lines (`labelCount 1`, `lines 2`); the temp row and script were deleted and the page now 404s. The admin editor needs a staff session for a click-through.
+- **Not in scope** — a true variants model (per-variant price/availability): network bands are covered by multi-value rows, but the Known-gap note stands for the rest.
+- **Layout follow-up (same day)** — the public product page's sections now render one full-width card per row instead of the two-column grid (captain: "don't use 2 (content|content) like that, one (content), and then next at the bottom"). Verified in the browser at 1400px: all 13 section cards share the same left/width and stack vertically. Multi-value cells now use the same divider as the spec rows, scoped to the value column (`dd` width 702 vs row 1196) with 8px spacing; the first value has no top border and the last none at the bottom. The earlier `border-border/50` hairline read as "a little weird and hard to look", so the style is the standard divider.
+
+## 2026-10-31 (later) — Social login wired end to end (Google & Facebook)
+
+Captain: "planning to implement oauth with supabase, currently we i have only google, and facebook".
+
+- **Scope (captain)** — Google + Facebook only, on the public login and the admin login; mobile, Telegram and Apple out of scope.
+- **Root state** — the backend had `GET /auth/social/:provider/url` and `POST /auth/social/callback`, but no web client called them; every social button was inert, there was no callback route and no Supabase SDK in `apps/web`.
+- **Backend** — `redirectTo` on the URL route (exact-origin allow-list from `FRONTEND_ORIGINS`; loopback-only in dev, fail-closed in production, no credentials/hash); additive `mode: 'user' | 'admin'` on the callback; admin mode resolves an existing staff account only (same 401 for every failure); the token's `identities` must contain the claimed provider; `email_confirmed_at` is required; social identity links on `(provider, providerAccountId)` first, then lower-cased email, then the existing upsert; `providerAccountId` is stored and NULL legacy rows self-heal; the 10/min per-route bucket on the callback was removed because the web calls it server-to-server from one egress IP (the global limiter still applies).
+- **Web** — `actions/social.ts` (`startSocialLogin` / `completeSocialLogin`), `components/auth/SocialCallback.tsx`, the `/[locale]/auth/callback/[provider]` and `/wanderer/auth/callback/[provider]` routes, and the four button handlers. Each click opens an `about:blank` popup synchronously (so popup blockers allow it), assigns the authorize URL once the server action answers, and disables every action button (Login, Telegram, Apple, Google, Facebook; spinner on the clicked social one) while the form fields stay editable; a 500 ms close poll re-enables the buttons when the popup closes, and a blocked popup falls back to the full-page flow. The callback completes in the opener (`window.opener.location.replace`) and closes the popup, or navigates itself when opened as a normal tab. A host-only httpOnly `social_oauth_pending` cookie (10 min, surface-tagged) binds the callback to the browser that started the flow. The callback strips the fragment immediately and again after hydration — Next's router restores the URL it hydrated with, so the immediate strip alone did not stick.
+- **Config** — `docs/social-oauth-setup.md` records the Supabase Redirect URLs, `FRONTEND_ORIGINS`, `NEXT_PUBLIC_ADMIN_URL` and the staff-email prerequisite (admin social login never creates an account; the seeded admin has no email).
+- **Verified** — backend 78 suites / 1067 tests (new `AuthService social login` block: redirect allow-list, unsupported provider, provider mismatch, unconfirmed email, admin no-create/non-staff/staff, user link-by-email / link-by-provider / create), build + eslint; web eslint + `tsc --noEmit` + `next build` with both callback routes in the manifest. Live curl: allowed redirect returns the Supabase URL, foreign origin 400, unsupported provider 400, tokenless callback 401. Headless Chromium: both Google buttons reach Google with the right `redirect_to`; clicking Google on `/en/login` and `/wanderer/login` opens an `about:blank` popup, the Login/Telegram/Apple/Google/Facebook buttons all disable while the fields remain editable (typed text survives) and the form is not dimmed, and closing the popup re-enables the buttons; the popup error card's Back to login closes the popup and re-enables the opener; a normal-tab callback's Back to login navigates to `/en/login`; the user/admin pending cookies are set and cleared; a junk token renders the backend error; a callback without the pending cookie renders the CSRF guard; the admin callback renders the uniform not-authorized message.
+- **Left open** — a full provider round trip needs real Google/Facebook credentials and the Supabase allow-list; the admin buttons only work for staff rows whose `users.email` matches the provider account. Telegram/Apple buttons remain inert.
+
+## 2026-11-01 — Linked social accounts on /settings
+
+Captain: "[Image #7] this has no icon '>', and try to implement has user has or added oauth.. let's plan".
+
+- **Scope (captain)** — link Google/Facebook; Telegram status/remove only; linked rows removable with a last-method guard; add the chevron.
+- **Backend** — `GET /users/me?includeAuthProviders=1` (additive, opt-in) returns `authProviders` filtered to google/facebook/telegram with a non-null account id, in a fixed order; `POST /auth/social/link` (JWT) validates the Supabase token/provider identity, 409s when the identity belongs to another user or a different account is already attached to this user, fills a legacy null account id, and never mints tokens; `DELETE /auth/social/:provider` (JWT, allow-list google/facebook/telegram) locks the user row (`FOR UPDATE`) and refuses `LAST_LOGIN_METHOD` when no phone, username+password, or other provider row remains.
+- **Web** — `authProviders` on `BackendUser`; `getSettingsUser` requests the flag; `startSocialLink` / `completeSocialLink` / `unlinkSocialProvider` actions; the link flow uses a separate `social_link_pending = provider:nonce` cookie and echoes the nonce in the `/auth/link/{provider}/{nonce}` path (a wrong nonce does not consume the cookie); `SocialCallback` gained `mode: user | admin | link`; the shared `LinkedAccountsRows` renders the three rows for both the hub and the rail, with the popup, a remove confirmation dialog and `router.refresh()`.
+- **Verified** — backend 78 suites / 1082 tests (15 new: link ownership/conflict/idempotent/legacy/invalid token/mismatch; unlink fallbacks/last-method/no-op/allow-list; provider-status flag), build + eslint; web eslint + `tsc --noEmit` + `next build` with `/auth/link/[provider]/[nonce]` in the manifest. Live curl with a scratch dev-OTP account: `authProviders: []` with the flag, absent without; link with a junk token 401 `INVALID_PROVIDER_TOKEN`; link without a JWT 401; unlink `github` 400; unlink an unlinked google `{unlinked:false}`. The scratch account was soft-deleted afterwards and the temp files removed. Headless Chromium: the three settings rows show `Add` + chevrons; clicking Google opens `about:blank` → Google and disables all three rows; closing the popup re-enables them; a foreign-nonce link callback shows "This connection did not start in this browser." and strips the fragment.
+- **Left open** — a real link round trip needs Google/Facebook credentials and the new Supabase allow-list entries (`/auth/link/.../*`); the linked-state row + remove dialog need a real linked account. Re-link after unlink: a later social sign-in with the same email auto-links again (`resolveSocialUser`), so a tombstone/`unlinkedAt` model is a follow-up. No unique `(provider, providerAccountId)` index yet — the 409 pre-check is advisory under a race.

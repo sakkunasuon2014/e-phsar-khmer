@@ -13,6 +13,15 @@ const STRANGER = '33333333-3333-4333-8333-333333333333';
 const LISTING = '44444444-4444-4444-8444-444444444444';
 const APPLICATION = '55555555-5555-4555-8555-555555555555';
 const ATTACHMENT = '66666666-6666-4666-8666-666666666666';
+const CONVERSATION = '77777777-7777-4777-8777-777777777777';
+const MESSAGE = '88888888-8888-4888-8888-888888888888';
+
+/**
+ * An encrypted application payload, as the browser sends it: a ciphertext
+ * body plus the E2E envelope. The service never inspects either.
+ */
+const E2E = { v: 2 } as never;
+const ENCRYPTED = { body: 'CIPHERTEXT', e2e: E2E };
 
 type MockDb = {
   select: jest.Mock;
@@ -26,7 +35,12 @@ function makeDb(): MockDb {
 
 function makeService(db: MockDb, overrides: Partial<ServiceMocks> = {}) {
   const mocks: ServiceMocks = {
-    chat: { sendMessage: jest.fn().mockResolvedValue({}) } as never,
+    chat: {
+      sendMessage: jest.fn().mockResolvedValue({
+        conversationId: CONVERSATION,
+        message: { id: MESSAGE },
+      }),
+    } as never,
     notifications: { notify: jest.fn().mockResolvedValue(undefined) } as never,
     resume: {
       getDocument: jest.fn().mockResolvedValue({ exists: false }),
@@ -252,15 +266,18 @@ describe('ApplicationsService', () => {
 
   describe('apply — happy path', () => {
     /**
-     * Every read `apply` makes on its success path, in order: the job, its
-     * photos, the pair probe, then the two name lookups behind the
-     * notification and the response.
+     * Every read `apply` makes on its success path, in order: the job, the
+     * pair probe, then (only when no chat message is sent) the block check,
+     * then the two name lookups behind the notification and the response.
      */
-    function arrangeHappyPath(opts: { resumeDocument?: unknown } = {}) {
+    function arrangeHappyPath(
+      opts: { resumeDocument?: unknown; encrypted?: boolean } = {},
+    ) {
       queueSelects(
         db,
         [jobRow()], // loadJob
         [], // findByPair — nothing yet
+        ...(opts.encrypted === false ? [[]] : []), // isBlockedEitherWay
       );
       db.insert.mockReturnValue(insertChain([applicationRow()]));
       // notifyPoster's name lookup …
@@ -305,37 +322,94 @@ describe('ApplicationsService', () => {
         return insertChain([applicationRow()]);
       });
 
-      await service.apply(APPLICANT, LISTING, { coverNote: 'Hello' });
+      await service.apply(APPLICANT, LISTING, {
+        coverNote: 'Hello',
+        ...ENCRYPTED,
+      });
 
       expect(order).toEqual(['chat', 'insert']);
     });
 
-    it('delivers through chat with a deterministic dedup key', async () => {
+    it('delivers the encrypted payload through chat with a deterministic dedup key', async () => {
       const { service, mocks } = arrangeHappyPath();
 
-      await service.apply(APPLICANT, LISTING, { coverNote: '  Hello  ' });
+      await service.apply(APPLICANT, LISTING, {
+        coverNote: '  Hello  ',
+        ...ENCRYPTED,
+      });
 
       expect(mocks.chat.sendMessage).toHaveBeenCalledWith(APPLICANT, {
         recipientId: POSTER,
         listingId: LISTING,
-        body: 'Application for "HEAD BAKER"\n\nHello',
+        body: 'CIPHERTEXT',
+        e2e: E2E,
         clientMessageId: `apply:${LISTING}:${APPLICANT}`,
       });
     });
 
-    it('falls back to the headline when there is no cover note', async () => {
-      const { service, mocks } = arrangeHappyPath();
+    it('returns the chat delivery ids so the browser can commit its ratchet session', async () => {
+      const { service } = arrangeHappyPath();
 
-      await service.apply(APPLICANT, LISTING, {});
+      const result = await service.apply(APPLICANT, LISTING, ENCRYPTED);
 
-      expect(mocks.chat.sendMessage).toHaveBeenCalledWith(
-        APPLICANT,
-        expect.objectContaining({ body: 'Application for "HEAD BAKER"' }),
+      expect(result.chat).toEqual({
+        conversationId: CONVERSATION,
+        message: { id: MESSAGE },
+      });
+    });
+
+    it('records the application without a chat message when no E2E payload is supplied', async () => {
+      const { service, mocks } = arrangeHappyPath({ encrypted: false });
+
+      const result = await service.apply(APPLICANT, LISTING, {
+        coverNote: 'Hello',
+      });
+
+      expect(mocks.chat.sendMessage).not.toHaveBeenCalled();
+      expect(db.insert).toHaveBeenCalled();
+      expect(mocks.notifications.notify).toHaveBeenCalledTimes(1);
+      expect(result.chat).toBeNull();
+    });
+
+    it('403s a blocked pair even when no chat message is sent', async () => {
+      queueSelects(
+        db,
+        [jobRow()],
+        [], // findByPair
+        [{ id: 'block-row' }], // isBlockedEitherWay
       );
+      const { service, mocks } = makeService(db);
+
+      await expect(
+        service.apply(APPLICANT, LISTING, { coverNote: 'Hello' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(mocks.chat.sendMessage).not.toHaveBeenCalled();
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('400s a body with no E2E payload (plaintext is never stored)', async () => {
+      queueSelects(db, [jobRow()], []);
+      const { service, mocks } = makeService(db);
+
+      await expect(
+        service.apply(APPLICANT, LISTING, { body: 'plaintext' }),
+      ).rejects.toThrow('Application messages must be encrypted');
+      expect(mocks.chat.sendMessage).not.toHaveBeenCalled();
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('400s an E2E payload with no body', async () => {
+      queueSelects(db, [jobRow()], []);
+      const { service, mocks } = makeService(db);
+
+      await expect(
+        service.apply(APPLICANT, LISTING, { e2e: E2E }),
+      ).rejects.toThrow('must carry a body');
+      expect(mocks.chat.sendMessage).not.toHaveBeenCalled();
     });
 
     it('notifies the poster exactly once, gated on the inserted row', async () => {
-      const { service, mocks } = arrangeHappyPath();
+      const { service, mocks } = arrangeHappyPath({ encrypted: false });
 
       await service.apply(APPLICANT, LISTING, { coverNote: 'Hello' });
 
@@ -356,7 +430,10 @@ describe('ApplicationsService', () => {
 
     it('stores the résumé snapshot when the applicant has a résumé', async () => {
       const document = resumeDocument();
-      const { service } = arrangeHappyPath({ resumeDocument: document });
+      const { service } = arrangeHappyPath({
+        resumeDocument: document,
+        encrypted: false,
+      });
       const values = captureInsertValues();
 
       await service.apply(APPLICANT, LISTING, {});
@@ -372,7 +449,7 @@ describe('ApplicationsService', () => {
     });
 
     it('stores a null snapshot when the applicant has no résumé', async () => {
-      const { service } = arrangeHappyPath();
+      const { service } = arrangeHappyPath({ encrypted: false });
       const values = captureInsertValues();
 
       await service.apply(APPLICANT, LISTING, {});
@@ -388,15 +465,15 @@ describe('ApplicationsService', () => {
         new ForbiddenException('Messaging unavailable'),
       );
 
-      await expect(service.apply(APPLICANT, LISTING, {})).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.apply(APPLICANT, LISTING, ENCRYPTED),
+      ).rejects.toThrow(ForbiddenException);
       expect(db.insert).not.toHaveBeenCalled();
       expect(mocks.notifications.notify).not.toHaveBeenCalled();
     });
 
     it('409s and skips the notification when the insert loses the race', async () => {
-      const { service, mocks } = arrangeHappyPath();
+      const { service, mocks } = arrangeHappyPath({ encrypted: false });
       db.insert.mockReturnValue(insertChain([]));
       // The re-read that resolves the winner's id.
       db.select.mockReturnValueOnce(chain([applicationRow()]));

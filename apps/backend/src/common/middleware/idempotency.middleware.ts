@@ -116,44 +116,49 @@ export class IdempotencyMiddleware implements NestMiddleware {
         return;
       }
 
+      // A key belongs to exactly one request body, whatever state it is in.
+      // (A null hash is a pre-hash legacy row: treated as matching.)
+      if (existing.requestHash && existing.requestHash !== requestHash) {
+        res.status(422).json({
+          success: false,
+          error: {
+            code: 'IDEMPOTENCY_KEY_REUSE',
+            message: 'Idempotency key used with different request body',
+          },
+        });
+        return;
+      }
+
       if (existing.status === 'completed') {
         res.status(existing.responseStatus ?? 200).json(existing.responseBody);
         return;
       }
 
       if (existing.status === 'processing') {
-        if (existing.requestHash && existing.requestHash !== requestHash) {
-          res.status(422).json({
-            success: false,
-            error: {
-              code: 'IDEMPOTENCY_KEY_REUSE',
-              message: 'Idempotency key used with different request body',
-            },
-          });
-          return;
-        }
-
         const ageMs = now.getTime() - new Date(existing.lockedAt).getTime();
         if (ageMs < 30_000) {
-          res.status(409).json({
-            success: false,
-            error: {
-              code: 'IDEMPOTENCY_IN_PROGRESS',
-              message:
-                'Request with this idempotency key is already being processed',
-            },
-          });
+          this.inProgress(res);
           return;
         }
       }
 
-      if (existing.status === 'failed') {
-        // Reclaim the row (instead of deleting it) so the retry's
-        // response can still be cached under the same id
-        await this.db
-          .update(idempotencyKeys)
-          .set({ status: 'processing', requestHash, lockedAt: now, expiresAt })
-          .where(eq(idempotencyKeys.id, existing.id));
+      // A failed row, or a processing row whose owner looks dead. Reclaim it
+      // (rather than delete it) so the retry's response is cached under the
+      // same id — conditionally on the lock we read, so two retries racing
+      // for the same stale row cannot both proceed.
+      const reclaimed = await this.db
+        .update(idempotencyKeys)
+        .set({ status: 'processing', requestHash, lockedAt: now, expiresAt })
+        .where(
+          and(
+            eq(idempotencyKeys.id, existing.id),
+            eq(idempotencyKeys.lockedAt, existing.lockedAt),
+          ),
+        )
+        .returning({ id: idempotencyKeys.id });
+      if (reclaimed.length === 0) {
+        this.inProgress(res);
+        return;
       }
 
       rowId = existing.id;
@@ -166,14 +171,21 @@ export class IdempotencyMiddleware implements NestMiddleware {
       if (!captured) {
         captured = true;
         const status = res.statusCode;
+        // A 5xx is a server fault, not the request's answer: caching it would
+        // replay the failure for the key's whole TTL. Mark it failed so the
+        // client's retry is reclaimed and actually re-executed.
+        const outcome =
+          status >= 500
+            ? { status: 'failed' as const }
+            : {
+                status: 'completed' as const,
+                responseStatus: status,
+                responseBody: body,
+                completedAt: new Date(),
+              };
         void this.db
           .update(idempotencyKeys)
-          .set({
-            status: 'completed',
-            responseStatus: status,
-            responseBody: body,
-            completedAt: new Date(),
-          })
+          .set(outcome)
           .where(eq(idempotencyKeys.id, rowId))
           .catch((err: unknown) =>
             console.error('Idempotency update failed', err),
@@ -183,6 +195,16 @@ export class IdempotencyMiddleware implements NestMiddleware {
     };
 
     next();
+  }
+
+  private inProgress(res: Response): void {
+    res.status(409).json({
+      success: false,
+      error: {
+        code: 'IDEMPOTENCY_IN_PROGRESS',
+        message: 'Request with this idempotency key is already being processed',
+      },
+    });
   }
 
   async cleanupExpired() {

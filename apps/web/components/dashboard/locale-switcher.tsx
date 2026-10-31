@@ -3,38 +3,37 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { IconLanguage } from "@tabler/icons-react";
+import Image from "next/image";
 import { toast } from "@/components/ui/sonner";
-
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { updateAdminLocale } from "@/actions/admin-locale";
 
-const LOCALE_LABELS: Record<string, string> = {
-  en: "English",
-  km: "ខ្មែរ",
-};
-
-const LOCALES = Object.keys(LOCALE_LABELS);
-
 /**
- * In-dashboard language switcher for the /wanderer/* admin surface. Reads the
- * current locale from the NextIntlClientProvider (sourced from the admin_locale
- * cookie), and on select calls the `updateAdminLocale` server action which sets
- * the cookie + PATCHes /users/me, then refreshes so the wanderer root layout
- * re-reads the cookie and re-renders in the new locale.
+ * The same flag picker the storefront NavBar uses (`components/LocalSelector`),
+ * kept in sync by hand because the admin surface changes locale through a
+ * cookie + `router.refresh()`, never through the URL segment.
  */
+const LANGUAGES = [
+  { value: "en", label: "English", icon: "/flag/uk.png" },
+  { value: "km", label: "ខ្មែរ", icon: "/flag/khmer.png" },
+];
+
 export function LocaleSwitcher() {
   const locale = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const handleChange = (next: string) => {
+    if (next === locale) return;
     startTransition(async () => {
       const result = await updateAdminLocale(next);
       if (result.success) {
@@ -45,6 +44,9 @@ export function LocaleSwitcher() {
     });
   };
 
+  const current =
+    LANGUAGES.find((language) => language.value === locale) ?? LANGUAGES[0];
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild className="cursor-pointer">
@@ -52,29 +54,43 @@ export function LocaleSwitcher() {
           variant="ghost"
           size="icon-lg"
           disabled={isPending}
-          className="h-10 w-10 hover:bg-muted/60 hover:rounded-full transition-all duration-200"
+          aria-label="Switch language"
+          className="h-10 w-10 rounded-full transition-all duration-200 hover:bg-muted/60"
         >
-          <IconLanguage stroke={2} className="h-[1.1rem] w-[1.1rem]" />
-          <span className="sr-only">Switch language</span>
+          <Image
+            src={current.icon}
+            alt={current.label}
+            width={20}
+            height={20}
+            className="rounded-sm"
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="center"
         sideOffset={10}
-        className="w-44 rounded-lg shadow-xl"
+        className="w-50 rounded-lg shadow-xl"
       >
-        {LOCALES.map((code) => (
-          <DropdownMenuItem
-            key={code}
-            onClick={() => handleChange(code)}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 cursor-pointer"
-          >
-            <span className="text-sm">{LOCALE_LABELS[code]}</span>
-            {locale === code && (
-              <div className="ml-auto h-2 w-2 rounded-full bg-[#00a0e9]" />
-            )}
-          </DropdownMenuItem>
-        ))}
+        <DropdownMenuLabel>Language</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuRadioGroup value={locale} onValueChange={handleChange}>
+          {LANGUAGES.map((language) => (
+            <DropdownMenuRadioItem
+              key={language.value}
+              value={language.value}
+              className="cursor-pointer"
+            >
+              <Image
+                src={language.icon}
+                alt={language.label}
+                width={20}
+                height={20}
+                className="rounded-md"
+              />
+              {language.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

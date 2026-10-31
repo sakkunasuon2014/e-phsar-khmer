@@ -5,7 +5,7 @@
 # packages/* must NOT be excluded: pnpm-workspace.yaml globs packages/* and
 # `pnpm install --frozen-lockfile` in Dockerfile.vercel validates every
 # workspace importer in pnpm-lock.yaml against a matching package.json.
-# (apps/web is the exception — see below.)
+# The same goes for apps/web — see the note at the bottom.
 .turbo
 **/.next
 **/coverage
@@ -19,9 +19,8 @@ tasks
 .idea
 .vscode
 
-# This project only builds the backend image (Framework preset = Container).
-# The frontend never enters the Docker build context — pnpm runs
-# `--filter backend...` — and its package.json isn't needed either: the same
-# build was verified to pass --frozen-lockfile with apps/web absent entirely.
-# Excluding it cuts the upload from ~257 MB to ~10 MB (1197 files, from 4633).
-apps/web
+# apps/web must NOT be excluded: this file is read by every Vercel project
+# built from this repo, including the web project (Root Directory = apps/web).
+# Excluding it removes apps/web/package.json from the build and fails with
+# NEXT_NO_VERSION. The backend's Docker build is unaffected — pnpm runs
+# `--filter backend...` — it just uploads ~257 MB instead of ~10 MB.

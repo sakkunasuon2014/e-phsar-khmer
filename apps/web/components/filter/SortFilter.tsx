@@ -107,7 +107,7 @@ export default function SortFilter() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="center" className="rounded-sm w-50 p-0 mt-3">
-        <p className="text-base text-foreground text-center pt-2 ">
+        <p className="type-card-heading text-foreground text-center pt-2 ">
           {t("Filters.sort.label")}
         </p>
         <ul className="">
@@ -119,7 +119,7 @@ export default function SortFilter() {
                 <button
                   type="button"
                   onClick={() => selectSort(option.value)}
-                  className="flex w-full items-center justify-between px-3 py-2.5 text-sm hover:bg-muted/60 transition-colors cursor-pointer"
+                  className="flex w-full items-center justify-between px-3 py-2.5 type-nav hover:bg-muted/60 transition-colors cursor-pointer"
                 >
                   <span>{t(option.labelKey)}</span>
                   {isSelected && (

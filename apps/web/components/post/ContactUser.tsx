@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { IconMapPin, IconPhoneCall } from "@tabler/icons-react";
 import CarrierBadge from "./CarrierBadge";
 import ListingLocationMap from "./ListingLocationMap";
 import { trackEvent } from "@/lib/insights/queue";
+import { maskPhone } from "@/lib/phone";
 
 export default function ContactUser({
   user,
@@ -14,6 +16,7 @@ export default function ContactUser({
   locationLine,
   addressLine,
   listingId,
+  contactDisabled = false,
 }: {
   user: { phone?: string[] };
   district?: { name?: string };
@@ -26,89 +29,133 @@ export default function ContactUser({
   addressLine?: string;
   /** Present on a real listing; drives call/show-contact tracking. */
   listingId?: string;
+  /** An expired ad: numbers stay masked and the reveal is never offered. */
+  contactDisabled?: boolean;
 }) {
   const t = useTranslations("Post");
+  // Numbers stay masked until the visitor asks for them. The whole
+  // logo + number + "Show Phone Number" group is one click target.
+  const [revealed, setRevealed] = useState(false);
   const phone0 = user?.phone?.[0];
   const phone1 = user?.phone?.[1];
+  // Display order and colours match the original markup (second number first).
+  const phones: {
+    value: string;
+    color: string;
+    badgeBg: string;
+    letter: string;
+  }[] = [];
+  if (phone1) {
+    phones.push({
+      value: phone1,
+      color: "text-[#118c28]",
+      badgeBg: "bg-[#118c28]",
+      letter: "S",
+    });
+  }
+  if (phone0) {
+    phones.push({
+      value: phone0,
+      color: "text-[#f68b1e]",
+      badgeBg: "bg-[#f68b1e]",
+      letter: "C",
+    });
+  }
   const heading =
     locationLine ?? [district?.name, province?.name].filter(Boolean).join(", ");
   // The map link searches the most precise text we have, address included.
   const mapQuery = [heading, addressLine].filter(Boolean).join(", ");
 
+  // One list serves all three states: revealed (linked), expired (masked, no
+  // action offered) and the normal masked reveal button.
+  const phoneNodes = (linked: boolean) => (
+    <>
+      {phones.map((phone) => (
+        <span key={phone.value} className={`flex items-center ${phone.color}`}>
+          <CarrierBadge
+            phone={phone.value}
+            className="mr-1"
+            fallback={
+              <span
+                className={`${phone.badgeBg} text-white type-discount w-[15px] h-[15px] flex items-center justify-center rounded-sm mr-2`}
+              >
+                {phone.letter}
+              </span>
+            }
+          />
+          {linked ? (
+            <a
+              href={`tel:${phone.value}`}
+              onClick={() => {
+                if (listingId) trackEvent(listingId, "call");
+              }}
+              className="hover:underline"
+            >
+              {phone.value}
+            </a>
+          ) : (
+            maskPhone(phone.value)
+          )}
+        </span>
+      ))}
+    </>
+  );
+
   return (
     <>
       <div className="mt-4">
-        <h1 className="text-sm text-foreground mb-3">{t("contactHint")}</h1>
-        <h3 className="text-base font-medium flex items-center mb-2">
-          <IconPhoneCall className="scale-80 mr-2 text-muted-foreground" />
-          {t("contactPhones")}
-        </h3>
-        <div className="flex flex-wrap items-center gap-5 text-sm font-bold ml-[26px]">
-          {phone1 ? (
-            <span className="flex items-center text-[#118c28]">
-              <CarrierBadge
-                phone={phone1}
-                className="mr-1"
-                fallback={
-                  <span className="bg-[#118c28] text-white text-[10px] w-[15px] h-[15px] flex items-center justify-center rounded-sm mr-2">
-                    S
-                  </span>
-                }
-              />
-              <a
-                href={`tel:${phone1}`}
+        <h1 className="type-body-sm text-foreground mb-3">
+          {t("contactHint")}
+        </h1>
+        {/* The icon is its own flex track, so the heading text and every row
+            under it share one left edge. A hardcoded indent (ml-[26px]) kept
+            drifting: the icon lays out at 24px + 8px gap, not 26px. */}
+        <div className="flex items-start gap-2">
+          <IconPhoneCall className="shrink-0 scale-80 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <h3 className="type-card-heading mb-2">{t("contactPhones")}</h3>
+            {revealed ? (
+              <div className="flex flex-wrap items-center gap-5 type-nav">
+                {phoneNodes(true)}
+              </div>
+            ) : contactDisabled ? (
+              <span className="flex flex-wrap items-center gap-5 type-nav">
+                {phoneNodes(false)}
+              </span>
+            ) : (
+              <button
+                type="button"
                 onClick={() => {
-                  if (listingId) trackEvent(listingId, "call");
+                  setRevealed(true);
+                  if (listingId) trackEvent(listingId, "show_contact");
                 }}
-                className="hover:underline"
+                className="-m-2 inline-block max-w-full cursor-pointer rounded-md p-2 text-left transition-colors hover:bg-muted"
               >
-                {phone1}
-              </a>
-            </span>
-          ) : null}
-          {phone0 ? (
-            <span className="flex items-center text-[#f68b1e]">
-              <CarrierBadge
-                phone={phone0}
-                className="mr-1"
-                fallback={
-                  <span className="bg-[#f68b1e] text-white text-[10px] w-[15px] h-[15px] flex items-center justify-center rounded-sm mr-2">
-                    C
-                  </span>
-                }
-              />
-              <a
-                href={`tel:${phone0}`}
-                onClick={() => {
-                  if (listingId) trackEvent(listingId, "call");
-                }}
-                className="hover:underline"
-              >
-                {phone0}
-              </a>
-            </span>
-          ) : null}
+                <span className="flex flex-wrap items-center gap-5 type-nav">
+                  {phoneNodes(false)}
+                </span>
+                <span className="mt-2 block text-[#00a0e9] type-meta italic">
+                  {t("showPhone")}
+                </span>
+              </button>
+            )}
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (listingId) trackEvent(listingId, "show_contact");
-          }}
-          className="text-[#00a0e9] text-[13px] italic hover:underline mt-2 ml-[26px] inline-block"
-        >
-          {t("showPhone")}
-        </button>
       </div>
       <div className="mt-4">
-        <h3 className="text-base font-medium flex items-center mb-2">
-          <IconMapPin className="scale-80 mr-2 text-muted-foreground" />
-          {heading}
-        </h3>
-        {/* The street address sits on its own line under the location, and
-            only when the seller gave one — no empty line otherwise. */}
-        {addressLine ? (
-          <p className="text-sm text-muted-foreground mb-2">{addressLine}</p>
-        ) : null}
+        <div className="flex items-start gap-2">
+          <IconMapPin className="shrink-0 scale-80 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <h3 className="type-card-heading mb-2">{heading}</h3>
+            {/* The street address sits on its own line under the location,
+                and only when the seller gave one — no empty line otherwise. */}
+            {addressLine ? (
+              <p className="type-body-sm text-muted-foreground mb-2">
+                {addressLine}
+              </p>
+            ) : null}
+          </div>
+        </div>
         <ListingLocationMap coords={coords ?? null} locationLine={mapQuery} />
       </div>
     </>

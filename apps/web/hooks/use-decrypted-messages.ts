@@ -3,6 +3,7 @@
 import { useHistoryRestoredGeneration } from "@/hooks/use-history-restored";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/types/chat";
+import { E2E_PLAINTEXT_CACHED } from "@/lib/e2e/backup";
 import { decryptMessage, isDecryptable } from "@/lib/e2e/decrypt-message";
 import { createIndexedDbStore } from "@/lib/e2e/store";
 import type { DecryptOutcome, E2eStore, RatchetEngine } from "@/lib/e2e/types";
@@ -57,6 +58,10 @@ export function useDecryptedMessages(
         for (const [id, outcome] of done) next.set(id, outcome);
         return next;
       });
+      // The plaintext is cached locally now — the account backup sync listens
+      // for this and uploads the batch without waiting for its next tick.
+      if (typeof window !== "undefined")
+        window.dispatchEvent(new Event(E2E_PLAINTEXT_CACHED));
     };
 
     // Cleanup (the message list changed, or the engine did) stops the loop,

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -42,9 +42,28 @@ type Scope =
   | { kind: "sub"; slug: string; categorySlug: string };
 
 /**
+ * The scope the current route implies: a category or subcategory page scopes
+ * the bar to that page, everywhere else stays "All Categories". Read from the
+ * route params, never the pathname: next-intl's `usePathname` returns the
+ * pathname TEMPLATE (`/category/[categorySlug]/[subcategorySlug]`), not the
+ * concrete URL.
+ */
+function scopeFromParams(
+  categorySlug: string | undefined,
+  subcategorySlug: string | undefined,
+): Scope {
+  if (!categorySlug) return { kind: "all" };
+  return subcategorySlug
+    ? { kind: "sub", slug: subcategorySlug, categorySlug }
+    : { kind: "category", slug: categorySlug };
+}
+
+/**
  * Header search: a category scope dropdown (real catalogue, loaded on first
  * open) + keyword input. Submitting goes to `/search?q=…&category=…|sub=…`.
- * On the search page itself the bar mirrors the URL.
+ * On the search page itself the bar mirrors the URL; on a category or
+ * subcategory page it mirrors that page's scope, so searching from
+ * "Car for Sale" starts inside Car for Sale (captain, 2026-10-26).
  */
 export default function SearchBar() {
   const t = useTranslations("Search");
@@ -53,37 +72,52 @@ export default function SearchBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const onSearchPage = pathname === "/search";
+  const params = useParams<{
+    categorySlug?: string;
+    subcategorySlug?: string;
+  }>();
 
   const urlQ = onSearchPage ? (searchParams.get(Q_PARAM) ?? "") : "";
   const urlCategory = onSearchPage ? searchParams.get(CATEGORY_PARAM) : null;
   const urlSub = onSearchPage ? searchParams.get(SUB_PARAM) : null;
+  const routeScope = useMemo(
+    () => scopeFromParams(params.categorySlug, params.subcategorySlug),
+    [params.categorySlug, params.subcategorySlug],
+  );
 
   const [open, setOpen] = useState(false);
   const [text, setText] = useState(urlQ);
-  const [scope, setScope] = useState<Scope>({ kind: "all" });
+  const [scope, setScope] = useState<Scope>(routeScope);
 
   const categories = useQuery({
     queryKey: ["search-categories", locale],
     queryFn: () => getSearchCategories(locale),
     staleTime: 10 * 60 * 1000,
     // Needed to open the menu, or to name a scope that came from the URL.
-    enabled: open || !!urlCategory || !!urlSub,
+    // A category route needs it too — that is where its label comes from.
+    enabled: open || !!urlCategory || !!urlSub || routeScope.kind !== "all",
   });
 
-  // Mirror the URL whenever it changes (navigation, filter edits, back/forward).
-  // Deliberately NOT keyed on the category list: its lazy load must not reset
-  // a scope the user just picked.
+  // The keyword mirrors the search page's `q`. Route changes alone never
+  // touch it, so typing then browsing to another category keeps the text.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setText(urlQ);
-    if (urlSub) {
-      setScope({ kind: "sub", slug: urlSub, categorySlug: urlCategory ?? "" });
-    } else if (urlCategory) {
-      setScope({ kind: "category", slug: urlCategory });
-    } else {
-      setScope({ kind: "all" });
-    }
-  }, [urlQ, urlCategory, urlSub]);
+  }, [urlQ]);
+
+  // The scope mirrors the search page's URL and follows the category route
+  // everywhere else. Deliberately NOT keyed on the category list: its lazy
+  // load must not reset a scope the user just picked.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setScope(
+      urlSub
+        ? { kind: "sub", slug: urlSub, categorySlug: urlCategory ?? "" }
+        : urlCategory
+          ? { kind: "category", slug: urlCategory }
+          : routeScope,
+    );
+  }, [urlCategory, urlSub, routeScope]);
 
   const scopeLabel = (() => {
     if (scope.kind === "all") return t("allCategoriesOption");
@@ -127,9 +161,9 @@ export default function SearchBar() {
             <Button
               type="button"
               variant="ghost"
-              className="relative flex items-center rounded-l-xs rounded-r-none bg-card text-foreground hover:bg-muted/60 h-full px-4 focus:ring-0 whitespace-nowrap text-sm w-[170px] justify-between transition-colors duration-75 cursor-pointer"
+              className="relative flex items-center rounded-l-xs rounded-r-none bg-card text-foreground hover:bg-muted/60 h-full px-4 focus:ring-0 whitespace-nowrap type-nav w-[120px] sm:w-[170px] justify-between transition-colors duration-75 cursor-pointer"
             >
-              <span className="absolute left-1/2 -translate-x-1/2 truncate max-w-[115px] text-center">
+              <span className="absolute left-1/2 -translate-x-1/2 truncate max-w-[70px] sm:max-w-[115px] text-center">
                 {scopeLabel}
               </span>
               <IconChevronDown className="ml-auto scale-80 text-card-foreground" />
@@ -147,13 +181,13 @@ export default function SearchBar() {
               <div className="flex w-6 justify-center">
                 <IconSelector className="text-card-foreground" />
               </div>
-              <span className="text-sm font-semibold text-card-foreground">
+              <span className="type-nav text-card-foreground">
                 {t("allCategoriesOption")}
               </span>
             </DropdownMenuItem>
             <div className="my-1 h-px bg-border/60" />
             {categories.isLoading && (
-              <p className="px-4 py-2 text-sm text-muted-foreground">
+              <p className="px-4 py-2 type-body-sm text-muted-foreground">
                 {t("loading")}
               </p>
             )}
@@ -178,7 +212,7 @@ export default function SearchBar() {
                       <IconLayoutGrid className="size-5 text-muted-foreground" />
                     )}
                   </span>
-                  <span className="text-sm font-semibold text-card-foreground ">
+                  <span className="type-nav text-card-foreground ">
                     {category.name}
                   </span>
                 </DropdownMenuItem>
@@ -205,7 +239,7 @@ export default function SearchBar() {
                         />
                       )}
                     </span>
-                    <span className="text-sm text-card-foreground">
+                    <span className="type-body-sm text-card-foreground">
                       {sub.name}
                     </span>
                   </DropdownMenuItem>

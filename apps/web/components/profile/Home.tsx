@@ -246,7 +246,7 @@ export default function HomeProfile({
               stroke={2}
             />
           </div>
-          <p className="text-lg text-foreground font-medium pt-4">
+          <p className="type-card-heading text-foreground pt-4">
             {t("noResult")}
           </p>
           <p className="text-muted-foreground pt-2">{emptyMessage}</p>
@@ -291,7 +291,7 @@ export default function HomeProfile({
                   </Button>
                 </div>
                 <div className="flex items-center justify-between mt-6 px-1">
-                  <div className="flex items-center gap-2 text-[#00a0e9] font-medium text-sm cursor-pointer">
+                  <div className="flex items-center gap-2 text-[#00a0e9] type-nav cursor-pointer">
                     <MapPin className="w-4 h-4" />
                     <span>{t("location")}</span>
                   </div>
@@ -353,7 +353,7 @@ export default function HomeProfile({
               className="flex min-h-12 items-center justify-center"
             >
               {loading && (
-                <p className="text-sm text-muted-foreground">
+                <p className="type-body-sm text-muted-foreground">
                   {t("loadingMore")}
                 </p>
               )}

@@ -1,0 +1,142 @@
+{
+  "generatedAt": "2026-10-26T00:00:00.000Z",
+  "workstreams": [
+    {
+      "id": "W1",
+      "name": "Global shell: responsive nav + search + account block",
+      "goal": "Make NavBar/SearchBar/SocialBar fit at 320-1023px with no horizontal overflow, while keeping the current desktop layout pixel-equivalent at >=1024px.",
+      "files": [
+        "apps/web/components/web/NavBar.tsx",
+        "apps/web/components/web/SearchBar.tsx",
+        "apps/web/components/web/SocialBar.tsx",
+        "apps/web/components/web/MobileNavSheet.tsx"
+      ],
+      "findings": ["MR-001", "MR-006", "MR-005"],
+      "dependsOn": [],
+      "acceptance": [
+        "At 320/360/390/414/768px on /en, /en/all-ads, /en/category/cars-and-vehicles, /en/search, /en/login, /en/chats, and one listing-detail route: no element right-edge exceeds innerWidth + 1",
+        "Mobile sheet trigger is reachable and opens at 320px; search input is focusable and submits inside the sheet; logged-out Login/Register/Sell links or, logged in, every SocialBar menu item are tappable",
+        "At lg: (1024px) and above, the nav renders the original desktop row with no visible change versus a pre-change screenshot",
+        "SearchBar's scope button and label never truncate to an unreadable sliver at 320px",
+        "Notifications, Messages, and avatar-trigger hit areas measure >=44x44 CSS px"
+      ],
+      "verification": [
+        "pnpm --filter web lint",
+        "pnpm --filter web build",
+        "git grep -n \"hidden lg:\\|lg:hidden\\|Sheet\" apps/web/components/web/NavBar.tsx apps/web/components/web/MobileNavSheet.tsx",
+        "node tasks/mobile-verify.mjs --base <fresh-build-url> --widths 320,360,390,768 --routes /en,/en/all-ads,/en/category/cars-and-vehicles,/en/search,/en/login",
+        "optional: chrome-devtools-axi open <url> for a manual look (CLI bridge may be unavailable; do not hard-depend on it)"
+      ],
+      "risk": "medium",
+      "effort": "M"
+    },
+    {
+      "id": "W2",
+      "name": "Card & category grid responsiveness",
+      "goal": "Replace every fixed/unresponsive grid-column or min-width rule that forces horizontal overflow below 640px, using the breakpoint ladder CategoryGrid.tsx already proves out.",
+      "files": [
+        "apps/web/components/all-ads/AllAdsCategories.tsx",
+        "apps/web/components/category-layouts/SubcategoryGrid.tsx",
+        "apps/web/components/ads/GridCardPost.tsx"
+      ],
+      "findings": ["MR-002", "MR-003", "MR-010", "MR-005"],
+      "dependsOn": [],
+      "acceptance": [
+        "Re-measure only after W1 lands: at 320/360/390/768px on /en/all-ads, /en/category/cars-and-vehicles, /en/search, no AllAdsCategories/SubcategoryGrid/GridCardPost element's right edge exceeds innerWidth + 1",
+        "At 320px, category/subcategory circle grid renders 3 columns without clipping or overlap; card grid renders 2 columns without forcing the page wider than 320px",
+        "At >=1024px both grids render identically to today (md: breakpoint values unchanged; sm:min-w-[260px] still applies at and above 640px exactly as the old unconditional min-w-[260px] did)",
+        "GridCardPost's heart button measures >=44x44 CSS px"
+      ],
+      "verification": [
+        "pnpm --filter web lint",
+        "pnpm --filter web build",
+        "git grep -n \"gridTemplateColumns\" apps/web/components/category-layouts/SubcategoryGrid.tsx (expect no matches after the fix)",
+        "git grep -n \"min-w-\\[260px\\]\" apps/web/components/ads/GridCardPost.tsx (expect sm:min-w-[260px], not a bare min-w-[260px])",
+        "node tasks/mobile-verify.mjs --base <fresh-build-url, same build as W1> --widths 320,360,390,768 --routes /en/all-ads,/en/category/cars-and-vehicles,/en/search"
+      ],
+      "risk": "low",
+      "effort": "S"
+    },
+    {
+      "id": "W3",
+      "name": "Touch-target sizing: list cards & post-form delete button",
+      "goal": "Bring the two remaining sub-44px primary touch targets (outside the global shell and outside GridCardPost) up to 44px.",
+      "files": [
+        "apps/web/components/ads/ListCardPost.tsx",
+        "apps/web/components/post/ListingPostForm.tsx"
+      ],
+      "findings": ["MR-005", "MR-009"],
+      "dependsOn": [],
+      "acceptance": [
+        "ListCardPost's heart button and ListingPostForm's phone-row delete button both measure >=44x44 CSS px",
+        "List-view card layout does not visually shift or overlap the price/text beside the heart button after the hit-area grows, at 320/390 and at >=1024px",
+        "Post form's repeatable phone-number rows still align correctly with the larger delete button at 2 and 3 rows"
+      ],
+      "verification": [
+        "pnpm --filter web lint",
+        "pnpm --filter web build",
+        "git grep -n \"h-11 w-11\" apps/web/components/ads/ListCardPost.tsx apps/web/components/post/ListingPostForm.tsx",
+        "node tasks/mobile-verify.mjs ... (both buttons' small/sub-44px entries should disappear from output)",
+        "manual: toggle to list view and confirm the heart still toggles like state correctly"
+      ],
+      "risk": "low",
+      "effort": "S"
+    },
+    {
+      "id": "W4",
+      "name": "Post-form category picker: touch-reachable subcategory switch",
+      "goal": "Make the mock DynamicForm's category picker operable by tap, not just mouse hover -- the load-bearing fallback for admin-created subcategories with no seeded field_schema.",
+      "files": [
+        "apps/web/components/post/PostForm.tsx"
+      ],
+      "findings": ["MR-008"],
+      "dependsOn": [],
+      "acceptance": [
+        "Tapping or clicking without hovering first on any top-level category button updates the right-hand subcategory pane to that category's subcategories",
+        "Existing hover-preview behavior for mouse users is unchanged"
+      ],
+      "verification": [
+        "pnpm --filter web lint",
+        "pnpm --filter web build",
+        "git grep -n \"onClick\\|onMouseEnter\" apps/web/components/post/PostForm.tsx (expect both handlers on the same button)",
+        "no seeded route currently exercises this branch; manual verification requires a throwaway admin-created subcategory with no field_schema, or a code-review walkthrough -- note this caveat rather than claiming an end-to-end click-test the current catalogue can't trigger"
+      ],
+      "risk": "low",
+      "effort": "S"
+    },
+    {
+      "id": "W5",
+      "name": "Verification & re-measurement",
+      "goal": "Re-run the Lead's measured sweep against a build including W1-W4's changes, confirm the baseline overflow table is clean, and update the audit doc.",
+      "files": [
+        "tasks/mobile-audit.md",
+        "tasks/mobile-verify.json",
+        "tasks/mobile-verify-post-fix.json",
+        "tasks/mobile-audit-shots/*-post-fix.png"
+      ],
+      "findings": ["MR-001", "MR-002", "MR-003", "MR-005", "MR-006", "MR-009", "MR-010"],
+      "dependsOn": ["W1", "W2", "W3", "W4"],
+      "acceptance": [
+        "node tasks/mobile-verify.mjs --base <fresh-build> --widths 320,360,390,768 --routes /en,/en/all-ads,/en/category/cars-and-vehicles,/en/search,/en/login,/en/chats --shots exits 0",
+        "Regenerated JSON's overflow array is empty and small array no longer contains the specific buttons fixed in W1/W2/W3",
+        "Manual 1280px screenshot comparison shows the desktop shell unchanged from a pre-change baseline (captured before W1 lands)"
+      ],
+      "verification": [
+        "acceptance criteria above are themselves the verification steps -- this is the final gate",
+        "IMPORTANT: do not measure against :3011 as-is (it is a pre-fix build and must not be restarted/killed); build+start a second preview on a free port or coordinate a redeploy of :3011 once W1-W4 are merged"
+      ],
+      "risk": "high",
+      "effort": "S"
+    }
+  ],
+  "deferred": [
+    "MR-004 (w-5xl on homepage CTA) -- corrected to not-a-bug: Tailwind v4's width utility does not read the container scale (only max-width/min-width do), so w-5xl compiles to nothing; optional one-line cleanup only, not required for any acceptance criterion",
+    "MR-007 dead-code removal (5 files, not 4 as the static audit counted: LSHeader.tsx, LSPCHeader.tsx, LSPHeader.tsx, LSPYCHeader.tsx, LSSHeader.tsx) -- flagged, not deleted",
+    "components/chat/*, lib/e2e/*, actions/e2e-backup.ts, messages/*.json -- dirty/WIP, untouched",
+    "Backend (apps/backend/*) -- not part of this plan",
+    "Authenticated/admin surfaces beyond /en/login, /en/me (redirect), /en/chats (login-gated shell) -- remain static-only",
+    "10-11px discount/delivery badges and the 28x28 ThreeDotPost overflow-menu button -- sub-guideline but not overflow-causing and not named in the original audit",
+    "Locale-specific layout stress (km/zh) -- the shell overflow is layout-caused, not copy-length-caused, so fixing the layout fixes all measured locales at once",
+    "Any change requiring a new dependency or a tailwind.config.* file -- none needed"
+  ]
+}

@@ -138,7 +138,7 @@ export class AdminCategoriesService {
         }
 
         if (dto.nameKm !== undefined) {
-          const nameKm = dto.nameKm.trim();
+          const nameKm = dto.nameKm?.trim();
           if (nameKm) {
             await tx
               .insert(categoryTranslations)

@@ -47,13 +47,13 @@ export default function ChangeUsername({ me }: { me?: SettingsUser | null }) {
           <SettingSidebar me={me} />
           <main className="flex-1">
             <div className="bg-card border border-border rounded-sm ">
-              <h1 className="text-2xl font-medium text-foreground  mb-4 mt-12 text-center ">
+              <h1 className="type-page-title text-foreground mb-4 mt-12 text-center">
                 {t("title")}
               </h1>
               <p className="text-center mb-6">{t("description")}</p>
 
               <Field className="w-full max-w-md mx-auto mt-6">
-                <FieldLabel className="text-sm text-foreground tracking-tight">
+                <FieldLabel className="text-foreground tracking-tight">
                   {t("label")} <span className="text-destructive">*</span>
                 </FieldLabel>
                 <Input
@@ -64,7 +64,7 @@ export default function ChangeUsername({ me }: { me?: SettingsUser | null }) {
                   maxLength={50}
                   required
                 />
-                <FieldDescription className="text-sm">
+                <FieldDescription className="type-body-sm">
                   {t("hint")}
                   {isValid && !isChanged ? ` ${t("current")}` : ""}
                 </FieldDescription>

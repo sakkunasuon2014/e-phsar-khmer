@@ -113,7 +113,7 @@ export default function AllAdsFeed({
     <Tabs defaultValue="grid" className="max-w-7xl select-none bg-muted">
       {/* Header title */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
-        <h1 className="text-lg font-semibold text-card-foreground">
+        <h1 className="type-page-title text-card-foreground">
           {heading ?? t("heading")}
         </h1>
       </div>
@@ -146,7 +146,7 @@ export default function AllAdsFeed({
             {emptyMessage}
           </p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <GridCardSell />
             {posts.map((post) => (
               <GridCardPost key={post.postId} post={post} />
@@ -178,7 +178,9 @@ export default function AllAdsFeed({
           className="flex min-h-12 items-center justify-center"
         >
           {loading && (
-            <p className="text-sm text-muted-foreground">{t("loadingMore")}</p>
+            <p className="type-body-sm text-muted-foreground">
+              {t("loadingMore")}
+            </p>
           )}
         </div>
       )}

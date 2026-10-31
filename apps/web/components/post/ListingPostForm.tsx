@@ -24,6 +24,7 @@ import {
   type ListingFormConfig,
 } from "@/actions/listings";
 import type { BackendModel } from "@/lib/api/categories";
+import { describeBucket } from "@/lib/subscription-pricing";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -62,6 +63,8 @@ const LABEL_KEYS: Record<string, string> = {
   "Job Title": "jobTitle",
   Brand: "brand",
   Model: "model",
+  "Product Spec": "productSpec",
+  "Product Specification": "productSpec",
   Year: "year",
   "Tax Type": "taxType",
   Condition: "condition",
@@ -103,7 +106,7 @@ const LABEL_KEYS: Record<string, string> = {
  *
  * The design puts Condition in a different place on almost every form and the
  * `field_schema` cannot arbitrate: Cars For Sale's own schema lists Condition
- * before Body Type while its approved layout puts it after (tasks/redesign.md
+ * before Body Type while its approved layout puts it after (docs/post-form-layout.md
  * rows 11/15). So the slot is declared here, per subcategory:
  *
  *  - `lead` — directly under the identity pickers and above the spec cluster
@@ -188,7 +191,7 @@ function TextInput({
       <FieldLabel label={label} required={required} />
       <div className="relative">
         {prefix && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 type-body text-gray-500">
             {prefix}
           </span>
         )}
@@ -199,9 +202,18 @@ function TextInput({
           min={min}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full border border-gray-200 rounded-lg py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
+          // Chrome changes a focused number input on wheel — scrolling the
+          // page with the cursor over the field just typed silently walked
+          // "1" down to "0" (captain, 2026-10-28). Blur on wheel so the
+          // scroll moves the page, never the value.
+          onWheel={
+            type === "number"
+              ? (event) => event.currentTarget.blur()
+              : undefined
+          }
+          className={`w-full border border-gray-200 rounded-lg py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent ${
             prefix ? "pl-7" : "pl-3"
-          } ${trailing ? "pr-11" : "pr-3"}`}
+          } ${trailing ? "pr-14" : "pr-3"}`}
         />
         {trailing && (
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
@@ -228,6 +240,8 @@ function SearchPicker({
   disabled,
   placeholder,
   emptyLabel,
+  showOnlyKm,
+  resolveInput,
 }: {
   label: string;
   options: {
@@ -244,15 +258,43 @@ function SearchPicker({
   disabled?: boolean;
   placeholder?: string;
   emptyLabel?: string;
+  /** Drop the English half of `nameKm/name` (colours and the range pickers). */
+  showOnlyKm?: boolean;
+  /**
+   * Optional paste resolver (the Product Spec picker): a pasted product URL is
+   * matched against the loaded options and selected outright. Normal search
+   * filtering is untouched — a miss simply falls through to it.
+   */
+  resolveInput?: (text: string) => { id: string; name: string } | null;
 }) {
   const t = useTranslations("PostForm");
   const locale = useLocale();
   const [open, setOpen] = useState(false);
+  /**
+   * Inline pick-list ranges (storage / screen size / RAM / VGA) carry no
+   * `nameKm` in the DB — their seeded options are strings like "1TB & Above".
+   * Translate only the words; the number/unit prefix is already universal and
+   * the stored value stays the English option name.
+   */
+  const kmOptionLabel = (name: string): string | null => {
+    if (name === "Integrated") return t("options.integrated");
+    const above = name.match(/^(.*?)\s*&\s*(?:Above|Larger)$/);
+    if (above) return t("options.andAbove", { value: above[1] });
+    const below = name.match(/^(.*?)\s*(?:&\s*(?:Under|Below)|or below)$/);
+    if (below) return t("options.andBelow", { value: below[1] });
+    return null;
+  };
+  const optionKm = (option: { name: string; nameKm?: string | null }) =>
+    option.nameKm ?? (locale === "km" ? kmOptionLabel(option.name) : null);
   /** Bilingual on km ("សេដាន/Sedan"); the stored value stays the English name. */
-  const displayName = (option: { name: string; nameKm?: string | null }) =>
-    locale === "km" && option.nameKm
-      ? `${option.nameKm}/${option.name}`
+  const displayName = (option: { name: string; nameKm?: string | null }) => {
+    const km = optionKm(option);
+    return locale === "km" && km
+      ? showOnlyKm
+        ? km
+        : `${km}/${option.name}`
       : option.name;
+  };
   const selected = options.find((o) => o.id === value);
   const withIcons = options.some((o) => !!o.image);
 
@@ -264,7 +306,23 @@ function SearchPicker({
           <button
             type="button"
             disabled={disabled}
-            className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left text-sm focus:outline-none ${
+            // Keyboard paste on the focused (closed) trigger: the placeholder
+            // invites pasting a link, so it must work before the panel opens
+            // too — clicking the trigger opens the panel and pastes land in
+            // the CommandInput instead.
+            onPaste={
+              resolveInput
+                ? (event) => {
+                    const hit = resolveInput(
+                      event.clipboardData.getData("text"),
+                    );
+                    if (!hit) return;
+                    event.preventDefault();
+                    onChange(hit.id);
+                  }
+                : undefined
+            }
+            className={`flex w-full items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5 text-left type-body focus:outline-none ${
               disabled
                 ? "cursor-not-allowed bg-gray-100 text-gray-400"
                 : "cursor-pointer text-gray-700 focus:ring-2 focus:ring-orange-400 focus:border-transparent"
@@ -285,37 +343,51 @@ function SearchPicker({
           className="w-[var(--radix-popover-trigger-width)] p-0"
         >
           <Command>
-            <CommandInput placeholder={t("search")} />
+            <CommandInput
+              placeholder={t("search")}
+              onPaste={
+                resolveInput
+                  ? (event) => {
+                      const hit = resolveInput(
+                        event.clipboardData.getData("text"),
+                      );
+                      if (!hit) return;
+                      event.preventDefault();
+                      onChange(hit.id);
+                      setOpen(false);
+                    }
+                  : undefined
+              }
+            />
             <CommandList>
               <CommandEmpty>{emptyLabel ?? t("noMatch")}</CommandEmpty>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.id}
-                  value={
-                    option.nameKm
-                      ? `${option.nameKm} ${option.name}`
-                      : option.name
-                  }
-                  onSelect={() => {
-                    onChange(option.id);
-                    setOpen(false);
-                  }}
-                  className="cursor-pointer"
-                >
-                  {withIcons && (
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                      <DbImage
-                        src={option.image ?? ""}
-                        alt=""
-                        width={24}
-                        height={24}
-                        className="object-contain"
-                      />
-                    </span>
-                  )}
-                  <span>{displayName(option)}</span>
-                </CommandItem>
-              ))}
+              {options.map((option) => {
+                const km = optionKm(option);
+                return (
+                  <CommandItem
+                    key={option.id}
+                    value={km ? `${km} ${option.name}` : option.name}
+                    onSelect={() => {
+                      onChange(option.id);
+                      setOpen(false);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {withIcons && (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                        <DbImage
+                          src={option.image ?? ""}
+                          alt=""
+                          width={24}
+                          height={24}
+                          className="object-contain"
+                        />
+                      </span>
+                    )}
+                    <span>{displayName(option)}</span>
+                  </CommandItem>
+                );
+              })}
             </CommandList>
           </Command>
         </PopoverContent>
@@ -354,7 +426,7 @@ function ToggleGroup({
             key={o}
             type="button"
             onClick={() => onChange(o)}
-            className={`h-11 cursor-pointer rounded-sm border text-sm transition-colors ${
+            className={`h-11 cursor-pointer rounded-sm border type-nav transition-colors ${
               value === o
                 ? "border-gray-300 bg-gray-100 font-medium text-gray-800"
                 : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
@@ -408,6 +480,9 @@ export default function ListingPostForm({
   const [models, setModels] = useState<BackendModel[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [model, setModel] = useState("");
+  // The trusted spec page this phone ad links to (a `models` id). Kept apart
+  // from `attributes` — the backend stores it on `listings.product_model_id`.
+  const [productModelId, setProductModelId] = useState("");
   const [year, setYear] = useState("");
   const [condition, setCondition] = useState("");
   const [vehicleType, setVehicleType] = useState("");
@@ -482,6 +557,21 @@ export default function ListingPostForm({
           Math.min(3, Math.max(1, prefilled.filter((x) => x.trim()).length)),
         );
         setContactEmail(cfg.contact.email ?? "");
+        // Location + Address start from the profile too, but only where the
+        // subcategory's schema declares the block — the same gate that decides
+        // whether it renders at all. Read `cfg.fields`, not `has()`: `config`
+        // state is not set yet inside this callback.
+        const declares = (key: string) => cfg.fields.includes(key);
+        if (declares("location")) {
+          setPlace({
+            province: cfg.location.province,
+            district: cfg.location.district,
+            commune: cfg.location.commune,
+          });
+        }
+        if (declares("address") && cfg.location.address) {
+          setAddress(cfg.location.address);
+        }
       }
       setConfigLoading(false);
     });
@@ -493,6 +583,9 @@ export default function ListingPostForm({
   const onBrandChange = async (id: string) => {
     setBrandId(id);
     setModel("");
+    // Changing the ad's identity drops its spec link: the page is for one
+    // model, so a mismatched pair would advertise someone else's specs.
+    setProductModelId("");
     setModels([]);
     if (!id) return;
     setModelsLoading(true);
@@ -504,6 +597,73 @@ export default function ListingPostForm({
     } finally {
       setModelsLoading(false);
     }
+  };
+
+  /**
+   * Attach a trusted spec page. Selecting it also fills Brand/Model when they
+   * are still empty, so the ad and the linked page agree; a later Brand/Model
+   * change clears the link (see `onBrandChange` and the model picker).
+   */
+  const applyProductSelection = async (modelId: string) => {
+    setProductModelId(modelId);
+    const product = config?.products.find((p) => p.modelId === modelId);
+    if (!product) return;
+
+    if (has("brand") && brandId === "") {
+      if (!config?.brands.some((b) => b.id === product.brandId)) return;
+      setBrandId(product.brandId);
+      setModel("");
+      setModels([]);
+      setModelsLoading(true);
+      try {
+        const list = await getBrandModels(product.brandId, subcategorySlug);
+        setModels(list);
+        if (list.some((m) => m.name === product.modelName)) {
+          setModel(product.modelName);
+        }
+      } catch {
+        setModels([]);
+      } finally {
+        setModelsLoading(false);
+      }
+      return;
+    }
+
+    if (
+      has("model") &&
+      model === "" &&
+      models.some((m) => m.name === product.modelName)
+    ) {
+      setModel(product.modelName);
+    }
+  };
+
+  /**
+   * Pasted product URLs (`/en/product/apple/iphone-16`) resolve locally against
+   * the published list. A URL-shaped paste that does not resolve (an external
+   * link, or a product page that is not published) gets a toast — silently
+   * filtering the list read as "paste is not allowed" (2026-10-28).
+   */
+  const resolveProductPaste = (text: string) => {
+    const trimmed = text.trim();
+    const looksLikeUrl =
+      /^(https?:\/\/|\/)/i.test(trimmed) || trimmed.includes("/product/");
+    const match = trimmed.match(/\/?product\/([^/?#\s]+)\/([^/?#\s]+)\/?/);
+    const product = match
+      ? config?.products.find(
+          (p) =>
+            p.brandSlug === decodeURIComponent(match[1]) &&
+            p.modelSlug === decodeURIComponent(match[2]),
+        )
+      : undefined;
+    if (!product) {
+      if (looksLikeUrl) toast.error(t("errors.productLinkInvalid"));
+      return null;
+    }
+    return {
+      id: product.modelId,
+      name: `${product.brandName} ${product.modelName}`,
+    };
   };
 
   const submit = async () => {
@@ -518,7 +678,7 @@ export default function ListingPostForm({
     const priceNum = Number(price);
     if (
       has("price") &&
-      (price === "" || !Number.isFinite(priceNum) || priceNum < 0)
+      (price === "" || !Number.isFinite(priceNum) || priceNum <= 0)
     ) {
       toast.error(t("errors.priceInvalid"));
       return;
@@ -551,6 +711,12 @@ export default function ListingPostForm({
     }
     if (has("brand") && brandId === "") {
       toast.error(t("errors.brandRequired"));
+      return;
+    }
+    // The trusted spec link is starred on the phones form — enforce it here or
+    // the star is a lie (required-ness is never read from `field_schema`).
+    if (has("productSpec") && productModelId === "") {
+      toast.error(t("errors.productRequired"));
       return;
     }
     // The computers spec cluster — all starred on every form that declares them.
@@ -680,12 +846,18 @@ export default function ListingPostForm({
     if (has("condition")) {
       payload.condition = condition === "New" ? "new" : "used";
     }
-    if (has("discount") && discountValue !== "") {
+    // 0 / empty means "no discount" — never persist a zero discount, which the
+    // cards render as a real "-0%" badge and a pointless strikethrough price
+    // (captain, 2026-10-28).
+    if (has("discount") && Number(discountValue) > 0) {
       payload.discountValue = Number(discountValue);
       payload.discountType = discountType;
     }
     if (photos.length > 0) {
       payload.photos = photos.map((p, sort) => ({ ...p, sort }));
+    }
+    if (has("productSpec") && productModelId) {
+      payload.productModelId = productModelId;
     }
 
     setSubmitting(true);
@@ -696,8 +868,7 @@ export default function ListingPostForm({
       toast.error(result.error);
       return;
     }
-    toast.success(t("published"));
-    if (result.warning) toast.warning(result.warning);
+    toast.success("Your ad was published");
     router.push({
       pathname: "/post/[slug]",
       params: { slug: result.listingId },
@@ -717,7 +888,7 @@ export default function ListingPostForm({
         <p className="mb-4">{t("loadError")}</p>
         <button
           onClick={onBack}
-          className="text-sm text-[#00a0e9] font-semibold hover:underline"
+          className="type-nav text-[#00a0e9] hover:underline"
         >
           {t("back")}
         </button>
@@ -762,6 +933,7 @@ export default function ListingPostForm({
       onChange={setCondition}
     />
   ) : null;
+  const bucketCopy = describeBucket(config.plan?.bucket ?? null);
 
   return (
     <div className="space-y-8">
@@ -769,11 +941,39 @@ export default function ListingPostForm({
         <div />
         <button
           onClick={onBack}
-          className="text-sm text-[#00a0e9] font-semibold hover:underline cursor-pointer"
+          className="type-nav text-[#00a0e9] hover:underline cursor-pointer"
         >
           {t("reset")}
         </button>
       </div>
+
+      {config.plan && (
+        <div
+          role="status"
+          className={`flex flex-wrap items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm ring-1 ${
+            config.plan.usage.ads >= config.plan.limits.ads
+              ? "bg-amber-500/10 text-amber-800 ring-amber-500/30 dark:text-amber-300"
+              : "bg-muted text-muted-foreground ring-border"
+          }`}
+        >
+          <span>
+            {/* Limits are per bucket: the group subscription covering this
+                subcategory, else the free cap for where it is posted. */}
+            <strong className="font-semibold text-foreground">
+              {bucketCopy.planLabel}
+            </strong>{" "}
+            · {config.plan.usage.ads} of {config.plan.limits.ads} ads used ·{" "}
+            {bucketCopy.scopeLabel} · up to {config.plan.limits.photos} photos
+            per ad
+          </span>
+          <Link
+            href="/premium-account"
+            className="font-semibold text-[#0089c8] hover:underline"
+          >
+            {bucketCopy.ctaLabel}
+          </Link>
+        </div>
+      )}
 
       {/* ── Photos ─────────────────────────────────────────────────────────── */}
       <ImageUpload
@@ -787,7 +987,7 @@ export default function ListingPostForm({
 
       {/* ── Post Details ───────────────────────────────────────────────────── */}
       <div className="space-y-5">
-        <h2 className="text-lg font-bold text-foreground">
+        <h2 className="type-section-title text-foreground">
           {t("postDetails")}
         </h2>
 
@@ -805,12 +1005,12 @@ export default function ListingPostForm({
         <div>
           <FieldLabel label={t("category")} required />
           <div className="flex flex-wrap items-center gap-3 rounded-sm border border-dashed border-gray-300 px-3 py-2.5">
-            <span className="text-sm text-foreground">{categoryName}</span>
+            <span className="type-body text-foreground">{categoryName}</span>
             <ChevronRight className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-foreground">{subName}</span>
+            <span className="type-body text-foreground">{subName}</span>
             <button
               onClick={onBack}
-              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 text-sm font-semibold text-card transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
+              className="rounded-sm bg-[#00a0e9] px-4 py-1.5 type-nav text-card transition-colors hover:bg-[#00a0e9]/80 cursor-pointer"
             >
               {t("change")}
             </button>
@@ -822,7 +1022,7 @@ export default function ListingPostForm({
             because the captain's mock reads Bedroom → Bathroom → Facing → Size
             → Type, and `type` renders in the identity cluster below. No other
             family declares these keys, so the position is inert elsewhere.
-            Every one is an ordinary `SearchPicker`/input: redesign.md's rule is
+            Every one is an ordinary `SearchPicker`/input: post-form-layout.md's rule is
             that no native `<select>` remains, not that the mock's chevron
             renders as one. All four are unstarred in that mock. */}
         {has("bedroom") && (
@@ -922,6 +1122,7 @@ export default function ListingPostForm({
             value={typeValue}
             onChange={setTypeValue}
             placeholder={t("placeholders.chooseType")}
+            showOnlyKm
             required={!TYPE_OPTIONAL.has(subcategorySlug)}
           />
         )}
@@ -977,12 +1178,33 @@ export default function ListingPostForm({
             label={labelFor("model", "Model")}
             options={models.map((m) => ({ id: m.name, name: m.name }))}
             value={model}
-            onChange={setModel}
+            onChange={(id) => {
+              setModel(id);
+              // A different model means a different spec page — keep them in
+              // lockstep rather than linking an unrelated handset's specs.
+              setProductModelId("");
+            }}
             disabled={has("brand") && brandId === ""}
             placeholder={
               modelsLoading ? t("loadingModels") : t("placeholders.chooseModel")
             }
             emptyLabel={t("noModel")}
+          />
+        )}
+        {has("productSpec") && (
+          <SearchPicker
+            label={labelFor("productSpec", "Product Specification")}
+            options={config.products.map((p) => ({
+              id: p.modelId,
+              name: `${p.brandName} ${p.modelName}`,
+              image: p.image,
+            }))}
+            value={productModelId}
+            onChange={applyProductSelection}
+            resolveInput={resolveProductPaste}
+            placeholder={t("placeholders.chooseProduct")}
+            emptyLabel={t("noProduct")}
+            required
           />
         )}
         {conditionSlot === "lead" && conditionBlock}
@@ -998,6 +1220,7 @@ export default function ListingPostForm({
             value={screenSize}
             onChange={setScreenSize}
             placeholder={t("placeholders.chooseScreenSize")}
+            showOnlyKm
             required
           />
         )}
@@ -1015,6 +1238,7 @@ export default function ListingPostForm({
             value={storage}
             onChange={setStorage}
             placeholder={t("placeholders.chooseStorage")}
+            showOnlyKm
             required={STORAGE_REQUIRED.includes(subcategorySlug)}
           />
         )}
@@ -1030,6 +1254,7 @@ export default function ListingPostForm({
             value={ram}
             onChange={setRam}
             placeholder={t("placeholders.chooseRam")}
+            showOnlyKm
             required
           />
         )}
@@ -1060,6 +1285,7 @@ export default function ListingPostForm({
             value={vga}
             onChange={setVga}
             placeholder={t("placeholders.chooseVga")}
+            showOnlyKm
             required
           />
         )}
@@ -1160,6 +1386,7 @@ export default function ListingPostForm({
             onChange={setColor}
             placeholder={t("placeholders.chooseColor")}
             required
+            showOnlyKm
           />
         )}
 
@@ -1168,7 +1395,7 @@ export default function ListingPostForm({
             label={labelFor("price", "Price")}
             required
             type="number"
-            min={0}
+            min={0.01}
             prefix="$"
             value={price}
             onChange={setPrice}
@@ -1184,7 +1411,11 @@ export default function ListingPostForm({
                 min={0}
                 value={discountValue}
                 onChange={(e) => setDiscountValue(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+                // Same wheel guard as TextInput: a scrolled focused field must
+                // not turn an untouched discount into "0" (which then rendered
+                // as a 0% discount).
+                onWheel={(event) => event.currentTarget.blur()}
+                className="w-full border border-gray-200 rounded-lg py-2.5 pl-3 pr-3 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
               />
               <div className="flex shrink-0 overflow-hidden rounded-sm border border-gray-200">
                 {(
@@ -1198,7 +1429,7 @@ export default function ListingPostForm({
                     type="button"
                     onClick={() => setDiscountType(kind)}
                     aria-pressed={discountType === kind}
-                    className={`w-12 cursor-pointer text-sm transition-colors ${
+                    className={`w-12 cursor-pointer type-nav transition-colors ${
                       discountType === kind
                         ? "bg-gray-100 font-medium text-gray-800"
                         : "bg-white text-gray-500 hover:bg-gray-50"
@@ -1216,7 +1447,7 @@ export default function ListingPostForm({
           <div>
             <FieldLabel label={labelFor("deliveryFree", "Free Delivery")} />
             <div className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5">
-              <span className="text-sm text-gray-700">
+              <span className="type-body text-gray-700">
                 {deliveryFree ? t("yes") : t("no")}
               </span>
               <Switch
@@ -1238,7 +1469,7 @@ export default function ListingPostForm({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={8}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1259,7 +1490,7 @@ export default function ListingPostForm({
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               rows={3}
-              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
+              className="w-full resize-y border border-gray-200 rounded-lg pl-3 pr-3 py-2.5 type-body text-gray-700 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
         )}
@@ -1270,7 +1501,7 @@ export default function ListingPostForm({
 
       {/* ── Contact ────────────────────────────────────────────────────────── */}
       <div className="space-y-5">
-        <h2 className="text-lg font-bold text-foreground">{t("contact")}</h2>
+        <h2 className="type-section-title text-foreground">{t("contact")}</h2>
 
         {/* The jobs form's Company sits at the top of Contact — its own spec
             lists it directly after Address, ahead of Name. Unstarred. */}
@@ -1317,7 +1548,7 @@ export default function ListingPostForm({
                         type="button"
                         onClick={() => removePhoneRow(i)}
                         aria-label={`${t("removePhone")} ${i + 1}`}
-                        className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
+                        className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-2 border-red-500 text-red-500 transition-colors hover:bg-red-50"
                       >
                         <Minus className="h-4 w-4" strokeWidth={3} />
                       </button>
@@ -1348,7 +1579,7 @@ export default function ListingPostForm({
           />
         )}
 
-        <p className="text-sm text-gray-600">
+        <p className="type-body text-gray-600">
           {t("agreement.prefix")}{" "}
           <Link href="/posting-rule" className="text-[#00a0e9] hover:underline">
             {t("agreement.postingRule")}
@@ -1366,7 +1597,7 @@ export default function ListingPostForm({
         <button
           onClick={submit}
           disabled={submitting}
-          className="w-full rounded-sm bg-[#f68b1e] py-3 text-base font-semibold text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
+          className="w-full rounded-sm bg-[#f68b1e] py-3 type-nav text-card transition-colors hover:bg-[#e07d15] disabled:opacity-50 cursor-pointer"
         >
           {submitting ? t("publishing") : t("submit")}
         </button>

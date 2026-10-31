@@ -1,4 +1,4 @@
-describe from frontend, our backend made for E-Market or Khmer24.com like:
+describe from frontend, our backend made for E-Market or PhsarKhmer.com like:
 
 Login:
 

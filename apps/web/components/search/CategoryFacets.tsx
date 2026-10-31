@@ -104,7 +104,7 @@ export async function CategoryFacets({
                   href={{ pathname: "/search", query: r.query }}
                   aria-current={r.active ? "page" : undefined}
                   className={cn(
-                    "shrink-0 whitespace-nowrap rounded-full border bg-card px-3 py-1.5 text-sm transition-colors hover:bg-muted",
+                    "shrink-0 whitespace-nowrap rounded-full border bg-card px-3 py-1.5 type-nav transition-colors hover:bg-muted",
                     r.active && "border-sky-500 text-sky-600 font-medium",
                   )}
                 >
@@ -122,7 +122,7 @@ export async function CategoryFacets({
 
   return (
     <nav aria-label={t("categories")} className="rounded-sm border bg-card p-2">
-      <p className="px-3 pt-1 pb-2 text-sm font-semibold">{t("categories")}</p>
+      <p className="px-3 pt-1 pb-2 type-nav">{t("categories")}</p>
       <ul className="space-y-0.5">
         {rows.map((r) => (
           <li key={r.key}>
@@ -130,7 +130,7 @@ export async function CategoryFacets({
               href={{ pathname: "/search", query: r.query }}
               aria-current={r.active ? "page" : undefined}
               className={cn(
-                "flex items-center justify-between gap-3 rounded-sm px-3 py-2 text-sm transition-colors hover:bg-muted",
+                "flex items-center justify-between gap-3 rounded-sm px-3 py-2 type-nav transition-colors hover:bg-muted",
                 r.depth === 1 && "pl-7",
                 r.active && "bg-muted text-sky-600 font-semibold",
               )}

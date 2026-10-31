@@ -300,6 +300,122 @@ describe('E2eKeysService.getBundle', () => {
   });
 });
 
+describe('E2eKeysService target device set', () => {
+  const at = (n: number) => new Date(Date.UTC(2026, 8, n));
+  /** u1 went quiet: every device is past DEVICE_STALE_DAYS. */
+  const allStale = [
+    { id: 'd-old', userId: 'u1', lastSeenAt: at(1), fresh: false },
+    { id: 'd-new', userId: 'u1', lastSeenAt: at(9), fresh: false },
+    { id: 'd-mid', userId: 'u1', lastSeenAt: at(5), fresh: false },
+  ];
+
+  it('listActiveDevices returns the newest two when every device is stale', async () => {
+    const db = makeDb(makeTx());
+    db.select
+      .mockReturnValueOnce(limitQuery([])) // no block
+      .mockReturnValueOnce(whereQuery(allStale));
+    const service = new E2eKeysService(db as never);
+
+    await expect(service.listActiveDevices('caller', 'u1')).resolves.toEqual([
+      'd-new',
+      'd-mid',
+    ]);
+  });
+
+  it('listActiveDevices excludes stale devices while a fresh one exists', async () => {
+    const db = makeDb(makeTx());
+    db.select
+      .mockReturnValueOnce(limitQuery([]))
+      .mockReturnValueOnce(
+        whereQuery([
+          ...allStale,
+          { id: 'd-fresh', userId: 'u1', lastSeenAt: at(28), fresh: true },
+        ]),
+      );
+    const service = new E2eKeysService(db as never);
+
+    await expect(service.listActiveDevices('caller', 'u1')).resolves.toEqual([
+      'd-fresh',
+    ]);
+  });
+
+  it('listActiveDevices returns [] when nothing is registered or all are revoked', async () => {
+    const db = makeDb(makeTx());
+    db.select
+      .mockReturnValueOnce(limitQuery([]))
+      .mockReturnValueOnce(whereQuery([]));
+    const service = new E2eKeysService(db as never);
+
+    await expect(service.listActiveDevices('caller', 'u1')).resolves.toEqual(
+      [],
+    );
+  });
+
+  it('listActiveDevices and loadActiveDevices return the same set for the same rows', async () => {
+    const db = makeDb(makeTx());
+    db.select
+      .mockReturnValueOnce(limitQuery([]))
+      .mockReturnValueOnce(whereQuery(allStale))
+      .mockReturnValueOnce(whereQuery(allStale));
+    const service = new E2eKeysService(db as never);
+
+    const listed = await service.listActiveDevices('caller', 'u1');
+    const loaded = await service.loadActiveDevices(['u1']);
+
+    expect(loaded.map((d) => d.id).sort()).toEqual([...listed].sort());
+  });
+
+  const deviceRow = (id: string) => ({
+    id,
+    userId: 'u1',
+    identityKey: 'ik',
+    identitySigningKey: 'isk',
+    registrationId: 7,
+    signedPrekeyId: 1,
+    signedPrekeyPublic: 'spk',
+    signedPrekeySignature: 'sig',
+  });
+
+  it('getDeviceBundle serves a stale device that is in the fallback set', async () => {
+    const db = makeDb(makeTx());
+    db.select
+      .mockReturnValueOnce(limitQuery([deviceRow('d-mid')])) // non-revoked row
+      .mockReturnValueOnce(whereQuery(allStale)) // u1's target set
+      .mockReturnValueOnce(limitQuery([])); // no block
+    db.update.mockReturnValue({
+      set: () => ({ where: () => ({ returning: () => Promise.resolve([]) }) }),
+    });
+    const service = new E2eKeysService(db as never);
+
+    await expect(
+      service.getDeviceBundle('caller', 'd-mid'),
+    ).resolves.toMatchObject({ deviceId: 'd-mid', userId: 'u1' });
+  });
+
+  it('getDeviceBundle 404s a stale device outside the fallback set', async () => {
+    const db = makeDb(makeTx());
+    db.select
+      .mockReturnValueOnce(limitQuery([deviceRow('d-old')]))
+      .mockReturnValueOnce(whereQuery(allStale));
+    const service = new E2eKeysService(db as never);
+
+    await expect(service.getDeviceBundle('caller', 'd-old')).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('getDeviceBundle 404s a revoked or unknown device', async () => {
+    const db = makeDb(makeTx());
+    db.select.mockReturnValueOnce(limitQuery([]));
+    const service = new E2eKeysService(db as never);
+
+    await expect(service.getDeviceBundle('caller', 'gone')).rejects.toThrow(
+      NotFoundException,
+    );
+  });
+});
+
 describe('E2eKeysService.getPrekeyCount', () => {
   it('returns 0 when no rows', async () => {
     const tx = makeTx();

@@ -1,11 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getE2eEngine, subscribeE2eEngine } from "@/lib/e2e/engine-provider";
+import {
+  getE2eEngine,
+  reheartbeatE2eDevice,
+  subscribeE2eEngine,
+} from "@/lib/e2e/engine-provider";
+import {
+  localStorageHeartbeatDeps,
+  runHeartbeatIfDue,
+} from "@/lib/e2e/heartbeat-schedule";
 import type { RatchetEngine } from "@/lib/e2e/types";
+import { startHeldSendsLoop } from "@/lib/e2e/held-sends-runtime";
+import { startVisiblePoller } from "@/lib/polling/visible-poller";
 
 /** Backoff between bootstrap retries after a failure (ms), capped at the last. */
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 30_000];
+/**
+ * How often the visible poller below checks whether a heartbeat is due. It
+ * does not itself control the heartbeat cadence — `heartbeat-schedule.ts`'s
+ * ~6 h window does — just how promptly a long-open tab notices the window
+ * has elapsed, and how promptly becoming visible after a long gap catches up.
+ */
+const HEARTBEAT_CHECK_INTERVAL_MS = 15 * 60 * 1000;
 
 /**
  * Resolve the real Signal engine for `userId`, bootstrapping local keys on
@@ -78,6 +95,37 @@ export function useE2eEngine(userId: string | null): RatchetEngine | null {
       unsubscribe();
     };
   }, [userId]);
+
+  const deviceId =
+    resolved?.userId === userId ? resolved.engine.deviceId : null;
+
+  // Leader tab re-runs the device heartbeat (+ prekey top-up) every ~6 h, and
+  // on becoming visible after a long hidden gap — see heartbeat-schedule.ts.
+  // Every mounted caller of this hook starts one of these; `leaderKey` (Web
+  // Locks) and the shared localStorage window mean only one ever actually
+  // runs per browser, the others simply find it not due.
+  useEffect(() => {
+    if (!userId || !deviceId) return;
+    const schedule = localStorageHeartbeatDeps(`${userId}:${deviceId}`);
+    const stop = startVisiblePoller({
+      run: () =>
+        runHeartbeatIfDue(schedule, () => reheartbeatE2eDevice(userId)).catch(
+          (err: unknown) => {
+            console.warn("[e2e] heartbeat failed; will retry", err);
+          },
+        ),
+      intervalMs: HEARTBEAT_CHECK_INTERVAL_MS,
+      leaderKey: `e2e-heartbeat:${userId}:${deviceId}`,
+    });
+    return stop;
+  }, [userId, deviceId]);
+
+  // Retry sends held for recipients with no E2E device yet. Costs nothing
+  // while nothing is held; see held-sends-runtime.ts.
+  useEffect(() => {
+    if (!userId || !deviceId) return;
+    return startHeldSendsLoop(userId);
+  }, [userId, deviceId]);
 
   if (!userId || resolved?.userId !== userId) return null;
   return resolved.engine;

@@ -15,6 +15,12 @@ import type {
   JobApplicationStatus,
   ReceivedApplication,
 } from "@/types/applications";
+import type {
+  ChatActionResult,
+  E2eHeader,
+  E2eV2Payload,
+  SendMessageResult,
+} from "@/types/chat";
 
 /** Backend envelope meta for the offset-paginated lists. */
 interface PageMeta {
@@ -51,6 +57,10 @@ function errorText(err: unknown): string {
  * (a second application to the same job is refused, not silently swallowed),
  * 403 `Messaging unavailable` (a block in either direction — the application
  * *is* a message), and 400 for a closed job or your own listing.
+ *
+ * This is the NO-MESSAGE form: the poster has no devices registered for
+ * encrypted chat, so there is nobody to encrypt to. The backend still runs
+ * the block check and records the application + notification.
  */
 export async function applyToJob(input: {
   listingId: string;
@@ -67,6 +77,52 @@ export async function applyToJob(input: {
       },
     );
     return { ok: true, data };
+  } catch (err) {
+    return toFailure(err);
+  }
+}
+
+/**
+ * Apply WITH the encrypted chat copy. The ciphertext and E2E payload are
+ * produced in the applicant's browser (`sendE2eText`); this action only
+ * forwards them and returns the delivery ids so the caller can commit its
+ * ratchet session. Shaped like `sendChatMessage` so it can be the `send`
+ * callback of `sendE2eText`.
+ */
+export async function applyToJobEncrypted(input: {
+  listingId: string;
+  coverNote?: string;
+  body?: string;
+  e2e?: E2eV2Payload;
+  e2eHeader?: E2eHeader;
+  recipientIdentityKey?: string;
+}): Promise<ChatActionResult<SendMessageResult>> {
+  try {
+    const { data } = await userServerFetch<AppliedJob>(
+      `/listings/${input.listingId}/applications`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          ...(input.coverNote?.trim()
+            ? { coverNote: input.coverNote.trim() }
+            : {}),
+          ...(input.body ? { body: input.body } : {}),
+          ...(input.e2e ? { e2e: input.e2e } : {}),
+          ...(input.e2eHeader ? { e2eHeader: input.e2eHeader } : {}),
+          ...(input.recipientIdentityKey
+            ? { recipientIdentityKey: input.recipientIdentityKey }
+            : {}),
+        }),
+      },
+    );
+    if (!data.chat)
+      return {
+        ok: false,
+        status: 0,
+        code: "NO_CHAT_DELIVERY",
+        message: "The application was saved without a chat message",
+      };
+    return { ok: true, data: data.chat };
   } catch (err) {
     return toFailure(err);
   }

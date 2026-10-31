@@ -84,7 +84,7 @@ export default async function Resume() {
         // wizard from that state would write over a resume that exists.
         <div className="max-w-7xl mx-auto w-full px-4 pt-4">
           <div className="rounded-2xl border bg-card p-6 text-center sm:p-10">
-            <p className="text-base text-foreground">
+            <p className="type-body text-foreground">
               {t("Me.resumeLoadFailed")}
             </p>
           </div>

@@ -57,18 +57,18 @@ export function ForgotPasswordForm() {
         onSubmit={handleSubmit}
         className="w-full max-w-xl mx-auto bg-card rounded-sm border border-border p-6"
       >
-        <h1 className="text-lg font-medium text-center mb-4 text-foreground">
+        <h1 className="type-page-title text-center mb-4 text-foreground">
           Forgot Password / Account
         </h1>
-        <p className="text-sm text-gray-500 text-center mb-6 leading-relaxed">
+        <p className="type-body-sm text-gray-500 text-center mb-6">
           Enter your phone number or email address that you registered on
           <br />
-          Khmer24 and we&apos;ll send the code to set the new password
+          PhsarKhmer and we&apos;ll send the code to set the new password
         </p>
 
         {/* 1. Big Alert Banner - ONLY shows if the format is invalid */}
         {isInvalidFormat && (
-          <div className="mb-4 bg-red-600 text-white text-sm p-3 rounded-sm flex flex-col gap-1">
+          <div className="mb-4 bg-red-600 text-white type-body-sm p-3 rounded-sm flex flex-col gap-1">
             <span className="font-bold">⚠️ Forgot password failed!</span>
             <span>The Email, Phone number or Username is invalid.</span>
           </div>
@@ -92,12 +92,12 @@ export function ForgotPasswordForm() {
               hasError
                 ? "border-red-500 focus:border-red-500 focus:ring-red-500"
                 : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-            } focus:outline-none focus:ring-1 transition-colors text-sm`}
+            } focus:outline-none focus:ring-1 transition-colors type-body-sm`}
           />
 
           {/* 2. Short Error Message below the input */}
           {isTooShort && (
-            <FieldDescription className="pt-1 text-red-500 text-sm">
+            <FieldDescription className="pt-1 text-red-500 type-body-sm">
               Phone Number, Username or Email must be at least 2 characters
               long.
             </FieldDescription>
@@ -105,7 +105,7 @@ export function ForgotPasswordForm() {
 
           {/* 3. Format Error Message below the input */}
           {isInvalidFormat && (
-            <FieldDescription className="pt-1 text-red-500 text-xs">
+            <FieldDescription className="pt-1 text-red-500 type-meta">
               Please enter a valid Phone Number, Username or Email address.
             </FieldDescription>
           )}

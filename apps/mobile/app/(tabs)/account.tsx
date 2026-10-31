@@ -1,4 +1,5 @@
 import SafeAreaView from "@/components/common/SafeAreaView";
+import { BrandWordmark } from "@/components/common/BrandWordmark";
 import { Colors } from "@/constants/Colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -166,7 +167,7 @@ const AccountScreen = () => {
           name: authName.trim(),
           username: authName.toLowerCase().replace(/\s+/g, ""),
           phone: authPhone.trim(),
-          email: `${authName.toLowerCase().replace(/\s+/g, ".")}@psakhmer.com`,
+          email: `${authName.toLowerCase().replace(/\s+/g, ".")}@phsarkhmer.com`,
           accountType: "Normal account",
           avatar: "",
           isVerified: true,
@@ -178,7 +179,7 @@ const AccountScreen = () => {
   const handleTelegramLogin = () => {
     Alert.alert(
       "✈️ Telegram Quick Login",
-      "Would you like to sign in using your Telegram account (@paskhmer_kh)?",
+      "Would you like to sign in using your Telegram account (@phsarkhmer_kh)?",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -187,7 +188,7 @@ const AccountScreen = () => {
             login({
               name: "Sokha (Telegram)",
               username: "sokha_kh",
-              email: "sokha.telegram@paskhmer.com",
+              email: "sokha.telegram@phsarkhmer.com",
               phone: "012 889 900",
               bio: "Verified seller • Connected via Telegram @sokha_kh",
               accountType: "Normal account",
@@ -339,9 +340,7 @@ const AccountScreen = () => {
           </View>
 
           <View className="items-center mt-3">
-            <Text className="text-white text-3xl font-extrabold tracking-tight">
-              {"PsaKhmer"}
-            </Text>
+            <BrandWordmark tone="onPrimary" className="text-2xl" />
             <Text className="text-white/90 text-sm font-semibold mt-1">
               Buy Faster, Sell Faster
             </Text>
@@ -355,7 +354,7 @@ const AccountScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         {isAuthenticated ? (
-          /* ================= LOGGED IN VIEW (KHMER24 STYLE) ================= */
+          /* =============== LOGGED IN VIEW (PHSARKHMER STYLE) =============== */
           <View className="pb-10">
             {/* User Profile Card */}
             <View style={{ marginHorizontal: 16, marginTop: -14, zIndex: 30 }}>

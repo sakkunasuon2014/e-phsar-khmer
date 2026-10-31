@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useTranslations } from "next-intl";
-import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "@/i18n/routing";
+import { useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -27,139 +26,104 @@ import {
 } from "@/components/ui/dialog";
 import { FieldGroup } from "@/components/ui/field";
 import { toast } from "@/components/ui/sonner";
-import { createReport, loadReportReasons } from "@/actions/reports";
-import { Post } from "@/lib/posts";
-
-/** Real listings carry a UUID; mock cards carry a numeric id. */
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import type { Post } from "@/lib/posts";
+import { reportListing } from "@/actions/reports";
+import { REAL_ID, useReportReasons } from "./use-report-reasons";
 
 interface ReportPostProps {
   post: Post;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
 export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
-  const t = useTranslations();
   const router = useRouter();
+  const locale = useLocale();
+  const { reasons, isLoading } = useReportReasons("listing", open);
   const [reasonId, setReasonId] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: reasons = [], isLoading } = useQuery({
-    queryKey: ["report-reasons", "listing"],
-    queryFn: () => loadReportReasons("listing"),
-    enabled: open,
-    staleTime: 10 * 60_000,
-  });
+  const listingId = String(post?.postId ?? "");
 
-  // The dialog stays mounted (the parent owns `open`), so closing must clear
-  // the form. Done in the close handler rather than an effect — every close
-  // path (Cancel, Escape, overlay, submit) goes through this function.
-  const reset = () => {
+  const close = () => {
     setReasonId("");
     setDescription("");
-    setSubmitting(false);
-  };
-  const handleOpenChange = (next: boolean) => {
-    if (!next) reset();
-    onOpenChange(next);
+    onOpenChange(false);
   };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetId = String(post.postId);
-    if (!UUID_RE.test(targetId)) {
-      toast.error(t("Report.cannotReport"));
-      return;
-    }
     if (!reasonId) {
-      toast.error(t("Report.chooseReasonError"));
+      toast.error("Please choose a reason");
       return;
     }
-
+    // Mock cards carry numeric ids and have no row to report — inert, like
+    // the demo hearts.
+    if (!REAL_ID.test(listingId)) {
+      toast.success("Thanks — this demo listing can't be reported.");
+      close();
+      return;
+    }
     setSubmitting(true);
-    const result = await createReport({
-      targetType: "listing",
-      targetId,
+    const res = await reportListing({
+      listingId,
       reasonId,
       description: description.trim() || undefined,
     });
     setSubmitting(false);
-
-    if (!result.success) {
-      if (result.status === 401) {
-        toast.error(t("Report.signIn"));
-        handleOpenChange(false);
-        router.push("/login");
-        return;
-      }
-      toast.error(result.error);
+    if (res.success) {
+      toast.success("Report sent. Our team will review it.");
+      close();
       return;
     }
-
-    toast.success(t("Report.submitted"));
-    handleOpenChange(false);
+    toast.error(res.error);
+    if (res.code === "AUTH") router.push(`/${locale}/login`);
+    if (res.code === "DUPLICATE") close();
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
-        <form onSubmit={submit}>
+        <form onSubmit={submit} className="contents">
           <DialogHeader>
             <DialogTitle className="text-lg">
-              {t("Report.title", {
-                title: post?.title
-                  ? post.title.toUpperCase()
-                  : t("Report.fallbackTitle"),
-              })}
+              Report {post?.title ? post.title.toUpperCase() : "Post"}
             </DialogTitle>
             <DialogDescription className="sr-only">
-              {t("Report.description")}
+              Please provide details about why you are reporting this post.
             </DialogDescription>
           </DialogHeader>
           <Separator />
           <FieldGroup>
             <Field>
               <FieldLabel className="text-sm">
-                {t("Report.reason")} <span className="text-red-500">*</span>
+                Reason <span className="text-red-500">*</span>
               </FieldLabel>
               <Select value={reasonId} onValueChange={setReasonId}>
                 <SelectTrigger>
                   <SelectValue
-                    placeholder={
-                      isLoading
-                        ? t("Report.loadingReasons")
-                        : t("Report.chooseReason")
-                    }
+                    placeholder={isLoading ? "Loading…" : "Choose Reason"}
                   />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {reasons.map((reason) => (
-                      <SelectItem key={reason.id} value={reason.id}>
-                        {reason.reason}
+                    {reasons.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.reason}
                       </SelectItem>
                     ))}
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              {!isLoading && reasons.length === 0 ? (
-                <p className="text-xs text-destructive">
-                  {t("Report.reasonsFailed")}
-                </p>
-              ) : null}
               <Field>
-                <FieldLabel className="text-sm">
-                  {t("Report.descriptionLabel")}
-                </FieldLabel>
+                <FieldLabel className="text-sm">Description</FieldLabel>
                 <Textarea
                   id="message"
+                  placeholder="Enter your message..."
+                  maxLength={2000}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder={t("Report.messagePlaceholder")}
-                  className="h-[140px] overflow-y-auto resize-none rounded-sm"
+                  className="h-[180px] overflow-y-auto resize-none rounded-sm"
                 />
               </Field>
             </Field>
@@ -169,17 +133,18 @@ export function ReportPost({ post, open, onOpenChange }: ReportPostProps) {
               <Button
                 type="button"
                 variant="outline"
+                onClick={close}
                 className="rounded-sm cursor-pointer h-10 text-foreground bg-muted-foreground/10 hover:bg-muted-foreground/20 w-1/3"
               >
-                {t("Common.cancel")}
+                Cancel
               </Button>
             </DialogClose>
             <Button
               type="submit"
-              disabled={submitting || !reasonId}
-              className="rounded-sm cursor-pointer h-10 text-card bg-orange-400 hover:bg-orange-500 w-2/3 disabled:opacity-60"
+              disabled={submitting}
+              className="rounded-sm cursor-pointer h-10 text-card bg-orange-400 hover:bg-orange-500 w-2/3"
             >
-              {submitting ? t("Common.submitting") : t("Common.submit")}
+              {submitting ? "Sending…" : "Submit"}
             </Button>
           </DialogFooter>
         </form>

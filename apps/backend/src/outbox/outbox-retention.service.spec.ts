@@ -57,12 +57,16 @@ describe('OutboxRetention.sweep', () => {
 });
 
 describe('OutboxRetention lifecycle', () => {
-  it('sweeps on boot and then hourly', async () => {
+  it('leaves boot alone, sweeps within two minutes, then hourly', async () => {
     jest.useFakeTimers();
     const { retention, purgePublished } = makeRetention([]);
 
     retention.onApplicationBootstrap();
     await Promise.resolve();
+    // A restart loop must not turn into a delete-query loop.
+    expect(purgePublished).not.toHaveBeenCalled();
+
+    await jest.advanceTimersByTimeAsync(2 * 60 * 1000);
     expect(purgePublished).toHaveBeenCalledTimes(1);
 
     await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
@@ -71,6 +75,17 @@ describe('OutboxRetention lifecycle', () => {
     retention.onModuleDestroy();
     await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
     expect(purgePublished).toHaveBeenCalledTimes(2);
+  });
+
+  it('cancels a still-pending first sweep on shutdown', async () => {
+    jest.useFakeTimers();
+    const { retention, purgePublished } = makeRetention([]);
+
+    retention.onApplicationBootstrap();
+    retention.onModuleDestroy();
+    await jest.advanceTimersByTimeAsync(3 * 60 * 60 * 1000);
+
+    expect(purgePublished).not.toHaveBeenCalled();
   });
 
   it('does not run on an API-only instance', () => {

@@ -1,12 +1,22 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import { Loader2Icon } from "lucide-react";
 import { loginSchema } from "@/schemas/login";
 import { useAppForm } from "@/components/form/hooks";
 import { login } from "@/actions/login";
+import { startSocialLogin } from "@/actions/social";
+import {
+  SOCIAL_CLOSE_POLL_MS,
+  SOCIAL_POPUP_FEATURES,
+  SOCIAL_POPUP_NAME,
+  type SocialProvider,
+} from "@/lib/auth/social";
 import { requestLoginOtp } from "@/actions/otp";
 import { isLocalPhone, normalizePhone } from "@/lib/phone";
 import { getDeviceIdentity } from "@/lib/device";
 import { storeOtpRegistration } from "@/lib/otp-registration";
+import { bootstrapE2eAfterAuth } from "@/lib/e2e/bootstrap-after-auth";
 import { toast } from "@/components/ui/sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -20,6 +30,7 @@ import {
 import { FcGoogle } from "react-icons/fc";
 import { FaFacebook, FaApple, FaTelegramPlane } from "react-icons/fa";
 import { Link, useRouter } from "@/i18n/routing";
+import { useLocale } from "next-intl";
 
 type FormData = z.infer<typeof loginSchema>;
 
@@ -28,6 +39,71 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const locale = useLocale();
+  const [socialPending, setSocialPending] = useState<SocialProvider | null>(
+    null,
+  );
+  const closePoll = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (closePoll.current !== null) {
+        window.clearInterval(closePoll.current);
+        closePoll.current = null;
+      }
+    };
+  }, []);
+
+  async function handleSocial(provider: SocialProvider) {
+    setSocialPending(provider);
+
+    // Opened synchronously inside the click handler so the browser allows it;
+    // the authorize URL is assigned once the server action answers.
+    const popup = window.open(
+      "about:blank",
+      SOCIAL_POPUP_NAME,
+      SOCIAL_POPUP_FEATURES,
+    );
+
+    try {
+      const result = await startSocialLogin(provider, "user", locale);
+
+      if (!result.success) {
+        popup?.close();
+        setSocialPending(null);
+        toast.error(result.error);
+        return;
+      }
+
+      // Popup blocked: fall back to the full-page flow.
+      if (!popup) {
+        window.location.assign(result.url);
+        return;
+      }
+
+      // The visitor may have closed the blank window while it was fetching.
+      if (popup.closed) {
+        setSocialPending(null);
+        return;
+      }
+
+      popup.location.href = result.url;
+
+      if (closePoll.current !== null) window.clearInterval(closePoll.current);
+      closePoll.current = window.setInterval(() => {
+        if (!popup.closed) return;
+        if (closePoll.current !== null) {
+          window.clearInterval(closePoll.current);
+          closePoll.current = null;
+        }
+        setSocialPending(null);
+      }, SOCIAL_CLOSE_POLL_MS);
+    } catch {
+      popup?.close();
+      setSocialPending(null);
+      toast.error("Could not start sign-in.");
+    }
+  }
 
   const form = useAppForm({
     defaultValues: {
@@ -66,6 +142,9 @@ export function LoginForm({
       const result = await login(value, device ?? undefined);
 
       if (result.success) {
+        // Register this browser for E2E chat as part of signing in, not when
+        // some later page happens to render the provider.
+        if (result.user) bootstrapE2eAfterAuth(result.user.id);
         form.reset();
         toast.success("Login successfully!", { position: "top-right" });
         router.push("/me");
@@ -78,7 +157,7 @@ export function LoginForm({
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0 bg-card rounded-sm">
-        <CardContent className="grid p-0 md:grid-cols-2">
+        <CardContent className="p-0">
           <form
             className="p-6 md:p-8"
             onSubmit={(e) => {
@@ -88,7 +167,7 @@ export function LoginForm({
           >
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
-                <h1 className="text-xl font-medium">
+                <h1 className="type-page-title">
                   Login to manage ads or post free ad
                 </h1>
               </div>
@@ -114,13 +193,14 @@ export function LoginForm({
 
               <Link
                 href="/forgot-password"
-                className="inline-block text-right text-sm underline-offset-2 hover:underline"
+                className="inline-block text-right type-body-sm underline-offset-2 hover:underline"
               >
                 Forgot Password / Account
               </Link>
 
               <Button
                 type="submit"
+                disabled={socialPending !== null}
                 className="h-10 w-full rounded-sm bg-orange-500 hover:bg-orange-600 text-white cursor-pointer"
               >
                 Login
@@ -132,6 +212,7 @@ export function LoginForm({
 
               <Button
                 type="button"
+                disabled={socialPending !== null}
                 className="h-10 w-full rounded-sm bg-sky-500 hover:bg-sky-600 text-white cursor-pointer"
               >
                 <div className="flex items-center justify-center rounded-full bg-sky-400 w-6 h-6">
@@ -144,22 +225,37 @@ export function LoginForm({
                 <Button
                   variant="outline"
                   type="button"
+                  onClick={() => handleSocial("facebook")}
+                  disabled={socialPending !== null}
+                  aria-busy={socialPending === "facebook"}
                   className="h-10 !w-full rounded-lg cursor-pointer"
                 >
-                  <FaFacebook className="text-blue-500 scale-150" />
+                  {socialPending === "facebook" ? (
+                    <Loader2Icon className="h-5 w-5 animate-spin text-blue-500" />
+                  ) : (
+                    <FaFacebook className="text-blue-500 scale-150" />
+                  )}
                   <span className="sr-only">Login with Meta</span>
                 </Button>
                 <Button
                   variant="outline"
                   type="button"
+                  onClick={() => handleSocial("google")}
+                  disabled={socialPending !== null}
+                  aria-busy={socialPending === "google"}
                   className="h-10 !w-full rounded-lg cursor-pointer"
                 >
-                  <FcGoogle className="h-5 w-5 scale-150" />
+                  {socialPending === "google" ? (
+                    <Loader2Icon className="h-5 w-5 animate-spin text-[#00a0e9]" />
+                  ) : (
+                    <FcGoogle className="h-5 w-5 scale-150" />
+                  )}
                   <span className="sr-only">Login with Google</span>
                 </Button>
                 <Button
                   variant="outline"
                   type="button"
+                  disabled={socialPending !== null}
                   className="h-10 !w-full rounded-lg cursor-pointer"
                 >
                   <FaApple className="h-5 w-5 scale-150" />
@@ -173,14 +269,19 @@ export function LoginForm({
               </FieldDescription>
             </FieldGroup>
           </form>
+          {/*
+            Right-side image column disabled for now (no artwork shipped).
+            To restore: uncomment this markup, put back the
+            "grid md:grid-cols-2" classes on CardContent above, and re-add the
+            eslint-disable-next-line for the img.
           <div className="relative hidden bg-muted md:block">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static placeholder */}
             <img
               src="/placeholder.svg"
               alt="Image"
               className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
             />
           </div>
+          */}
         </CardContent>
       </Card>
       <FieldDescription className="px-6 text-center">

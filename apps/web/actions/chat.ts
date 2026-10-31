@@ -224,8 +224,8 @@ export async function fetchMessages(
 /**
  * Send a message; creates the conversation on the first one. Rejections worth
  * surfacing verbatim: 403 `Messaging unavailable` (a block exists in either
- * direction) and 400 (self-message / empty / bad image path / listing owned by
- * neither participant).
+ * direction) and 400 (self-message / missing E2E envelope / empty body / any
+ * legacy imagePath / listing owned by neither participant).
  */
 export async function sendChatMessage(
   input: SendMessageInput,
@@ -251,52 +251,6 @@ export async function markConversationRead(
       { method: "POST" },
     );
     return { ok: true, data };
-  } catch (err) {
-    return toFailure(err);
-  }
-}
-
-// ── Uploads ─────────────────────────────────────────────────────────────────
-
-interface SignUploadResponse {
-  signedUrl: string;
-  path: string;
-  token: string;
-  publicUrl: string;
-}
-
-/**
- * Signed upload URL for a chat image, scoped to the CURRENT USER.
- *
- * Deliberately not reusing `actions/files.ts#signUpload`: that one runs through
- * `serverFetch`, so the backend would mint a path under the admin's id
- * (`chat/{adminId}/…`) and then reject the send, since it requires `imagePath`
- * to sit under the sender's own prefix.
- */
-export async function signChatUpload(
-  filename: string,
-): Promise<ChatActionResult<SignUploadResponse>> {
-  try {
-    const { data } = await userServerFetch<SignUploadResponse>("/files/sign", {
-      method: "POST",
-      body: JSON.stringify({ filename, scope: "chat" }),
-    });
-    return { ok: true, data };
-  } catch (err) {
-    return toFailure(err);
-  }
-}
-
-/** Clean up an orphaned chat upload (picked an image, then cancelled). */
-export async function deleteChatUpload(
-  path: string,
-): Promise<ChatActionResult<null>> {
-  try {
-    await userServerFetch("/files", {
-      method: "DELETE",
-      body: JSON.stringify({ paths: [path] }),
-    });
-    return { ok: true, data: null };
   } catch (err) {
     return toFailure(err);
   }

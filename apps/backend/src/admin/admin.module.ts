@@ -17,11 +17,13 @@ import { UserSubscriptionsController } from './subscriptions/user-subscriptions.
 import { UserSubscriptionsService } from './subscriptions/user-subscriptions.service';
 import { ReportsController } from './reports/reports.controller';
 import { ReportsService } from './reports/reports.service';
-import { AdminFeedbackController } from './feedback/feedback.controller';
-import { AdminFeedbackService } from './feedback/feedback.service';
+import { SubscriptionsCoreModule } from '../subscriptions/subscriptions-core.module';
+import { ListingsModule } from '../listings/listings.module';
+import { AdminListingsController } from './admin-listings.controller';
+import { AdminListingsService } from './admin-listings.service';
 
 @Module({
-  imports: [FilesModule, ChatModule],
+  imports: [FilesModule, ChatModule, SubscriptionsCoreModule, ListingsModule],
   controllers: [
     AdminController,
     AdminCategoriesController,
@@ -31,7 +33,7 @@ import { AdminFeedbackService } from './feedback/feedback.service';
     SubscriptionConfigController,
     UserSubscriptionsController,
     ReportsController,
-    AdminFeedbackController,
+    AdminListingsController,
   ],
   providers: [
     AdminService,
@@ -42,7 +44,7 @@ import { AdminFeedbackService } from './feedback/feedback.service';
     SubscriptionConfigService,
     UserSubscriptionsService,
     ReportsService,
-    AdminFeedbackService,
+    AdminListingsService,
   ],
   exports: [AdminService],
 })

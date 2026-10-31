@@ -80,17 +80,26 @@ function makeLoginDevices() {
   };
 }
 
+function makeSupabase(overrides: Record<string, jest.Mock> = {}) {
+  return {
+    getUser: jest.fn(),
+    signInWithOAuth: jest.fn(),
+    ...overrides,
+  };
+}
+
 function makeService(
   db: ReturnType<typeof makeDb>,
   jwtService: ReturnType<typeof makeJwtService>,
   configService: ReturnType<typeof makeConfigService>,
   loginDevices = makeLoginDevices(),
+  supabaseService = makeSupabase(),
 ) {
   return new AuthService(
     db as never,
     jwtService as never,
     configService as never,
-    {} as never,
+    supabaseService as never,
     loginDevices as never,
   );
 }
@@ -958,5 +967,701 @@ describe('VerifyOtpDto validation', () => {
       }),
     );
     expect(errors.length).toBeGreaterThan(0);
+  });
+});
+
+describe('AuthService.findById', () => {
+  it('reports verifiedAccount from the active subscription probe', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows = call === 1 ? [makeUser()] : [{ id: 'sub-1' }];
+      return {
+        from: () => ({
+          where: () => ({ limit: () => Promise.resolve(rows) }),
+        }),
+      };
+    });
+    const service = makeService(db, makeJwtService(), makeConfigService());
+
+    const me = await service.findById('user-uuid');
+
+    expect(me.verifiedAccount).toBe(true);
+  });
+});
+
+describe('AuthService social login', () => {
+  function makeSocialDb(
+    opts: {
+      providerUser?: UserRow | null;
+      emailUser?: UserRow | null;
+      createdUser?: UserRow;
+    } = {},
+  ) {
+    type InsertChain = {
+      values: jest.Mock;
+      onConflictDoUpdate: jest.Mock;
+      onConflictDoNothing: jest.Mock;
+      returning: jest.Mock;
+    };
+    type SelectChain = {
+      from: jest.Mock;
+      innerJoin: jest.Mock;
+      where: jest.Mock;
+      limit: jest.Mock;
+    };
+
+    const insert = jest.fn((): InsertChain => {
+      const chain: InsertChain = {
+        values: jest.fn(() => chain),
+        onConflictDoUpdate: jest.fn(() => chain),
+        onConflictDoNothing: jest.fn(() => chain),
+        returning: jest
+          .fn()
+          .mockResolvedValue([
+            opts.createdUser ?? makeUser({ email: 'new@example.com' }),
+          ]),
+      };
+      return chain;
+    });
+
+    const select = jest.fn((): SelectChain => {
+      let providerQuery = false;
+      const chain: SelectChain = {
+        from: jest.fn(() => chain),
+        innerJoin: jest.fn(() => {
+          providerQuery = true;
+          return chain;
+        }),
+        where: jest.fn(() => chain),
+        limit: jest.fn(() =>
+          Promise.resolve(
+            providerQuery
+              ? opts.providerUser
+                ? [{ user: opts.providerUser }]
+                : []
+              : opts.emailUser
+                ? [opts.emailUser]
+                : [],
+          ),
+        ),
+      };
+      return chain;
+    });
+
+    return { select, insert, update: jest.fn(), delete: jest.fn() };
+  }
+
+  function makeSocialUser(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'supabase-user-id',
+      email: 'staff@example.com',
+      email_confirmed_at: '2026-01-01T00:00:00Z',
+      identities: [{ provider: 'google' }],
+      app_metadata: { provider: 'google' },
+      ...overrides,
+    };
+  }
+
+  function makeSocialSupabase(user: Record<string, unknown>) {
+    return makeSupabase({
+      getUser: jest.fn().mockResolvedValue({
+        data: { user },
+        error: null,
+      }),
+      signInWithOAuth: jest.fn().mockResolvedValue({
+        data: {
+          url: 'https://supabase.example/auth/v1/authorize?provider=google',
+        },
+        error: null,
+      }),
+    });
+  }
+
+  const googleDto = {
+    provider: 'google' as const,
+    accessToken: 'supabase-access-token',
+  };
+
+  it('forwards the redirectTo to Supabase when the origin is allowed', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const config = makeConfigService({
+      frontendOrigins: ['http://localhost:3001'],
+    });
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      config,
+      undefined,
+      supabase,
+    );
+
+    await service.getSocialAuthUrl(
+      'google',
+      'http://localhost:3001/en/auth/callback/google',
+    );
+
+    expect(supabase.signInWithOAuth).toHaveBeenCalledWith(
+      'google',
+      'http://localhost:3001/en/auth/callback/google',
+    );
+  });
+
+  it('rejects a redirect origin that is not allow-listed', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const config = makeConfigService({
+      frontendOrigins: ['http://localhost:3001'],
+    });
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      config,
+      undefined,
+      supabase,
+    );
+
+    await expect(
+      service.getSocialAuthUrl(
+        'google',
+        'https://evil.example/en/auth/callback/google',
+      ),
+    ).rejects.toThrow('INVALID_REDIRECT_URI');
+    expect(supabase.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it('rejects a redirect protocol that is not http(s)', async () => {
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      makeSocialSupabase(makeSocialUser()),
+    );
+
+    await expect(
+      service.getSocialAuthUrl('google', 'javascript:alert(1)'),
+    ).rejects.toThrow('INVALID_REDIRECT_URI');
+  });
+
+  it('rejects an unsupported provider', async () => {
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      makeSupabase(),
+    );
+
+    await expect(service.getSocialAuthUrl('github')).rejects.toThrow(
+      'UNSUPPORTED_PROVIDER',
+    );
+  });
+
+  it('rejects a token whose identity does not match the claimed provider', async () => {
+    const supabase = makeSocialSupabase(
+      makeSocialUser({ identities: [{ provider: 'facebook' }] }),
+    );
+    const service = makeService(
+      makeDb(),
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await expect(service.handleSocialCallback(googleDto)).rejects.toThrow(
+      'SOCIAL_PROVIDER_MISMATCH',
+    );
+  });
+
+  it('rejects an unconfirmed social email', async () => {
+    const supabase = makeSocialSupabase(
+      makeSocialUser({ email_confirmed_at: undefined }),
+    );
+    const db = makeSocialDb();
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await expect(service.handleSocialCallback(googleDto)).rejects.toThrow(
+      'SOCIAL_EMAIL_UNVERIFIED',
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('admin mode never creates an account and answers uniformly', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const db = makeSocialDb({ providerUser: null, emailUser: null });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await expect(
+      service.handleSocialCallback({ ...googleDto, mode: 'admin' }),
+    ).rejects.toThrow('SOCIAL_LOGIN_NOT_ALLOWED');
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('admin mode rejects a non-staff account', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const db = makeSocialDb({
+      providerUser: null,
+      emailUser: makeUser({ email: 'staff@example.com', role: 'user' }),
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await expect(
+      service.handleSocialCallback({ ...googleDto, mode: 'admin' }),
+    ).rejects.toThrow('SOCIAL_LOGIN_NOT_ALLOWED');
+  });
+
+  it('admin mode signs in an existing staff account', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const staff = makeUser({ email: 'staff@example.com', role: 'admin' });
+    const db = makeSocialDb({ providerUser: null, emailUser: staff });
+    const config = makeConfigService({
+      'jwt.accessExpiresIn': '15m',
+      'jwt.refreshExpiresIn': '30d',
+      'jwt.refreshSecret': 'refresh-secret',
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      config,
+      undefined,
+      supabase,
+    );
+
+    const result = await service.handleSocialCallback({
+      ...googleDto,
+      mode: 'admin',
+    });
+
+    expect(result.user.id).toBe('user-uuid');
+    expect(result.accessToken).toBe('signed-token');
+  });
+
+  it('user mode links an existing account by lower-cased email', async () => {
+    const supabase = makeSocialSupabase(
+      makeSocialUser({ email: 'Staff@Example.com' }),
+    );
+    const existing = makeUser({ email: 'staff@example.com' });
+    const db = makeSocialDb({ providerUser: null, emailUser: existing });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    const result = await service.handleSocialCallback(googleDto);
+
+    expect(result.user.id).toBe(existing.id);
+    // The email match wins; only the provider link is inserted.
+    expect(db.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('user mode reuses the provider link before the email', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const linked = makeUser({ email: 'old@example.com' });
+    const db = makeSocialDb({
+      providerUser: linked,
+      emailUser: makeUser({ email: 'staff@example.com' }),
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    const result = await service.handleSocialCallback(googleDto);
+
+    expect(result.user.id).toBe(linked.id);
+    expect(db.select).toHaveBeenCalledTimes(1);
+  });
+
+  it('user mode creates an account when no link or email matched', async () => {
+    const supabase = makeSocialSupabase(makeSocialUser());
+    const created = makeUser({ email: 'staff@example.com' });
+    const db = makeSocialDb({
+      providerUser: null,
+      emailUser: null,
+      createdUser: created,
+    });
+    const service = makeService(
+      db,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    const result = await service.handleSocialCallback(googleDto);
+
+    expect(result.user.id).toBe(created.id);
+    // One insert for the user, one for the provider link.
+    expect(db.insert).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('AuthService linked providers', () => {
+  const socialUser = {
+    id: 'supabase-user-id',
+    email: 'user@example.com',
+    email_confirmed_at: '2026-01-01T00:00:00Z',
+    identities: [{ provider: 'google' }],
+    app_metadata: { provider: 'google' },
+  };
+
+  function supabaseFor(user: Record<string, unknown> | null) {
+    return makeSupabase({
+      getUser: jest.fn().mockResolvedValue({ data: { user }, error: null }),
+      signInWithOAuth: jest.fn(),
+    });
+  }
+
+  function makeLinkDb(
+    opts: {
+      linkedTo?: UserRow | null;
+      existing?: { id: string; providerAccountId: string | null } | null;
+    } = {},
+  ) {
+    let selectCall = 0;
+    const select = jest.fn(() => {
+      selectCall += 1;
+      const call = selectCall;
+      const chain: Record<string, jest.Mock> = {};
+      chain.from = jest.fn(() => chain);
+      chain.innerJoin = jest.fn(() => chain);
+      chain.where = jest.fn(() => chain);
+      chain.limit = jest.fn(() =>
+        Promise.resolve(
+          call === 1
+            ? opts.linkedTo
+              ? [{ user: opts.linkedTo }]
+              : []
+            : opts.existing
+              ? [opts.existing]
+              : [],
+        ),
+      );
+      return chain;
+    });
+
+    const insert = jest.fn(() => ({
+      values: jest.fn().mockResolvedValue(undefined),
+    }));
+    const update = jest.fn(() => ({
+      set: jest.fn(() => ({
+        where: jest.fn().mockResolvedValue(undefined),
+      })),
+    }));
+
+    return {
+      select,
+      insert,
+      update,
+      delete: jest.fn(),
+      transaction: jest.fn(),
+    };
+  }
+
+  function makeUnlinkDb(
+    opts: {
+      user?: UserRow | null;
+      providers?: { provider: string; providerAccountId: string | null }[];
+    } = {},
+  ) {
+    let selectCall = 0;
+    const tx = {
+      select: jest.fn(() => {
+        selectCall += 1;
+        const call = selectCall;
+        const chain: Record<string, jest.Mock> = {};
+        chain.from = jest.fn(() => chain);
+        chain.where = jest.fn(() => {
+          const thenable = Promise.resolve(
+            call === 1
+              ? opts.user
+                ? [opts.user]
+                : []
+              : (opts.providers ?? []),
+          ) as unknown as Promise<unknown[]> & { for: jest.Mock };
+          thenable.for = jest.fn(() =>
+            Promise.resolve(opts.user ? [opts.user] : []),
+          );
+          return thenable;
+        });
+        return chain;
+      }),
+      delete: jest.fn(() => ({
+        where: jest.fn().mockResolvedValue(undefined),
+      })),
+    };
+
+    const db = {
+      select: jest.fn(),
+      insert: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      transaction: jest.fn((cb: (t: typeof tx) => unknown) => cb(tx)),
+    };
+    return { db, tx };
+  }
+
+  const linkDto = { provider: 'google' as const, accessToken: 'x'.repeat(30) };
+
+  it('links a new provider identity to the current user', async () => {
+    const db = makeLinkDb();
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabaseFor(socialUser),
+    );
+
+    const result = await service.linkSocialProvider('user-uuid', linkDto);
+
+    expect(result).toEqual({
+      provider: 'google',
+      providerAccountId: 'supabase-user-id',
+      linked: true,
+    });
+    expect(db.insert).toHaveBeenCalledTimes(1);
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses an identity already linked to another user', async () => {
+    const db = makeLinkDb({ linkedTo: makeUser({ id: 'other-user' }) });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabaseFor(socialUser),
+    );
+
+    await expect(
+      service.linkSocialProvider('user-uuid', linkDto),
+    ).rejects.toThrow('already connected to another user');
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('refuses a different account for the same provider', async () => {
+    const db = makeLinkDb({
+      existing: { id: 'row-1', providerAccountId: 'another-account' },
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabaseFor(socialUser),
+    );
+
+    await expect(
+      service.linkSocialProvider('user-uuid', linkDto),
+    ).rejects.toThrow('A different account for this provider');
+  });
+
+  it('is idempotent when the identity already belongs to the user', async () => {
+    const db = makeLinkDb({
+      linkedTo: makeUser({ id: 'user-uuid' }),
+      existing: { id: 'row-1', providerAccountId: 'supabase-user-id' },
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabaseFor(socialUser),
+    );
+
+    const result = await service.linkSocialProvider('user-uuid', linkDto);
+
+    expect(result.linked).toBe(true);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('fills the account id on a legacy row with none', async () => {
+    const db = makeLinkDb({
+      existing: { id: 'row-1', providerAccountId: null },
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabaseFor(socialUser),
+    );
+
+    await service.linkSocialProvider('user-uuid', linkDto);
+
+    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid provider token', async () => {
+    const supabase = makeSupabase({
+      getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: {} }),
+      signInWithOAuth: jest.fn(),
+    });
+    const service = makeService(
+      makeLinkDb() as never,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await expect(
+      service.linkSocialProvider('user-uuid', linkDto),
+    ).rejects.toThrow('Invalid social access token');
+  });
+
+  it('rejects a token belonging to another provider', async () => {
+    const supabase = supabaseFor({
+      ...socialUser,
+      identities: [{ provider: 'facebook' }],
+      app_metadata: { provider: 'facebook' },
+    });
+    const service = makeService(
+      makeLinkDb() as never,
+      makeJwtService(),
+      makeConfigService(),
+      undefined,
+      supabase,
+    );
+
+    await expect(
+      service.linkSocialProvider('user-uuid', linkDto),
+    ).rejects.toThrow('SOCIAL_PROVIDER_MISMATCH');
+  });
+
+  it('unlinks a provider when the account has another way in', async () => {
+    const { db } = makeUnlinkDb({
+      user: makeUser(),
+      providers: [{ provider: 'google', providerAccountId: 'a' }],
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+    );
+
+    const result = await service.unlinkSocialProvider('user-uuid', 'google');
+
+    expect(result).toEqual({ provider: 'google', unlinked: true });
+  });
+
+  it('refuses to remove the account last way in', async () => {
+    const { db } = makeUnlinkDb({
+      user: makeUser({
+        username: null,
+        passwordHash: null,
+        primaryPhone: null,
+      }),
+      providers: [{ provider: 'google', providerAccountId: 'a' }],
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+    );
+
+    await expect(
+      service.unlinkSocialProvider('user-uuid', 'google'),
+    ).rejects.toThrow('only way to sign in');
+  });
+
+  it('counts a phone as a fallback login method', async () => {
+    const { db } = makeUnlinkDb({
+      user: makeUser({
+        username: null,
+        passwordHash: null,
+        primaryPhone: '+85512345678',
+      }),
+      providers: [{ provider: 'google', providerAccountId: 'a' }],
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+    );
+
+    const result = await service.unlinkSocialProvider('user-uuid', 'google');
+
+    expect(result.unlinked).toBe(true);
+  });
+
+  it('counts another linked provider as a fallback', async () => {
+    const { db } = makeUnlinkDb({
+      user: makeUser({
+        username: null,
+        passwordHash: null,
+        primaryPhone: null,
+      }),
+      providers: [
+        { provider: 'google', providerAccountId: 'a' },
+        { provider: 'telegram', providerAccountId: 'b' },
+      ],
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+    );
+
+    const result = await service.unlinkSocialProvider('user-uuid', 'google');
+
+    expect(result.unlinked).toBe(true);
+  });
+
+  it('is a no-op for a provider that is not linked', async () => {
+    const { db } = makeUnlinkDb({
+      user: makeUser(),
+      providers: [{ provider: 'telegram', providerAccountId: 'b' }],
+    });
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+    );
+
+    const result = await service.unlinkSocialProvider('user-uuid', 'google');
+
+    expect(result).toEqual({ provider: 'google', unlinked: false });
+  });
+
+  it('rejects a provider outside the allow-list', async () => {
+    const { db } = makeUnlinkDb();
+    const service = makeService(
+      db as never,
+      makeJwtService(),
+      makeConfigService(),
+    );
+
+    await expect(
+      service.unlinkSocialProvider('user-uuid', 'github'),
+    ).rejects.toThrow('Unsupported provider');
   });
 });

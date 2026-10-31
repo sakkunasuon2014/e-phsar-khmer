@@ -33,7 +33,7 @@ export default async function NotFoundPage() {
       <NotFoundTitle />
       <div className="mx-auto w-full max-w-7xl border bg-card">
         <div className="flex flex-col items-center px-4 pt-10 pb-12 text-center">
-          <h2 className="text-xl font-bold text-foreground">
+          <h2 className="type-section-title text-foreground">
             The product you are looking for is sold out (or deleted).
           </h2>
 
@@ -41,16 +41,16 @@ export default async function NotFoundPage() {
 
           <Link
             href="/all-ads"
-            className="mt-8 text-sm text-[#00a0e9] hover:underline"
+            className="mt-8 type-nav text-[#00a0e9] hover:underline"
           >
             Click here to find other new products currently on sale on
-            Psakhmer.com.
+            PhsarKhmer.com.
           </Link>
           <Link
             href="/"
-            className="mt-3 text-sm text-foreground hover:underline"
+            className="mt-3 type-nav text-foreground hover:underline"
           >
-            Click here to go to Psakhmer.com Home Page
+            Click here to go to PhsarKhmer.com Home Page
           </Link>
         </div>
 
@@ -58,7 +58,7 @@ export default async function NotFoundPage() {
           <>
             <div className="border-t" />
             <div className="px-4 pt-8 pb-12">
-              <h3 className="text-center text-lg font-bold text-foreground">
+              <h3 className="type-card-heading text-center text-foreground">
                 Find Product by Categories
               </h3>
               <div className="mt-8 grid grid-cols-3 gap-x-4 gap-y-8 sm:grid-cols-4 md:grid-cols-6">
@@ -84,7 +84,7 @@ export default async function NotFoundPage() {
                         <CategoryIconFallback />
                       )}
                     </div>
-                    <span className="mt-4 text-sm leading-tight text-foreground">
+                    <span className="mt-4 type-body-sm text-foreground">
                       {category.name}
                     </span>
                   </Link>

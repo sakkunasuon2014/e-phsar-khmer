@@ -6,7 +6,6 @@ import { PaymentGatewayRegistryTag } from '../../../providers/payment-gateway-re
 import type { ProcessAttemptJobData } from '../../../queue/payment-queue.types';
 import { PaymentGatewayCallError, PaymentPersistenceError } from '../errors';
 import type { PaymentProcessingError } from '../errors';
-import { enqueuePaymentAttemptPoll } from '../attempt/enqueue-payment-attempt-poll.use-case';
 import { failPaymentAttempt } from './fail-payment-attempt.use-case';
 import { findPaymentAttempt } from '../attempt/find-payment-attempt.use-case';
 import { checkPayment } from '../transaction/check-payment.use-case';
@@ -42,6 +41,11 @@ function nextTransactionStatus(
  * mistake, not transient, so it fails the attempt outright instead of
  * retrying; a gateway call that produces no answer throws
  * `PaymentGatewayCallError` so BullMQ's backoff retries instead.
+ *
+ * A `pending` result for a provider with no webhook (Bakong) schedules
+ * nothing here: the caller announces `payment.issued` after this commits and
+ * `PaymentReconciler` — the one poller — picks the attempt up from the
+ * database.
  */
 export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
   function* (
@@ -141,6 +145,9 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
             expectedVersion: transaction.version,
             status: toStatus,
             completedAt: toStatus === 'succeeded' ? now : undefined,
+            expiresAt: result.expiresAt
+              ? new Date(result.expiresAt)
+              : undefined,
           });
           yield* recordPaymentStatusHistory({
             paymentTransactionId: transaction.id,
@@ -160,15 +167,6 @@ export const processPaymentAttempt = Effect.fn('processPaymentAttempt')(
               );
             }
           }
-        }
-
-        if (result.status === 'pending' && result.poll) {
-          yield* enqueuePaymentAttemptPoll(outbox, {
-            paymentTransactionId: transaction.id,
-            paymentAttemptId: attempt.id,
-            intervalMs: result.poll.intervalMs,
-            expiresAt: result.poll.expiresAt,
-          });
         }
       }),
       (cause) => new PaymentPersistenceError({ cause }),

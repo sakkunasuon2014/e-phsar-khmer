@@ -105,8 +105,10 @@ export class UpdateProfileDto {
 
   /**
    * Settings-only switch behind "Update this contact to your ads": after the
-   * profile write, copy the contact trio to every non-deleted listing the
-   * user owns. Additive and optional, so existing callers are unaffected.
+   * profile write, copy the contact block and location (province/district/
+   * commune, address, and the map pin when the profile has one) to every
+   * non-deleted listing the user owns. Additive and optional, so existing
+   * callers are unaffected.
    */
   @ApiPropertyOptional()
   @IsOptional()

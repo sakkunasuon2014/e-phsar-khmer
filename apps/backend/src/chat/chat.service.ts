@@ -7,7 +7,6 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import {
   and,
   asc,
@@ -24,19 +23,22 @@ import {
 } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
-import type { DbClient } from '../db/drizzle.provider';
+import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import {
   conversations,
   messageEnvelopes,
   messages,
-  userE2eDevices,
   userE2eIdentities,
 } from '../db/schema/chat.schema';
 import type { ConversationRow, MessageRow } from '../db/schema/chat.schema';
-import { activeDeviceCondition, diffDevices } from './e2e/e2e-devices.util';
+import {
+  diffDevices,
+  loadTargetDevices,
+  lockE2eDeviceKeys,
+} from './e2e/e2e-devices.util';
+import type { ActiveDevice } from './e2e/e2e-devices.util';
 import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { userBlocks, users } from '../db/schema/users.schema';
-import { SupabaseService } from '../common/supabase/supabase.service';
 import { isBlockedEitherWay } from './blocks.util';
 import { isUniqueViolation } from './pg-errors.util';
 import { ChatPubSubService } from './chat-pubsub.service';
@@ -45,6 +47,7 @@ import { ChatMetricsService } from './chat-metrics.service';
 import { ChatAttachmentsService } from './chat-attachments.service';
 import type { PaginationMeta } from '../common/types/api-response.types';
 import type { SendMessageDto } from './dto/send-message.dto';
+import type { E2eV2PayloadDto } from './dto/e2e-v2.dto';
 import type { QueryChatsDto } from './dto/query-chats.dto';
 import type { QueryMessagesDto } from './dto/query-messages.dto';
 import type {
@@ -67,14 +70,6 @@ interface ConversationPollContext extends ConversationRow {
 
 @Injectable()
 export class ChatService {
-  /**
-   * The single object-name segment `FilesService.createSignedUploadUrl`
-   * produces: `${randomUUID()}-${safeName(filename)}`, where `safeName`
-   * collapses everything outside this class to `_`. Deliberately excludes `/`,
-   * `\` and `%`, so no traversal — literal, encoded, or mixed — can survive it.
-   */
-  private static readonly CHAT_OBJECT_NAME_RE = /^[A-Za-z0-9._-]{1,200}$/;
-
   /** Cursor ids are compared against `uuid` columns; anything else is a 500. */
   private static readonly UUID_RE =
     /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -83,8 +78,6 @@ export class ChatService {
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
-    private readonly supabaseService: SupabaseService,
-    private readonly configService: ConfigService,
     private readonly pubsub: ChatPubSubService,
     private readonly metrics: ChatMetricsService,
     private readonly attachments: ChatAttachmentsService,
@@ -109,12 +102,6 @@ export class ChatService {
         ),
       );
     })();
-  }
-
-  private get bucket(): string {
-    return (
-      this.configService.get<string>('supabase.storageBucket') ?? 'listings'
-    );
   }
 
   /**
@@ -144,6 +131,65 @@ export class ChatService {
     }
   }
 
+  /**
+   * Active device rows for a send's two participants. Shared by the
+   * fast-fail read and the authoritative re-read inside the insert
+   * transaction, so both apply the exact same "active" rule — the one the
+   * devices endpoint hands senders (loadTargetDevices).
+   */
+  private loadParticipantActiveDevices(
+    executor: DbExecutor,
+    userIds: [string, string],
+  ): Promise<ActiveDevice[]> {
+    return loadTargetDevices(executor, userIds);
+  }
+
+  /**
+   * v2: envelopes must cover exactly the active device set. Checked
+   * server-side because the sender's device list goes stale the instant
+   * either user logs in or out anywhere else.
+   *
+   * Called twice: once on the fast-fail read (keeps the old error order and
+   * spares the conversation upsert for an obviously stale sender), and again
+   * on the locked re-read inside the insert transaction, where a device
+   * registering concurrently can no longer slip in between check and insert.
+   */
+  private assertEnvelopesCoverActiveDevices(
+    activeDevices: ActiveDevice[],
+    senderId: string,
+    recipientId: string,
+    e2e: E2eV2PayloadDto,
+  ): void {
+    const senderDeviceId = e2e.senderDeviceId;
+    if (
+      !activeDevices.some(
+        (d) => d.id === senderDeviceId && d.userId === senderId,
+      )
+    )
+      throw new ForbiddenException({
+        code: 'E2E_DEVICE_INACTIVE',
+        message: 'This device is not registered for encrypted chat',
+      });
+    const expected = activeDevices
+      .filter((d) => d.id !== senderDeviceId)
+      .map((d) => ({ userId: d.userId, deviceId: d.id }));
+    if (!expected.some((d) => d.userId === recipientId))
+      throw new NotFoundException({
+        code: 'E2E_NO_RECIPIENT_DEVICES',
+        message: 'Recipient has no devices registered for encrypted chat',
+      });
+    const { missing, stale } = diffDevices(
+      expected,
+      e2e.envelopes.map((e) => e.recipientDeviceId),
+    );
+    if (missing.length > 0 || stale.length > 0)
+      throw new ConflictException({
+        code: 'E2E_DEVICES_MISMATCH',
+        message: 'Device list changed',
+        details: { missing, stale },
+      });
+  }
+
   private async sendMessageInternal(
     senderId: string,
     dto: SendMessageDto,
@@ -164,17 +210,21 @@ export class ChatService {
 
     if (dto.recipientId === senderId)
       throw new BadRequestException('Cannot message yourself');
-    if (!dto.body && !dto.imagePath)
-      throw new BadRequestException('Message must contain text or an image');
-    if ((dto.e2eHeader || dto.e2e) && dto.imagePath)
-      throw new BadRequestException('E2E messages cannot include an image yet');
+    // New writes must be E2E-marked. Historical plaintext messages remain
+    // readable, but no REST or WebSocket sender may add more plaintext rows.
+    if (!dto.e2eHeader && !dto.e2e)
+      throw new BadRequestException('Encrypted messages are required');
+    if (!dto.body)
+      throw new BadRequestException('Encrypted messages must carry a body');
+    // `imagePath` is the legacy public-bucket path. Existing rows still render,
+    // but new images must use private, client-encrypted v2 attachments.
+    if (dto.imagePath)
+      throw new BadRequestException('Unencrypted chat images are not accepted');
     if (dto.e2eHeader && dto.e2e)
       throw new BadRequestException(
         'Provide either e2eHeader or e2e, not both',
       );
     if (dto.e2e) {
-      if (!dto.body)
-        throw new BadRequestException('E2E messages must carry a body');
       const ids = dto.e2e.envelopes.map((e) => e.recipientDeviceId);
       if (new Set(ids).size !== ids.length)
         throw new BadRequestException('Duplicate envelope device');
@@ -185,8 +235,6 @@ export class ChatService {
       throw new BadRequestException(
         'Attachments require an encrypted (v2) message',
       );
-    if (dto.imagePath) this.assertOwnedChatImagePath(dto.imagePath, senderId);
-
     // These three checks are independent reads (none depends on another's
     // result), so they run concurrently instead of as sequential round trips
     // to the DB — each round trip to a remote Postgres is the dominant cost
@@ -194,8 +242,7 @@ export class ChatService {
     // when multiple checks fail stays the same as the old sequential order:
     // recipient existence, then block, then listing ownership.
     //
-    // The two E2E reads ride the same round trip and are skipped entirely
-    // (no query) for plaintext messages.
+    // The v2 device-set read is skipped for v1 E2E messages.
     const [recipient, blocked, listing, activeDevices, recipientIdentity] =
       await Promise.all([
         this.db
@@ -214,15 +261,10 @@ export class ChatService {
               .then((rows) => rows[0])
           : Promise.resolve(undefined),
         dto.e2e
-          ? this.db
-              .select({ id: userE2eDevices.id, userId: userE2eDevices.userId })
-              .from(userE2eDevices)
-              .where(
-                and(
-                  inArray(userE2eDevices.userId, [senderId, dto.recipientId]),
-                  activeDeviceCondition(),
-                ),
-              )
+          ? this.loadParticipantActiveDevices(this.db, [
+              senderId,
+              dto.recipientId,
+            ])
           : Promise.resolve(undefined),
         dto.e2eHeader && dto.recipientIdentityKey
           ? this.db
@@ -259,39 +301,15 @@ export class ChatService {
         message: "Recipient's encryption keys changed",
       });
 
-    // v2: envelopes must cover exactly the active device set. Checked
-    // server-side because the sender's device list goes stale the instant
-    // either user logs in or out anywhere else.
-    if (dto.e2e && activeDevices) {
-      const senderDeviceId = dto.e2e.senderDeviceId;
-      if (
-        !activeDevices.some(
-          (d) => d.id === senderDeviceId && d.userId === senderId,
-        )
-      )
-        throw new ForbiddenException({
-          code: 'E2E_DEVICE_INACTIVE',
-          message: 'This device is not registered for encrypted chat',
-        });
-      const expected = activeDevices
-        .filter((d) => d.id !== senderDeviceId)
-        .map((d) => ({ userId: d.userId, deviceId: d.id }));
-      if (!expected.some((d) => d.userId === dto.recipientId))
-        throw new NotFoundException({
-          code: 'E2E_NO_RECIPIENT_DEVICES',
-          message: 'Recipient has no devices registered for encrypted chat',
-        });
-      const { missing, stale } = diffDevices(
-        expected,
-        dto.e2e.envelopes.map((e) => e.recipientDeviceId),
+    // v2: fast-fail set check. The authoritative one runs again inside the
+    // insert transaction, under the per-user device locks.
+    if (dto.e2e && activeDevices)
+      this.assertEnvelopesCoverActiveDevices(
+        activeDevices,
+        senderId,
+        dto.recipientId,
+        dto.e2e,
       );
-      if (missing.length > 0 || stale.length > 0)
-        throw new ConflictException({
-          code: 'E2E_DEVICES_MISMATCH',
-          message: 'Device list changed',
-          details: { missing, stale },
-        });
-    }
 
     // Race-safe find-or-create + recency bump in one statement.
     // The bump uses the DB clock (`now()` / the column default), never
@@ -315,23 +333,14 @@ export class ChatService {
       })
       .returning();
 
-    let imageUrl: string | null = null;
-    if (dto.imagePath) {
-      const { data } = this.supabaseService.getPublicUrl(
-        this.bucket,
-        dto.imagePath,
-      );
-      imageUrl = data.publicUrl;
-    }
-
     const values = {
       conversationId: conversation.id,
       senderId,
       body: dto.body ?? null,
       clientMessageId: dto.clientMessageId ?? null,
       listingId: dto.listingId ?? null,
-      imageUrl,
-      imagePath: dto.imagePath ?? null,
+      imageUrl: null,
+      imagePath: null,
       groupId: dto.groupId ?? null,
       isE2e: Boolean(dto.e2eHeader || dto.e2e),
       e2eHeader: dto.e2eHeader ?? null,
@@ -351,6 +360,22 @@ export class ChatService {
         const attachmentIds = dto.attachmentIds ?? [];
         [message, envelopes, attached] = await this.db.transaction(
           async (tx) => {
+            // A device registering after the fast-fail read above would be
+            // missing from `e2e.envelopes` — it could never decrypt the
+            // message. The per-user advisory locks serialize us with
+            // registerDevice (same sorted keys, so no deadlock), and the
+            // re-read under them is the set that actually applies.
+            await lockE2eDeviceKeys(tx, [senderId, dto.recipientId]);
+            const lockedDevices = await this.loadParticipantActiveDevices(tx, [
+              senderId,
+              dto.recipientId,
+            ]);
+            this.assertEnvelopesCoverActiveDevices(
+              lockedDevices,
+              senderId,
+              dto.recipientId,
+              e2e,
+            );
             const [row] = await tx.insert(messages).values(values).returning();
             const rows = await tx
               .insert(messageEnvelopes)
@@ -520,6 +545,7 @@ export class ChatService {
         id: users.id,
         username: users.username,
         profilePhotoUrl: users.profilePhotoUrl,
+        lastSeenAt: users.lastSeenAt,
       })
       .from(users)
       .where(and(eq(users.id, otherUserId), isNull(users.deletedAt)))
@@ -588,6 +614,7 @@ export class ChatService {
         id: users.id,
         username: users.username,
         profilePhotoUrl: users.profilePhotoUrl,
+        lastSeenAt: users.lastSeenAt,
       })
       .from(users)
       .where(and(eq(users.id, otherUserId), isNull(users.deletedAt)))
@@ -857,32 +884,6 @@ export class ChatService {
     };
   }
 
-  /**
-   * An attached image must be an object the SENDER uploaded, and nothing else.
-   *
-   * Structural, not substring-based. A `startsWith('chat/{id}/')` + reject-`..`
-   * pair is a denylist, and denylists on storage keys leak: `%2e%2e`,
-   * backslashes and fullwidth dots all slip past a literal `..` scan, and any
-   * of them may be normalised downstream by the storage layer. So instead:
-   * split on `/`, demand exactly three segments, demand segment 2 EQUALS the
-   * sender's id (an equality check — a prefix check could match a longer id,
-   * even though UUIDs happen to be fixed-length), and constrain the object name
-   * to the character class our own signer emits. `/`, `\` and `%` are outside
-   * that class, so there is no encoding left to smuggle a separator through.
-   */
-  private assertOwnedChatImagePath(imagePath: string, senderId: string): void {
-    const segments = imagePath.split('/');
-    if (
-      segments.length !== 3 ||
-      segments[0] !== 'chat' ||
-      segments[1] !== senderId ||
-      segments[2] === '.' ||
-      segments[2] === '..' ||
-      !ChatService.CHAT_OBJECT_NAME_RE.test(segments[2])
-    )
-      throw new BadRequestException('Invalid image path');
-  }
-
   private async getConversationForUserOrThrow(
     conversationId: string,
     userId: string,
@@ -1075,6 +1076,7 @@ export class ChatService {
         id: users.id,
         username: users.username,
         profilePhotoUrl: users.profilePhotoUrl,
+        lastSeenAt: users.lastSeenAt,
       })
       .from(users)
       .where(inArray(users.id, userIds));

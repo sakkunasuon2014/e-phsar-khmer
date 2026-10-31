@@ -104,8 +104,8 @@ export default function LSPYCHeader({
     <div className="bg-white border-b border-gray-200 px-1 py-1 md:px-2 md:py-1 select-none">
       {/* HEADER */}
       <div className="flex items-center justify-between mb-1">
-        <h1 className="font-semibold text-lg md:text-lg">
-          {title} <span className="font-semibold text-lg">in Cambodia</span>
+        <h1 className="type-page-title">
+          {title} <span>in Cambodia</span>
         </h1>
 
         {/* Right Icons */}
@@ -140,7 +140,7 @@ export default function LSPYCHeader({
         <div className="relative">
           <button
             onClick={() => setShowLocationDropdown(!showLocationDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
+            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 type-nav hover:bg-gray-200
               ${
                 filters.province
                   ? "bg-blue-50 border-blue-300 text-blue-700"
@@ -171,7 +171,7 @@ export default function LSPYCHeader({
                     setFilters({ ...filters, province: loc.val });
                     setShowLocationDropdown(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  className="w-full text-left px-4 py-2.5 type-nav text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
                 >
                   <span>{loc.label}</span>
                   {filters.province === loc.val && (
@@ -187,7 +187,7 @@ export default function LSPYCHeader({
         <div className="relative">
           <button
             onClick={() => setShowSortDropdown(!showSortDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
+            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 type-nav hover:bg-gray-200
               ${
                 filters.sort !== "latest"
                   ? "bg-blue-50 border-blue-300 text-blue-700"
@@ -216,7 +216,7 @@ export default function LSPYCHeader({
                     setFilters({ ...filters, sort: opt.val });
                     setShowSortDropdown(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  className="w-full text-left px-4 py-2.5 type-nav text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
                 >
                   <span>{opt.label}</span>
                   {filters.sort === opt.val && (
@@ -232,7 +232,7 @@ export default function LSPYCHeader({
         <div className="relative">
           <button
             onClick={() => setShowPriceDropdown(!showPriceDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
+            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 type-nav hover:bg-gray-200
               ${
                 filters.priceRange
                   ? "bg-blue-50 border-blue-300 text-blue-700"
@@ -261,7 +261,7 @@ export default function LSPYCHeader({
                     setFilters({ ...filters, priceRange: opt.val });
                     setShowPriceDropdown(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  className="w-full text-left px-4 py-2.5 type-nav text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
                 >
                   <span>{opt.label}</span>
                   {filters.priceRange === opt.val && (
@@ -277,7 +277,7 @@ export default function LSPYCHeader({
         <div className="relative">
           <button
             onClick={() => setShowYearDropdown(!showYearDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
+            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 type-nav hover:bg-gray-200
               ${
                 filters.year
                   ? "bg-blue-50 border-blue-300 text-blue-700"
@@ -308,7 +308,7 @@ export default function LSPYCHeader({
                     setFilters({ ...filters, year: opt.val });
                     setShowYearDropdown(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  className="w-full text-left px-4 py-2.5 type-nav text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
                 >
                   <span>{opt.label}</span>
                   {filters.year === opt.val && (
@@ -324,7 +324,7 @@ export default function LSPYCHeader({
         <div className="relative">
           <button
             onClick={() => setShowConditionDropdown(!showConditionDropdown)}
-            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200
+            className={`flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 type-nav hover:bg-gray-200
               ${
                 filters.condition
                   ? "bg-blue-50 border-blue-300 text-blue-700"
@@ -353,7 +353,7 @@ export default function LSPYCHeader({
                     setFilters({ ...filters, condition: opt.val });
                     setShowConditionDropdown(false);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                  className="w-full text-left px-4 py-2.5 type-nav text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-between"
                 >
                   <span>{opt.label}</span>
                   {filters.condition === opt.val && (
@@ -368,7 +368,7 @@ export default function LSPYCHeader({
         {/* More Filters Button */}
         <button
           onClick={handleMoreFilters}
-          className="ml-auto flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 text-sm hover:bg-gray-200 text-gray-700"
+          className="ml-auto flex items-center gap-1 bg-gray-100 border border-gray-200 rounded px-3 py-1.5 type-nav hover:bg-gray-200 text-gray-700"
         >
           <i className="bi bi-funnel text-sm"></i>
           <span className="font-medium whitespace-nowrap">More Filters</span>

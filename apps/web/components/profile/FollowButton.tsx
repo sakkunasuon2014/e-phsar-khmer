@@ -93,7 +93,7 @@ export function FollowButton({
         <Plus className="mr-1 h-4 w-4" />
       )}
       {variant === "compact" ? (
-        <span className="text-xs">
+        <span className="type-meta">
           {following ? t("following") : t("follow")}
         </span>
       ) : (

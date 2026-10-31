@@ -135,7 +135,7 @@ export function ResumeJobPreferencesDialog({
               <button
                 type="button"
                 id={id}
-                className="flex min-h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 py-1.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
+                className="flex min-h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 py-1.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9]"
               >
                 {values.length === 0 ? (
                   <span className="text-muted-foreground">
@@ -146,7 +146,7 @@ export function ResumeJobPreferencesDialog({
                     {values.map((value) => (
                       <span
                         key={value}
-                        className="flex items-center gap-1 rounded-sm bg-[#00a0e9] px-2 py-1 text-sm font-medium text-white"
+                        className="flex items-center gap-1 rounded-sm bg-[#00a0e9] px-2 py-1 type-nav text-white"
                       >
                         {value}
                         <span
@@ -234,9 +234,7 @@ export function ResumeJobPreferencesDialog({
         className="flex h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[950px]"
       >
         <div className="flex shrink-0 items-center gap-3 border-b px-6 py-4">
-          <DialogTitle className="text-2xl font-semibold">
-            {t("form.titles.jobPrefs")}
-          </DialogTitle>
+          <DialogTitle>{t("form.titles.jobPrefs")}</DialogTitle>
           <DialogClose asChild>
             <button
               type="button"
@@ -254,7 +252,7 @@ export function ResumeJobPreferencesDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <FieldGroup>
             <div className="flex h-11 items-center justify-between rounded-sm border border-input px-3">
-              <span className="text-base text-foreground">
+              <span className="type-body text-foreground">
                 {t("form.openJob")}
               </span>
               <Switch
@@ -323,7 +321,7 @@ export function ResumeJobPreferencesDialog({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+            className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 type-nav text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t("form.save")}
           </button>

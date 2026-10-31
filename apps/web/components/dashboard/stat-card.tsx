@@ -25,10 +25,10 @@ export function StatCard({
     <Card className="gap-4 py-4">
       <CardContent className="flex flex-col gap-3 p-0 px-4">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{title}</span>
+          <span className="type-body-sm text-muted-foreground">{title}</span>
           <div
             className={cn(
-              "flex items-center gap-1 text-xs font-medium",
+              "flex items-center gap-1 type-meta",
               isPositive ? "text-emerald-500" : "text-red-400",
             )}
           >
@@ -40,8 +40,8 @@ export function StatCard({
             {change}
           </div>
         </div>
-        <div className="text-2xl font-semibold tracking-tight">{value}</div>
-        <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <div className="type-section-title tracking-tight">{value}</div>
+        <div className="flex items-center gap-1.5 type-body-sm text-muted-foreground">
           <span>{description}</span>
           {isPositive ? (
             <TrendingUp className="size-3" />
@@ -49,7 +49,7 @@ export function StatCard({
             <TrendingDown className="size-3" />
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{subtext}</p>
+        <p className="type-meta text-muted-foreground">{subtext}</p>
       </CardContent>
     </Card>
   );

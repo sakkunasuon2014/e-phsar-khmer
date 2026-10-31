@@ -41,7 +41,7 @@ export default async function CategoryGrid() {
   return (
     <div className="w-full flex justify-center mt-4">
       <div className="w-full max-w-7xl bg-card border rounded-sm pt-4 pb-8">
-        <h2 className="text-lg font-medium text-foreground mb-6 px-4">
+        <h2 className="type-section-title text-foreground mb-6 px-4">
           {t("title")}
         </h2>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-y-8 gap-x-8 px-2">

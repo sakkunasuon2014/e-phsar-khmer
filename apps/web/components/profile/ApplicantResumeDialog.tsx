@@ -106,7 +106,7 @@ export function ApplicantResumeDialog({
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
         ) : detail.resume === null ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
+          <p className="py-10 text-center type-body-sm text-muted-foreground">
             {t("noResume")}
           </p>
         ) : (
@@ -146,10 +146,10 @@ function ResumeSnapshotView({
     .join(", ");
 
   return (
-    <div className="space-y-5 text-sm">
+    <div className="space-y-5 type-body-sm">
       {personal ? (
         <section>
-          <h3 className="text-base font-semibold text-foreground">
+          <h3 className="type-card-heading text-foreground">
             {personal.firstName} {personal.lastName}
           </h3>
           <p className="text-muted-foreground">
@@ -231,12 +231,12 @@ function ResumeSnapshotView({
               <p className="truncate font-medium text-foreground">
                 {snapshot.attachment.fileName}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="type-meta text-muted-foreground">
                 {formatBytes(snapshot.attachment.size)}
               </p>
             </div>
             {cvGone ? (
-              <span className="text-xs text-muted-foreground">
+              <span className="type-meta text-muted-foreground">
                 {t("noLongerAvailable")}
               </span>
             ) : (
@@ -299,7 +299,7 @@ function List({
           <li key={row.id} className="border-l-2 border-muted pl-3">
             <p className="font-medium text-foreground">{row.lead}</p>
             {row.meta ? (
-              <p className="text-xs text-muted-foreground">{row.meta}</p>
+              <p className="type-meta text-muted-foreground">{row.meta}</p>
             ) : null}
             {row.body ? (
               <p className="mt-0.5 whitespace-pre-line text-foreground/90">

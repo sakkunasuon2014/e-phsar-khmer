@@ -1,56 +1,53 @@
 import CategoryGrid from "@/components/home/CategoryGrid";
-import TopAds from "@/components/ads/TopAds";
+import TrendingAds from "@/components/ads/TrendingAds";
 import BrowseByLocation from "@/components/home/BrowseByLocation";
 // import FeedbackButton from "@/components/ui/FeedBackButton";
 import { Link } from "@/i18n/routing";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
-import Image from "next/image";
 
+import AdvertisementCarousel from "@/components/ads/AdvertisementCarousel";
 import { GridCardPost } from "@/components/ads/GridCardPost";
 import { GridCardSell } from "@/components/ads/GridCardSell";
 import { getTranslations, getLocale } from "next-intl/server";
 import { getListingsFeed, toCardPost } from "@/lib/api/categories";
+import { getAdvertisements } from "@/lib/api/advertisements";
 
 export default async function HomePage() {
   const t = await getTranslations("HomePage");
   const locale = await getLocale();
 
-  // Real Latest Ads feed (all active listings); top ads stay untouched.
-  const feedPosts = ((await getListingsFeed({}, locale))?.items ?? []).map(
-    toCardPost,
-  );
+  // Real Latest Ads feed (all active listings); Trending ranks engagement
+  // separately and falls back to the newest live ads in its tail.
+  const [feedPosts, homeBanners] = await Promise.all([
+    getListingsFeed({}, locale).then((feed) =>
+      (feed?.items ?? []).map(toCardPost),
+    ),
+    getAdvertisements("home"),
+  ]);
 
   return (
     <>
-      <main className="min-h-screen flex flex-col bg-muted">
-        <div className="w-auto flex justify-center py-6">
-          <div className="w-full max-w-4xl">
-            <Link href="/" target="_blank">
-              <AspectRatio
-                ratio={4}
-                className="bg-card overflow-hidden cusor-pointer"
-              >
-                <Image
-                  src="/ads/flag-animation.gif"
-                  alt="Flag Ad"
-                  fill
-                  priority
-                  sizes="100vw"
-                  unoptimized
-                  className="object-cover"
-                />
-              </AspectRatio>
-            </Link>
+      {/* `home-type` is the one place the display sizes survive: h1 24, h2 20
+          (captain, 2026-10-26); every other page runs the 20/16 scale. */}
+      <main className="home-type min-h-screen flex flex-col bg-muted">
+        {homeBanners.length > 0 && (
+          <div className="w-auto flex justify-center py-6">
+            <div className="w-full max-w-4xl">
+              <AdvertisementCarousel banners={homeBanners} priority />
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="px-6 py-8 md:px-12 md:py-6">
           <div className="max-w-7xl mx-auto space-y-4">
-            <h1 className="text-xl  text-foreground">{t("welcome.title")}</h1>
+            {/* The welcome line keeps normal weight (captain, 2026-10-23);
+                page titles elsewhere keep their bold `type-page-title` role. */}
+            <h1 className="type-page-title font-normal text-foreground">
+              {t("welcome.title")}
+            </h1>
             <CategoryGrid />
-            <TopAds />
-            <h2 className="text-xl">{t("latestads")}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <TrendingAds />
+            <h2 className="type-section-title">{t("latestads")}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <GridCardSell />
               {feedPosts.map((post) => (
                 <GridCardPost key={post.postId} post={post} />
@@ -61,7 +58,7 @@ export default async function HomePage() {
         <div className="flex justify-center">
           <Link
             href="/all-ads"
-            className="w-5xl max-w-5xl px-6 py-2 bg-[#00a7e1] hover:bg-[#0095ca] text-s text-white text-center font-medium  rounded transition-colors"
+            className="max-w-5xl px-6 py-2.5 bg-[#00a7e1] hover:bg-[#0095ca] type-nav text-white text-center rounded transition-colors"
           >
             {t("viewall")}
           </Link>

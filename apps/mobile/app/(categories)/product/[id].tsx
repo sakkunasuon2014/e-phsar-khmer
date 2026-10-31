@@ -1,5 +1,6 @@
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Colors } from "@/constants/Colors";
+import { SITE_URL } from "@/constants/site";
 import { SAMPLE_PRODUCTS } from "@/constants/data/products";
 import { Ionicons } from "@expo/vector-icons";
 import { setStringAsync } from "expo-clipboard";
@@ -63,7 +64,7 @@ const ProductDetailScreen = () => {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out this ${product.title} on Global Link!`,
+        message: `Check out this ${product.title} on PhsarKhmer!`,
       });
     } catch (error) {
       console.log(error);
@@ -71,7 +72,7 @@ const ProductDetailScreen = () => {
   };
 
   const handleCopyLink = async () => {
-    const link = `https://globallink.com/product/${product.id}`;
+    const link = `${SITE_URL}/product/${product.id}`;
     await setStringAsync(link);
     if (Platform.OS === "android") {
       ToastAndroid.show("Link copied!", ToastAndroid.SHORT);
@@ -246,7 +247,7 @@ const ProductDetailScreen = () => {
             {product.location} - {product.date}
           </Text>
 
-          {/* Khmer24 Seller Management Tools */}
+          {/* PhsarKhmer Seller Management Tools */}
           <View className="mt-3 flex-row gap-2 pt-3 border-t border-neutral-border/60">
             <TouchableOpacity
               onPress={() => router.push(`/product/edit/${product.id}`)}
@@ -429,7 +430,7 @@ const ProductDetailScreen = () => {
           </Text>
           <Text className="text-neutral-text-sub mb-4">
             Please don&apos;t forget to mention that you found this ad on
-            psaNPIC.
+            PhsarKhmer.
           </Text>
 
           {product.phones?.map((phone, index) => {
@@ -916,18 +917,16 @@ const ProductDetailScreen = () => {
                   <View className="w-20 h-20 bg-white p-1 border border-neutral-border rounded-lg relative self-end mb-1">
                     <Image
                       source={{
-                        uri: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://psanpic.com/product/${product.id}`,
+                        uri: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${SITE_URL}/product/${product.id}`,
                       }}
                       className="w-full h-full"
                     />
                     {/* Icon overlay */}
                     <View className="absolute inset-0 items-center justify-center">
                       <View className="bg-white p-0.5 rounded shadow-sm">
-                        <Image
-                          source={require("@/assets/images/psa-npic.png")}
-                          className="w-5 h-5"
-                          resizeMode="contain"
-                        />
+                        <Text className="text-[10px] font-black text-primary">
+                          P
+                        </Text>
                       </View>
                     </View>
                   </View>

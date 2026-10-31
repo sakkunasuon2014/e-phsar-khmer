@@ -1,4 +1,8 @@
-import type { ChatUserSummary, ListingContext } from '../chat/chat.types';
+import type {
+  ChatUserSummary,
+  ListingContext,
+  MessageWithListing,
+} from '../chat/chat.types';
 import type { ResumeDocumentWire } from '../resume/resume.service';
 
 export type JobApplicationStatus = 'pending' | 'viewed' | 'hired' | 'rejected';
@@ -40,6 +44,26 @@ export interface AppliedJobView {
   updatedAt: Date;
   listing: ApplicationListing;
   poster: ChatUserSummary;
+}
+
+/**
+ * The chat delivery an apply produced, when the applicant's browser could
+ * encrypt to at least one of the poster's devices. `message` is the stored
+ * ciphertext row — the server never sees the plaintext.
+ */
+export interface ApplyChatDelivery {
+  conversationId: string;
+  message: MessageWithListing;
+}
+
+/**
+ * `POST /listings/:id/applications` result: the row plus its chat delivery.
+ * `chat` is null when the poster had no devices registered for encrypted chat
+ * and the application was recorded without a message (the poster still gets
+ * the row and its notification).
+ */
+export interface ApplyResultView extends AppliedJobView {
+  chat: ApplyChatDelivery | null;
 }
 
 /** One row of `/me/job-applications` — the poster's side. */

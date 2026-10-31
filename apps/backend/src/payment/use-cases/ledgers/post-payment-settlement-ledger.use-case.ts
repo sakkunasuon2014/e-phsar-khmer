@@ -23,7 +23,7 @@ type PostPaymentSettlementLedgerError =
  *
  * Callers are expected to already be inside a runInTransaction block, same
  * as every other write in the three success-transition use-cases
- * (processPaymentAttempt / processProviderEvent / pollPaymentAttempt) —
+ * (processPaymentAttempt / processProviderEvent / settleReconciledAttempt) —
  * the ledger posting commits or rolls back together with the status flip
  * that made it true.
  */

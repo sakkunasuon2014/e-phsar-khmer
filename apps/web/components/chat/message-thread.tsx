@@ -5,12 +5,17 @@ import Image from "next/image";
 import {
   ArrowLeft,
   Download,
+  ImageOff,
+  KeyRound,
   Loader2,
   MessageSquareOff,
+  MoreVertical,
+  SendHorizonal,
   ShieldAlert,
+  UserRound,
   X,
 } from "lucide-react";
-import { useFormatter, useTranslations } from "next-intl";
+import { useFormatter, useLocale, useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -20,10 +25,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
+import { Link } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
-import { dayKey } from "@/lib/chat/format";
+import { dayKey, formatPrice } from "@/lib/chat/format";
 import { saveFromUrl } from "@/lib/chat/save-file";
 import { chatKeys, isNotFound } from "@/lib/chat/queries";
 import { useChatThread } from "@/hooks/use-chat-thread";
@@ -31,11 +43,18 @@ import { useE2eEngine } from "@/hooks/use-e2e-engine";
 import { useDecryptedMessages } from "@/hooks/use-decrypted-messages";
 import { isDecryptable } from "@/lib/e2e/decrypt-message";
 import { parseAttachmentContent } from "@/lib/e2e/attachments/content";
+import { parseStructuredChatContent } from "@/lib/e2e/chat-content";
 import { Composer, type ComposerDraft } from "@/components/chat/composer";
 import { ListingContextCard } from "@/components/chat/listing-context-card";
 import { MessageBubble } from "@/components/chat/message-bubble";
 import { ImageGroup } from "@/components/chat/image-group";
 import { groupImageMessages } from "@/lib/chat/group-images";
+import type { MessageNode } from "@/lib/chat/group-images";
+import { groupUnavailable } from "@/lib/chat/group-unavailable";
+import {
+  E2E_RESTORE_SNOOZE_KEY,
+  useE2eBackupContext,
+} from "@/components/chat/e2e-backup-provider";
 import type {
   ChatUserSummary,
   ListingContext,
@@ -44,18 +63,78 @@ import type {
 
 /** How long the opening loading block may wait on decryption. */
 const DECRYPT_REVEAL_TIMEOUT_MS = 10_000;
+const E2E_RELOAD_ATTEMPTED_KEY = "chat:e2e-reload-attempted";
 
 /**
- * An encrypted-attachment message's plaintext is JSON (caption + per-file
- * keys); split it into the caption `body` and `e2eFiles` for the bubble.
- * Only messages the server lists `attachments` on are parsed.
+ * Text-only replies offered above the composer. Their label IS the message
+ * body, so tapping one sends exactly what the peer reads — through the same
+ * encrypted path as typed text.
  */
-function withFiles(m: ThreadMessage, plaintext: string | null): ThreadMessage {
-  if (!m.attachments?.length || plaintext === null)
-    return plaintext === m.body ? m : { ...m, body: plaintext };
-  const content = parseAttachmentContent(plaintext);
-  if (!content) return { ...m, body: null };
-  return { ...m, body: content.text ?? null, e2eFiles: content.attachments };
+const QUICK_REPLIES = [
+  "hi",
+  "available",
+  "offer",
+  "sold",
+  "negotiable",
+  "notNegotiable",
+] as const;
+
+/**
+ * Dismissal memory for the quick-replies row, scoped to one conversation.
+ * The row is an empty-thread onboarding aid (see `showQuickReplies`), so the
+ * flag only has to survive reloads of a still-empty chat. A brand-new
+ * conversation has no stored key — that is what re-introduces the row for
+ * every new chat without ever sharing a dismissal across chats.
+ */
+const QUICK_REPLIES_DISMISSED_KEY = "chat:quick-replies-dismissed";
+
+function readQuickRepliesDismissed(scope: string): boolean {
+  try {
+    return (
+      localStorage.getItem(`${QUICK_REPLIES_DISMISSED_KEY}:${scope}`) === "1"
+    );
+  } catch {
+    return false; // private mode / quota
+  }
+}
+
+function dismissQuickReplies(scope: string): void {
+  try {
+    localStorage.setItem(`${QUICK_REPLIES_DISMISSED_KEY}:${scope}`, "1");
+  } catch {
+    // Private mode / quota — hidden for this mount only.
+  }
+}
+
+/** One day-bucket's renderable rows: an image group, a single bubble, or a
+ * collapsed run of unavailable messages (finding H-5). */
+type ThreadNode =
+  | MessageNode
+  | { kind: "unavailable-notice"; key: string; count: number };
+
+/**
+ * Turn a decrypted plaintext into what the bubble renders: attachment JSON
+ * (caption + per-file keys), structured content (location / listing-only,
+ * which must never surface as raw JSON), or ordinary text. Legacy plaintext
+ * strings and old rows simply fall through as `body`.
+ */
+function withDecryptedContent(
+  m: ThreadMessage,
+  plaintext: string | null,
+): ThreadMessage {
+  // Only messages the server lists `attachments` on can carry file metadata.
+  if (m.attachments?.length && plaintext !== null) {
+    const content = parseAttachmentContent(plaintext);
+    if (!content) return { ...m, body: null };
+    return { ...m, body: content.text ?? null, e2eFiles: content.attachments };
+  }
+  if (plaintext === null) return m;
+  const structured = parseStructuredChatContent(plaintext);
+  if (structured?.kind === "location")
+    return { ...m, body: null, sharedLocation: structured.location };
+  if (structured?.kind === "listing")
+    return { ...m, body: null, listingOnly: true };
+  return plaintext === m.body ? m : { ...m, body: plaintext };
 }
 
 export function MessageThread({
@@ -82,21 +161,54 @@ export function MessageThread({
 }) {
   const t = useTranslations("Chat");
   const format = useFormatter();
+  const locale = useLocale();
   const queryClient = useQueryClient();
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [listingSent, setListingSent] = useState(false);
   const [listingDismissed, setListingDismissed] = useState(false);
-  // True while the listing preview is still pending a decision (send it, or
-  // remove it) — gates both render spots below and the attach in handleSend.
-  const showListingAttachment =
+  // Per-conversation dismissal memory for the quick-replies row. `peer.id` is
+  // the scope until the first send creates the conversation (`conversationId`
+  // null) — the same logical chat, and still one flag.
+  const quickRepliesScope = conversationId
+    ? `conversation:${conversationId}`
+    : `peer:${peer.id}`;
+  const [quickRepliesDismissedNow, setQuickRepliesDismissedNow] =
+    useState(false);
+  const quickRepliesDismissed =
+    quickRepliesDismissedNow || readQuickRepliesDismissed(quickRepliesScope);
+  const listingPending =
     Boolean(listingId) && !listingSent && !listingDismissed;
 
   const peerName = peer.username ?? t("unknownUser");
+  const username = peer.username;
+  // Read `lastSeenAt` defensively: it is optional on ChatUserSummary, and a
+  // missing or null value must simply render no secondary line.
+  const lastSeenAt =
+    (peer as { lastSeenAt?: string | null }).lastSeenAt ?? null;
+  const lastSeen = lastSeenAt ? new Date(lastSeenAt) : null;
+  // Formatted once here so a malformed timestamp can never render as
+  // "Invalid Date"; the header only decides whether to show the line.
+  const lastActiveLabel =
+    lastSeen !== null && !Number.isNaN(lastSeen.getTime())
+      ? t("thread.lastActive", {
+          time: format.relativeTime(lastSeen, new Date()),
+        })
+      : null;
 
   const onMutated = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: chatKeys.inbox() });
     void queryClient.invalidateQueries({ queryKey: chatKeys.unread() });
   }, [queryClient]);
+
+  const reloadAfterE2eUnavailable = useCallback(() => {
+    try {
+      if (sessionStorage.getItem(E2E_RELOAD_ATTEMPTED_KEY) === "1") return;
+      sessionStorage.setItem(E2E_RELOAD_ATTEMPTED_KEY, "1");
+    } catch {
+      // If sessionStorage is unavailable, still honor the requested reload.
+    }
+    window.location.reload();
+  }, []);
 
   const onSendError = useCallback(
     (message: string, status: number) => {
@@ -116,6 +228,7 @@ export function MessageThread({
       }
       if (message === "E2E_UNAVAILABLE") {
         toast.error(t("errors.e2eUnavailable"));
+        reloadAfterE2eUnavailable();
         return;
       }
       // Block state is cached (see `withPeer` in chat-workspace); a 403 means
@@ -130,7 +243,7 @@ export function MessageThread({
           : message || t("errors.sendFailed"),
       );
     },
-    [t, queryClient, peer.id],
+    [t, queryClient, peer.id, reloadAfterE2eUnavailable],
   );
 
   const thread = useChatThread({
@@ -152,9 +265,26 @@ export function MessageThread({
     loadOlder,
     send,
     retry,
+    cancelHeldSend,
     isSending,
     markActivity,
   } = thread;
+
+  // True while the listing preview is still pending a decision (send it, or
+  // remove it) — gates both render spots below and the attach in handleSend.
+  // A message that already carries the listing is proof it rode out: the
+  // local flags reset on every remount (the first send creates the
+  // conversation, which changes the mount key), the messages never do.
+  const showListingAttachment =
+    listingPending && !messages.some((m) => m.listingId === listingId);
+
+  // Quick replies are an empty-thread onboarding aid: introduced in every new
+  // chat, retired as soon as a message exists (from either side), and hidden
+  // once the user dismisses them — a dismissal stored per conversation, so a
+  // new chat always gets the introduction again. `!isLoading` keeps the row
+  // from flashing while a thread's first page is still in flight.
+  const showQuickReplies =
+    canMessage && !isLoading && messages.length === 0 && !quickRepliesDismissed;
 
   // ── E2E decrypt ──────────────────────────────────────────────────────────
   // Own optimistic echoes already carry plaintext; only server rows need
@@ -162,6 +292,16 @@ export function MessageThread({
   // we render a neutral placeholder, never the raw ciphertext.
   const e2eEngine = useE2eEngine(viewerId);
   const decrypted = useDecryptedMessages(messages, e2eEngine);
+  const backup = useE2eBackupContext();
+
+  useEffect(() => {
+    if (!e2eEngine) return;
+    try {
+      sessionStorage.removeItem(E2E_RELOAD_ATTEMPTED_KEY);
+    } catch {
+      // Private browsing/storage restrictions do not block E2E itself.
+    }
+  }, [e2eEngine]);
 
   // Server E2E rows with no decrypt outcome yet (engine bootstrapping, or
   // the batch is still running).
@@ -189,20 +329,54 @@ export function MessageThread({
     return () => clearTimeout(timer);
   }, [revealed]);
 
+  // Re-prompt for the passcode whenever a thread with unavailable messages
+  // opens on a locked, passcoded device — not once per browser session. The
+  // EnterPasscodeDialog's "Not now" button snoozes this for the rest of the
+  // session (sessionStorage); reloading (or opening another such thread in a
+  // new session) asks again.
+  const hasUnavailable = useMemo(
+    () => messages.some((m) => decrypted.get(m.id)?.status === "unavailable"),
+    [messages, decrypted],
+  );
+  const backupKind = backup?.state?.kind ?? null;
+  const backupHasPasscode =
+    backup?.state?.kind === "locked" && backup.state.hasPasscode;
+  useEffect(() => {
+    if (!backup || !revealed || !hasUnavailable) return;
+    if (backupKind !== "locked" || !backupHasPasscode) return;
+    try {
+      if (sessionStorage.getItem(E2E_RESTORE_SNOOZE_KEY) === "1") return;
+    } catch {
+      // Private mode — prompting anyway is harmless.
+    }
+    backup.setDialog("enter");
+  }, [backup, revealed, hasUnavailable, backupKind, backupHasPasscode]);
+
   const displayMessages = useMemo<ThreadMessage[]>(() => {
-    if (!messages.some((m) => m.isE2e || m.attachments?.length))
+    // Ordinary plaintext threads need no post-processing. Optimistic echoes
+    // are always inspected: a location / listing-only send stores its
+    // structured JSON in `body` even before the row is E2E.
+    if (
+      !messages.some(
+        (m) => m.isE2e || m.attachments?.length || m.tempId !== undefined,
+      )
+    )
       return messages;
     const out: ThreadMessage[] = [];
     for (const m of messages) {
       // Local optimistic / failed rows already hold the user's plaintext.
       if (m.tempId || !m.isE2e) {
-        out.push(withFiles(m, m.body));
+        out.push(withDecryptedContent(m, m.body));
         continue;
       }
       const outcome = decrypted.get(m.id);
-      if (outcome?.status === "ok") out.push(withFiles(m, outcome.plaintext));
+      if (outcome?.status === "ok")
+        out.push(withDecryptedContent(m, outcome.plaintext));
       else if (outcome?.status === "unavailable")
-        out.push({ ...m, body: t("message.notOnThisDevice") });
+        // Never ciphertext, and never its own bubble: a run of these is
+        // collapsed into one notice row below (`groupUnavailable`), whose
+        // text is state-aware instead of the old one-note-per-bubble copy.
+        out.push({ ...m, unavailable: true });
       else if (outcome?.status === "failed")
         out.push({ ...m, body: t("message.decryptFailed") });
       // Still decrypting. With a live engine, hold the row back — a new
@@ -251,17 +425,46 @@ export function MessageThread({
     if (atBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [displayMessages, revealed]);
 
+  // The listing still waiting to ride out on the next send of any kind.
+  const pendingListingId = showListingAttachment ? listingId : undefined;
+
   const handleSend = useCallback(
     (draft: ComposerDraft) => {
-      if (showListingAttachment) setListingSent(true);
+      if (pendingListingId) setListingSent(true);
+      // Location, voice and the ad picked from the composer's "+" menu must be
+      // forwarded here: the composer clears its staged state on send, so a
+      // dropped field is a silently lost message. An explicitly picked ad wins
+      // over the deep-linked listing card.
       send({
         body: draft.body,
         draftKeys: draft.draftKeys,
-        listingId: showListingAttachment ? listingId : undefined,
+        listingId: draft.listingId ?? pendingListingId,
+        location: draft.location,
+        voice: draft.voice,
       });
     },
-    [send, listingId, showListingAttachment],
+    [send, pendingListingId],
   );
+
+  const handleQuickReply = useCallback(
+    (text: string) => {
+      if (pendingListingId) setListingSent(true);
+      send({ body: text, listingId: pendingListingId });
+    },
+    [send, pendingListingId],
+  );
+
+  // Sending the card is a send of its own — the quick replies row stays
+  // available for a follow-up message.
+  const handleSendListing = useCallback(() => {
+    if (!listingId) return;
+    setListingSent(true);
+    send({ listingId });
+  }, [send, listingId]);
+
+  const listingPrice = listing
+    ? formatPrice(listing.price, listing.currency, locale)
+    : null;
 
   const grouped = useMemo(() => {
     // First group by day.
@@ -272,11 +475,37 @@ export function MessageThread({
       if (last && last.day === day) last.items.push(message);
       else dayBuckets.push({ day, items: [message] });
     }
-    // Then group consecutive image messages within each day.
-    return dayBuckets.map((bucket) => ({
-      day: bucket.day,
-      nodes: groupImageMessages(bucket.items),
-    }));
+    // Then, within each day: collapse runs of unavailable messages into one
+    // notice node first (a readable message splits a run in two — see
+    // `groupUnavailable`), then group consecutive image messages among what
+    // is left readable.
+    return dayBuckets.map((bucket) => {
+      const unavailability = groupUnavailable(
+        bucket.items,
+        (m) => m.unavailable === true,
+      );
+      const nodes: ThreadNode[] = [];
+      let readable: ThreadMessage[] = [];
+      const flushReadable = () => {
+        if (readable.length === 0) return;
+        nodes.push(...groupImageMessages(readable));
+        readable = [];
+      };
+      for (const node of unavailability) {
+        if (node.kind === "unavailable-run") {
+          flushReadable();
+          nodes.push({
+            kind: "unavailable-notice",
+            key: node.messages[0].id,
+            count: node.count,
+          });
+        } else {
+          readable.push(node.message);
+        }
+      }
+      flushReadable();
+      return { day: bucket.day, nodes };
+    });
   }, [displayMessages]);
 
   // A 404 on a conversation route means "not a participant" — the backend
@@ -328,16 +557,44 @@ export function MessageThread({
             {peerName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold leading-none">
             {peerName}
           </p>
-          {!canMessage && (
+          {!canMessage ? (
             <p className="mt-1 text-[11px] text-destructive">
               {blockedByMe ? t("thread.blockedByMe") : t("thread.blocked")}
             </p>
-          )}
+          ) : lastActiveLabel ? (
+            <p className="mt-1 truncate text-[11px] text-muted-foreground">
+              {lastActiveLabel}
+            </p>
+          ) : null}
         </div>
+        {username && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={t("thread.viewProfile")}
+                className="-mr-1 shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-[state=open]:bg-muted"
+              >
+                <MoreVertical className="size-5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem asChild>
+                <Link
+                  href={{ pathname: "/[username]", params: { username } }}
+                  className="flex w-full items-center gap-1.5"
+                >
+                  <UserRound className="size-4" />
+                  {t("thread.viewProfile")}
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Messages */}
@@ -376,25 +633,23 @@ export function MessageThread({
               </div>
             )}
 
-            {messages.length === 0 && (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-                {listing !== undefined && showListingAttachment && (
-                  <div className="flex flex-col items-center gap-1.5">
-                    <ListingContextCard listing={listing} />
-                    <button
-                      type="button"
-                      onClick={() => setListingDismissed(true)}
-                      className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
-                    >
-                      {t("thread.removeListing")}
-                    </button>
-                  </div>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  {t("thread.emptyTitle", { name: peerName })}
-                </p>
-              </div>
-            )}
+            {/* Empty thread: no prompt copy — the composer and the quick
+                replies are the empty state. Only a listing that is still
+                pending has something to show here. */}
+            {messages.length === 0 &&
+              listing !== undefined &&
+              showListingAttachment && (
+                <div className="flex flex-1 flex-col items-center justify-center gap-1.5">
+                  <ListingContextCard listing={listing} />
+                  <button
+                    type="button"
+                    onClick={() => setListingDismissed(true)}
+                    className="text-[11px] text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    {t("thread.removeListing")}
+                  </button>
+                </div>
+              )}
 
             {grouped.map((group) => (
               <div key={group.day} className="flex flex-col gap-4">
@@ -408,7 +663,12 @@ export function MessageThread({
                   </span>
                 </div>
                 {group.nodes.map((node) =>
-                  node.kind === "image-group" ? (
+                  node.kind === "unavailable-notice" ? (
+                    <UnavailableNotice
+                      key={`notice-${node.key}`}
+                      count={node.count}
+                    />
+                  ) : node.kind === "image-group" ? (
                     <ImageGroup
                       key={`group-${node.messages[0].id}`}
                       messages={node.messages}
@@ -424,6 +684,7 @@ export function MessageThread({
                       peerName={peerName}
                       peerAvatarUrl={peer.profilePhotoUrl}
                       onRetry={retry}
+                      onCancelHeld={cancelHeldSend}
                       onOpenImage={setLightbox}
                     />
                   ),
@@ -434,24 +695,92 @@ export function MessageThread({
         )}
       </div>
 
-      {/* Pending listing context — shown until it rides out on the first
-          send, or the buyer removes it before sending. */}
-      {showListingAttachment && displayMessages.length > 0 && (
+      {/* Pending listing — a compact row until the card itself is sent
+          (paper plane), it rides out on the next message, or it is
+          dismissed. The empty-thread case shows the full card above. */}
+      {canMessage && showListingAttachment && displayMessages.length > 0 && (
         <div className="shrink-0 border-t border-border bg-card px-3 py-2 sm:px-4">
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <p className="text-[11px] text-muted-foreground">
-              {t("thread.attachingListing")}
-            </p>
+          <div className="flex items-center gap-2.5">
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
+              {listing?.thumbnailUrl ? (
+                <Image
+                  src={listing.thumbnailUrl}
+                  alt={listing.title}
+                  fill
+                  sizes="40px"
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <ImageOff className="size-4 text-muted-foreground" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-foreground">
+                {listing?.title ?? t("listing.unavailable")}
+              </p>
+              <p className="truncate text-[11px] font-semibold text-[#f04d4e]">
+                {listingPrice ?? t("listing.noPrice")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleSendListing}
+              aria-label={t("composer.send")}
+              className="shrink-0 rounded-full bg-sky-500 p-1.5 text-white transition-colors hover:bg-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <SendHorizonal className="size-4" />
+            </button>
             <button
               type="button"
               onClick={() => setListingDismissed(true)}
               aria-label={t("thread.removeListing")}
+              className="shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Quick replies: one tap sends the pill's text (plus the pending
+          listing, if one is still armed). See `showQuickReplies` — the row
+          only exists in a message-less thread and a dismissal is persisted
+          per conversation. */}
+      {showQuickReplies && (
+        <div className="shrink-0 border-t border-border bg-card px-3 pt-2 sm:px-4">
+          <div className="flex items-center gap-1.5 pb-2">
+            <div
+              role="group"
+              aria-label={t("thread.quickReplies.label")}
+              className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {QUICK_REPLIES.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() =>
+                    handleQuickReply(t(`thread.quickReplies.${key}`))
+                  }
+                  disabled={isSending}
+                  className="shrink-0 rounded-full bg-sky-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-sky-600 disabled:opacity-60"
+                >
+                  {t(`thread.quickReplies.${key}`)}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                dismissQuickReplies(quickRepliesScope);
+                setQuickRepliesDismissedNow(true);
+              }}
+              aria-label={t("thread.quickReplies.hide")}
               className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <X className="size-3.5" />
             </button>
           </div>
-          <ListingContextCard listing={listing ?? null} />
         </div>
       )}
 
@@ -532,6 +861,42 @@ function ThreadNotice({
           {backLabel}
         </Button>
       )}
+    </div>
+  );
+}
+
+/**
+ * One notice row for a whole run of unavailable messages (finding H-5):
+ * state-aware text instead of the old identical note on every bubble, with
+ * the passcode button inline only when there is a passcode to enter.
+ */
+function UnavailableNotice({ count }: { count: number }) {
+  const t = useTranslations("Chat.message");
+  const tBackup = useTranslations("Chat.backup");
+  const backup = useE2eBackupContext();
+  const locked = backup?.state?.kind === "locked" ? backup.state : null;
+  const textKey = !locked
+    ? "unavailableReady"
+    : locked.hasPasscode
+      ? "unavailableLockedWithPasscode"
+      : "unavailableLockedNoPasscode";
+
+  return (
+    <div className="flex justify-center">
+      <div className="flex max-w-[85%] flex-col items-center gap-1.5 rounded-xl bg-muted/70 px-3 py-2 text-center text-[11px] text-muted-foreground sm:max-w-[70%]">
+        <p>{t(textKey, { count })}</p>
+        {locked?.hasPasscode && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => backup?.setDialog("enter")}
+          >
+            <KeyRound className="size-3" />
+            {tBackup("enterPasscode")}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

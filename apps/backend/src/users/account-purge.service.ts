@@ -26,6 +26,9 @@ const PURGE_BATCH_SIZE = 200;
 /** Falls back to 6 h — the window is 90 days, so precision is irrelevant. */
 const DEFAULT_INTERVAL_MS = 21_600_000;
 
+/** The first sweep waits this long (plus up to a minute of jitter) after boot. */
+const FIRST_SWEEP_MIN_DELAY_MS = 60_000;
+
 /**
  * Hard-deletes accounts whose 90-day recovery window has closed.
  *
@@ -43,6 +46,7 @@ const DEFAULT_INTERVAL_MS = 21_600_000;
 export class AccountPurgeService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AccountPurgeService.name);
   private timer?: NodeJS.Timeout;
+  private bootTimer?: NodeJS.Timeout;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DbClient,
@@ -63,11 +67,19 @@ export class AccountPurgeService implements OnModuleInit, OnModuleDestroy {
       this.configService.get<number>('accounts.purgeIntervalMs') ??
       DEFAULT_INTERVAL_MS;
 
-    void this.sweep();
+    // Not at boot: a service that restarts often (or scales out) would turn
+    // every start into a purge query. The recovery window is 90 days, so the
+    // first sweep can wait a jittered 1-2 minutes.
+    this.bootTimer = setTimeout(
+      () => void this.sweep(),
+      FIRST_SWEEP_MIN_DELAY_MS + Math.random() * 60_000,
+    );
+    this.bootTimer.unref?.();
     this.timer = setInterval(() => void this.sweep(), intervalMs);
   }
 
   onModuleDestroy(): void {
+    if (this.bootTimer) clearTimeout(this.bootTimer);
     if (this.timer) clearInterval(this.timer);
   }
 

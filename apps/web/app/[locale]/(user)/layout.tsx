@@ -2,6 +2,7 @@ import { NavBar } from "@/components/web/NavBar";
 import Footer from "@/components/web/Footer";
 import { getUserProfile } from "@/actions/user";
 import { ReactionsProvider } from "@/components/reactions/reactions-provider";
+import { E2eBackupProvider } from "@/components/chat/e2e-backup-provider";
 import { getMyReactionIds } from "@/lib/api/reactions";
 
 export default async function UserLayout({
@@ -16,7 +17,7 @@ export default async function UserLayout({
   const reactions = user ? await getMyReactionIds() : { liked: [], saved: [] };
 
   return (
-    <>
+    <E2eBackupProvider userId={user?.id ?? null}>
       <NavBar user={user} />
       <ReactionsProvider
         // Remount when the viewer changes: the provider seeds its sets once,
@@ -31,6 +32,6 @@ export default async function UserLayout({
         {children}
       </ReactionsProvider>
       <Footer />
-    </>
+    </E2eBackupProvider>
   );
 }

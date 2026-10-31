@@ -1,28 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-  MoreHorizontal,
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -32,19 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SelectItem } from "@/components/ui/select";
 import { useAppForm } from "@/components/form/hooks";
 import { z } from "zod";
 import { toast } from "@/components/ui/sonner";
@@ -55,7 +23,6 @@ import {
   FieldLegend,
   FieldSet,
 } from "@/components/ui/field";
-import DbImage, { NoImageCell } from "@/components/common/DbImage";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -71,8 +38,45 @@ import { brandSchema } from "@/schemas/brand";
 import type { Brand } from "@/types/brand";
 import { createBrand, deleteBrand, updateBrand } from "@/actions/brand";
 import { SubcategoryCheckboxes } from "@/components/dashboard/subcategory-checkboxes";
+import { AdminPage } from "@/components/dashboard/admin-page";
+import {
+  AdminFilter,
+  AdminSearch,
+  AdminTable,
+  ChipList,
+  DateCell,
+  PrimaryCell,
+  RowActions,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 
 type BrandFormData = z.infer<typeof brandSchema>;
+
+/** Every category represented by the brand's subcategory links (a brand may span several). */
+function brandCategoryNames(
+  brand: Brand,
+  subcategoryById: Map<string, AdminSubcategory>,
+  categoryById: Map<string, AdminCategory>,
+): string[] {
+  return [
+    ...new Set(
+      brand.subcategories
+        .map((id) => subcategoryById.get(id)?.categoryId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ]
+    .map((id) => categoryById.get(id)?.name)
+    .filter((name): name is string => Boolean(name));
+}
+
+function brandSubcategoryNames(
+  brand: Brand,
+  subcategoryById: Map<string, AdminSubcategory>,
+): string[] {
+  return brand.subcategories
+    .map((id) => subcategoryById.get(id)?.name)
+    .filter((name): name is string => Boolean(name));
+}
 
 function AddBrandForm({
   categories,
@@ -174,7 +178,7 @@ function AddBrandForm({
             </form.AppField>
           </FieldSet>
         ) : (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category to see subcategories.
           </p>
         )}
@@ -184,7 +188,7 @@ function AddBrandForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -304,7 +308,7 @@ function EditBrandForm({
             </form.AppField>
           </FieldSet>
         ) : (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category to see subcategories.
           </p>
         )}
@@ -314,7 +318,7 @@ function EditBrandForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -373,7 +377,7 @@ function DeleteBrandForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
           disabled={isDeleting}
         >
@@ -395,7 +399,7 @@ function DeleteBrandForm({
 
 export default function BrandsPage() {
   const queryClient = useQueryClient();
-  const { data: brandList = [] } = useQuery({
+  const { data: brandList = [], isLoading } = useQuery({
     queryKey: ["admin", "brands"],
     queryFn: getAdminBrands,
   });
@@ -411,27 +415,49 @@ export default function BrandsPage() {
     queryClient.invalidateQueries({ queryKey: ["admin", "brands"] });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<Brand | null>(null);
 
-  const filteredBrands = brandList.filter(
-    (brand) =>
-      brand.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      brand.slug.toLowerCase().includes(searchQuery.toLowerCase()),
+  const subcategoryById = useMemo(
+    () => new Map(allSubcategories.map((sub) => [sub.subId, sub])),
+    [allSubcategories],
+  );
+  const categoryById = useMemo(
+    () => new Map(categoryList.map((category) => [category.cateId, category])),
+    [categoryList],
   );
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredBrands.length / rowsPerPage),
-  );
-  const paginatedBrands = filteredBrands.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage,
-  );
+  const filteredBrands = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return brandList.filter((brand) => {
+      if (
+        categoryFilter !== "all" &&
+        !brand.subcategories.some(
+          (id) => subcategoryById.get(id)?.categoryId === categoryFilter,
+        )
+      ) {
+        return false;
+      }
+      if (!query) return true;
+      return [
+        brand.name,
+        brand.slug,
+        ...brandCategoryNames(brand, subcategoryById, categoryById),
+        ...brandSubcategoryNames(brand, subcategoryById),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [brandList, searchQuery, categoryFilter, subcategoryById, categoryById]);
+
+  const categoryOptions = categoryList.map((category) => ({
+    value: category.cateId,
+    label: category.name,
+  }));
 
   const handleAddSuccess = (data: BrandFormData) => {
     refreshBrands();
@@ -466,247 +492,137 @@ export default function BrandsPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  const columns = useMemo<AdminColumn<Brand>[]>(
+    () => [
+      {
+        key: "brand",
+        header: "Brand",
+        sortValue: (brand) => brand.name,
+        cell: (brand) => (
+          <PrimaryCell
+            image={brand.image}
+            alt={brand.name}
+            title={brand.name}
+            subtitle={brand.slug}
+            imageClassName="object-contain p-0.5"
+          />
+        ),
+      },
+      {
+        key: "category",
+        header: "Categories",
+        sortValue: (brand) =>
+          brandCategoryNames(brand, subcategoryById, categoryById).join(", "),
+        cell: (brand) => (
+          <ChipList
+            items={brandCategoryNames(brand, subcategoryById, categoryById)}
+            tone="category"
+          />
+        ),
+      },
+      {
+        key: "subcategories",
+        header: "Sub Categories",
+        sortValue: (brand) =>
+          brandSubcategoryNames(brand, subcategoryById).join(", "),
+        cell: (brand) => (
+          <ChipList items={brandSubcategoryNames(brand, subcategoryById)} />
+        ),
+      },
+      {
+        key: "updated",
+        header: "Updated",
+        sortValue: (brand) => brand.updatedAt,
+        cell: (brand) => <DateCell value={brand.updatedAt} />,
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (brand) => (
+          <RowActions
+            id={brand.brandId}
+            actions={[
+              {
+                label: "Edit",
+                icon: <Pencil className="mr-2 size-4" />,
+                tone: "warning",
+                onSelect: () => openEditDialog(brand),
+              },
+              {
+                label: "Delete",
+                icon: <Trash2 className="mr-2 size-4" />,
+                tone: "danger",
+                onSelect: () => openDeleteDialog(brand),
+              },
+            ]}
+          />
+        ),
+      },
+    ],
+    [subcategoryById, categoryById],
+  );
+
   return (
     <>
-      <main className="flex-1 overflow-auto p-6 min-w-0">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
-                Brands
-              </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Manage product brands here.
-              </p>
-            </div>
-
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
-                  <Plus className="mr-2 size-4" />
-                  Add Brand
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Brand</DialogTitle>
-                  <DialogDescription>
-                    Create a new brand for your products.
-                  </DialogDescription>
-                </DialogHeader>
-                {isAddDialogOpen && (
-                  <AddBrandForm
-                    categories={categoryList}
-                    subcategories={allSubcategories}
-                    onSuccess={handleAddSuccess}
-                    onCancel={() => setIsAddDialogOpen(false)}
-                  />
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
+      <AdminPage
+        title="Brands"
+        description="Manage product brands here."
+        action={
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
+                <Plus className="mr-2 size-4" />
+                Add Brand
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Brand</DialogTitle>
+                <DialogDescription>
+                  Create a new brand for your products.
+                </DialogDescription>
+              </DialogHeader>
+              {isAddDialogOpen && (
+                <AddBrandForm
+                  categories={categoryList}
+                  subcategories={allSubcategories}
+                  onSuccess={handleAddSuccess}
+                  onCancel={() => setIsAddDialogOpen(false)}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        }
+        toolbar={
+          <>
+            <AdminSearch
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9 border-border bg-card text-foreground focus-visible:ring-1 focus-visible:ring-[#00a0e9] focus-visible:border-[#00a0e9] transition-all"
+              onChange={setSearchQuery}
+              placeholder="Search brand, category, sub category..."
             />
-          </div>
-
-          <div className="rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center">ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead className="text-start">Logo</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Sub Category</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedBrands.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Search className="size-8" />
-                        <p>No brand found</p>
-                        {searchQuery && (
-                          <p className="text-sm">
-                            No results for &quot;{searchQuery}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginatedBrands.map((brand) => (
-                    <TableRow key={brand.brandId}>
-                      <TableCell className="text-center font-medium">
-                        {brand.brandId}
-                      </TableCell>
-                      <TableCell>{brand.name}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {brand.slug}
-                      </TableCell>
-                      <TableCell>
-                        <DbImage
-                          src={brand.image}
-                          alt={brand.name}
-                          width={40}
-                          height={40}
-                          className="w-10 h-10 object-contain rounded border bg-muted/30 p-0.5"
-                          fallback={<NoImageCell />}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {categoryList.find(
-                          (c) => c.cateId === brand.categoryId,
-                        ) && (
-                          <span className="rounded bg-sky-200 px-2 py-1 text-sm text-black">
-                            {
-                              categoryList.find(
-                                (c) => c.cateId === brand.categoryId,
-                              )?.name
-                            }
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {brand.subcategories.map((id) => {
-                            const sub = allSubcategories.find(
-                              (s) => s.subId === id,
-                            );
-                            return (
-                              <span
-                                key={id}
-                                className="rounded bg-sky-100 px-2 py-1 text-sm text-black"
-                              >
-                                {sub?.name ?? id}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {brand.createdAt}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {brand.updatedAt}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="rounded-full cursor-pointer"
-                            >
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="center">
-                            <DropdownMenuItem
-                              className="text-orange-500 cursor-pointer"
-                              onClick={() => openEditDialog(brand)}
-                            >
-                              <Pencil className="mr-2 size-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive cursor-pointer"
-                              onClick={() => openDeleteDialog(brand)}
-                            >
-                              <Trash2 className="mr-2 size-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-
-            <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                Rows per page
-                <Select
-                  value={rowsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setRowsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronsLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+            <AdminFilter
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              allLabel="All Categories"
+              options={categoryOptions}
+            />
+          </>
+        }
+      >
+        <AdminTable
+          columns={columns}
+          rows={filteredBrands}
+          rowKey={(brand) => brand.brandId}
+          isLoading={isLoading}
+          pageSize={20}
+          resetKey={`${searchQuery}:${categoryFilter}`}
+          emptyTitle="No brand found"
+          emptyHint={
+            searchQuery ? `No results for "${searchQuery}"` : undefined
+          }
+        />
+      </AdminPage>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>

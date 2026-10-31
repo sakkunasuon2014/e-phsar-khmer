@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -15,6 +16,7 @@ import { listingPhotos, listings } from '../db/schema/listings.schema';
 import { users } from '../db/schema/users.schema';
 import { ChatService } from '../chat/chat.service';
 import type { ChatUserSummary } from '../chat/chat.types';
+import { isBlockedEitherWay } from '../chat/blocks.util';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ResumeService } from '../resume/resume.service';
 import { ResumeAttachmentsService } from '../resume/resume-attachments.service';
@@ -28,6 +30,7 @@ import type {
   ApplicationListing,
   ApplicationResumeSummary,
   AppliedJobView,
+  ApplyResultView,
   JobApplicationStatus,
   ReceivedApplicationView,
 } from './applications.types';
@@ -44,9 +47,12 @@ const SNIPPET_MAX = 160;
  *
  * The delivery channel is chat: `ChatService.sendMessage` is the single chat
  * write path, and this module calls it in-process rather than opening a second
- * one. The message is sent **before** the row is inserted, with a
- * deterministic `clientMessageId`, so the two-step write self-heals — see
- * `apply` for why that order and what each failure leaves behind.
+ * one. The message is encrypted in the applicant's browser (the server holds
+ * no keys), sent **before** the row is inserted, with a deterministic
+ * `clientMessageId`, so the two-step write self-heals — see `apply` for why
+ * that order and what each failure leaves behind. When the poster has no
+ * encrypted-chat devices there is no one to encrypt to, so the application is
+ * recorded without a chat message and the notification is the only delivery.
  *
  * The résumé is frozen into the row at apply time (`resumeSnapshot`). Nothing
  * here ever reads the applicant's live résumé after that, which is what keeps
@@ -79,12 +85,20 @@ export class ApplicationsService {
    * the chat replays, the insert lands. No transaction spans the two because
    * `ChatService` writes on the shared client and cannot enlist; this is the
    * same honest non-transactionality `follow.created` carries.
+   *
+   * New messages must be encrypted, so `body` is ciphertext and the E2E
+   * payload comes from the applicant's browser. A half-specified payload is a
+   * 400 here rather than a chat-side error, and a plaintext-only body can
+   * never reach the database. When the poster has no devices to encrypt to,
+   * the client omits the payload: the application is still recorded, the
+   * block check runs here (the chat path is what normally enforces it), and
+   * `chat` comes back null.
    */
   async apply(
     applicantId: string,
     listingId: string,
     dto: CreateApplicationDto,
-  ): Promise<AppliedJobView> {
+  ): Promise<ApplyResultView> {
     const job = await this.loadJob(listingId);
     if (!job) throw new NotFoundException('Listing not found');
     if (job.categorySlug !== JOB_CATEGORY_SLUG)
@@ -109,15 +123,47 @@ export class ApplicationsService {
       });
 
     const coverNote = dto.coverNote?.trim() ? dto.coverNote.trim() : null;
+    const encrypted = Boolean(dto.e2e || dto.e2eHeader);
+
+    // Both-or-neither: a body with no E2E payload would be a plaintext chat
+    // row (the chat path refuses it anyway — say so here with a clear 400),
+    // and an E2E payload with no body carries nothing to decrypt.
+    if (encrypted && !dto.body)
+      throw new BadRequestException(
+        'An encrypted application message must carry a body',
+      );
+    if (dto.body && !encrypted)
+      throw new BadRequestException('Application messages must be encrypted');
+
+    // Without a chat send there is no ChatService call to enforce blocks, and
+    // a blocked pair must not be able to apply by omitting the payload.
+    if (
+      !encrypted &&
+      (await isBlockedEitherWay(this.db, applicantId, job.posterId))
+    )
+      throw new ForbiddenException('Messaging unavailable');
 
     // The message first (see the note above). A block in either direction
     // surfaces here as the chat path's own 403 and nothing is written.
-    await this.chat.sendMessage(applicantId, {
-      recipientId: job.posterId,
-      listingId,
-      body: buildApplicationBody(job.title, coverNote),
-      clientMessageId: applicationDedupKey(listingId, applicantId),
-    });
+    let chat: ApplyResultView['chat'] = null;
+    if (encrypted) {
+      const sent = await this.chat.sendMessage(applicantId, {
+        recipientId: job.posterId,
+        listingId,
+        body: dto.body,
+        ...(dto.e2e ? { e2e: dto.e2e } : {}),
+        ...(dto.e2eHeader
+          ? {
+              e2eHeader: dto.e2eHeader,
+              ...(dto.recipientIdentityKey
+                ? { recipientIdentityKey: dto.recipientIdentityKey }
+                : {}),
+            }
+          : {}),
+        clientMessageId: applicationDedupKey(listingId, applicantId),
+      });
+      chat = { conversationId: sent.conversationId, message: sent.message };
+    }
 
     const snapshot = await this.loadResumeSnapshot(applicantId);
 
@@ -164,6 +210,7 @@ export class ApplicationsService {
       updatedAt: row.updatedAt,
       listing: contexts.get(job.id) ?? unavailableListing(job.id),
       poster: posters.get(job.posterId) ?? unknownUser(job.posterId),
+      chat,
     };
   }
 
@@ -497,6 +544,7 @@ export class ApplicationsService {
         id: users.id,
         username: users.username,
         profilePhotoUrl: users.profilePhotoUrl,
+        lastSeenAt: users.lastSeenAt,
       })
       .from(users)
       .where(inArray(users.id, unique));
@@ -566,7 +614,7 @@ type JobRow = {
   title: string;
   price: string | null;
   currency: string;
-  status: 'draft' | 'active' | 'expired' | 'deleted';
+  status: 'draft' | 'active' | 'expired' | 'deleted' | 'restricted';
   company: string | null;
 };
 
@@ -575,17 +623,6 @@ type JobFacts = JobRow & {
   categorySlug: string;
   posterDeletedAt: Date | null;
 };
-
-/**
- * The chat message a delivery produces. The line naming the job matters: the
- * poster's thread shows the cover note as an ordinary bubble, and the job is
- * context they may not have open. Hardcoded English, like every other stored
- * notification string in this repo (`follow.created`).
- */
-function buildApplicationBody(title: string, coverNote: string | null): string {
-  const headline = `Application for "${title}"`;
-  return coverNote ? `${headline}\n\n${coverNote}` : headline;
-}
 
 /**
  * Chat's dedup key for an application. Derived from the pair, not the row id,
@@ -616,7 +653,7 @@ function snippet(value: string): string {
 
 /** A user row that no longer exists still has to render as something. */
 function unknownUser(id: string): ChatUserSummary {
-  return { id, username: null, profilePhotoUrl: null };
+  return { id, username: null, profilePhotoUrl: null, lastSeenAt: null };
 }
 
 /** A job whose listing row is gone (hard-deleted): the row still renders. */

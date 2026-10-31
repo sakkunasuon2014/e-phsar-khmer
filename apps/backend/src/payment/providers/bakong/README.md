@@ -30,15 +30,14 @@ Bakong does neither:
   `POST /v1/check_transaction_by_md5`.
 
 That second point is what makes this provider's `charge()` fundamentally
-incomplete on its own: returning `pending` and stopping there (as `charge()`
-alone does) would leave the attempt stuck forever, because nothing is ever
-going to tell it otherwise unless something keeps asking. `ChargeResult.poll`
-(set only by this provider — see
-[`../payment-gateway.types.ts`](../payment-gateway.types.ts)) is what closes
-that gap: it asks `processPaymentAttempt` to schedule a `reconcile()` poll
-loop, which becomes the _only_ path to a resolved status for an attempt
-charged through this provider. See [Lifecycle, end to end](#lifecycle-end-to-end)
-for the full loop.
+incomplete on its own: returning `pending` and stopping there would leave
+the attempt stuck forever, because nothing is ever going to tell it
+otherwise unless something keeps asking. `PaymentReconciler` is that
+something — armed by a `payment.issued` event when a checkout is issued,
+idle when nothing is open — and it is the _only_ path to a resolved status
+for an attempt charged through this provider. See
+[Where the poller fits](#where-the-poller-fits--demand-driven-one-poller)
+and [Lifecycle, end to end](#lifecycle-end-to-end) for the full loop.
 
 ### Individual vs merchant accounts
 
@@ -98,50 +97,64 @@ plays for the controllers (`Effect.runPromise`, not
 `PaymentEffectRunner` itself, since this runs from inside a plain
 `PaymentGatewayProvider` method rather than a controller action).
 
-### Where the queue and the outbox fit — a provider-owned addition
+### Where the poller fits — demand-driven, one poller
 
-The payment module README already describes the outbox↔BullMQ split in
-general terms; this provider is what pushed it to a third job kind and a
-third outbox event type, because ABA's webhook-driven model has no polling
-concept to reuse:
+An earlier design polled through a self-rescheduling chain (outbox row →
+BullMQ delayed job → Bakong call → next outbox row), with the reconciler as a
+second poller behind it. That asked Bakong twice per pending payment and wrote
+up to ~25 outbox rows and Redis jobs per abandoned QR. It is retired:
+`PaymentReconciler` is the **only** poller, and it works only while there is
+something to look at.
 
-- **`processPaymentAttempt`** (shared, `../../use-cases/`) is unchanged in
-  shape but gained one new branch: when `charge()`'s result carries
-  `poll`, it writes a `payment.attempt.poll_requested` outbox row —
-  `enqueuePaymentAttemptPoll` — inside the _same_ transaction as the
-  attempt's own pending-status write. This is the one genuinely durability-sensitive
-  moment in the whole loop: if the process died between committing "attempt
-  is pending" and scheduling the first poll, nothing would ever check this
-  attempt again. Same commit-then-enqueue guarantee the rest of the module
-  relies on.
-- **`pollPaymentAttempt`** (new, `../../use-cases/poll-payment-attempt.use-case.ts`)
-  is the loop body: call `reconcile()`, and either apply a definite outcome
-  (`succeeded`/`failed`) the same way `processPaymentAttempt` does, give up
-  as `failed` (`POLL_EXPIRED`) once `poll.expiresAt` has passed, or — on
-  `pending` — call `enqueuePaymentAttemptPoll` again for the next round.
-  That last branch **deliberately doesn't wrap the outbox write in
-  `runInTransaction`**: nothing else changes in the database on a
-  "still nothing to report" round, so there's nothing for the insert to be
-  atomic with. If the process dies right after that insert commits, the row
-  is exactly as durable as any other outbox row — BullMQ/the outbox's own
-  crash recovery covers it from there.
-- **`PaymentPollOutboxHandler`** (new, `../../outbox/payment-poll-outbox-handler.ts`)
-  is what turns a `payment.attempt.poll_requested` row into a BullMQ
-  `poll-attempt` job — the _only_ one of the three outbox handlers in this
-  module that passes a `delay` (`payload.intervalMs`) to `queue.add()`. The
-  outbox row itself is dispatched as soon as a worker claims it; the delay
-  lives on the BullMQ job, not on when the outbox considers the row "due".
-  Its `jobId` is the outbox event's own id, not the attempt id — contrast
-  `PaymentAttemptOutboxHandler`, whose fixed `jobId: paymentAttemptId` is a
-  one-shot dedupe key. A poll attempt legitimately produces many jobs over
-  one attempt's lifetime, so a fixed attempt-scoped jobId would collide
-  across rounds instead of deduping a retry of the _same_ round.
-- **No `dedupeKey`** on the poll outbox event (contrast the other two event
-  types, which key on `paymentAttemptId`/`paymentProviderEventId`) — every
-  call to `enqueuePaymentAttemptPoll` is meant to produce a fresh row, not
-  collapse into an earlier one. Postgres unique indexes ignore `NULL`, so an
-  omitted `dedupeKey` never collides with anything (see
-  `OutboxService.enqueue`'s own doc comment).
+- **`processPaymentAttempt`** (shared, `../../use-cases/`) calls `charge()` and,
+  on `pending`, commits the attempt (`providerAttemptId = md5`) and the
+  transaction's `expires_at` (the KHQR's own expiry — `charge()` returns it at
+  the top level, as ABA's does). It schedules **nothing**: the committed
+  `pending` row in Postgres is the whole handoff.
+- **`payment.issued`** is a local, non-durable `EventEmitter2` event
+  (`PAYMENT_ISSUED_EVENT`, `../../payment.constants.ts`) that `PaymentProcessor`
+  emits after a `process-attempt` job returns `pending`. `PaymentReconciler`
+  listens and calls `arm()`, which starts a pass within 5 s instead of waiting
+  out the safety sweep. It is advisory only — Postgres stays the source of
+  truth, so a lost event (a checkout issued on another instance, a restart)
+  costs at most one sweep interval, never a payment.
+- **`PaymentReconciler`** (`../../reconciler/payment-reconciler.service.ts`)
+  reads every unresolved attempt for `PAYMENT_RECONCILE_PROVIDERS` (default
+  `bakong`) straight from Postgres and settles through one idempotent path
+  (`settleReconciledAttempt`). Pacing comes from `nextTickDelayMs`:
+
+  | State seen by the last pass                    | Next pass in                                             |
+  | ---------------------------------------------- | -------------------------------------------------------- |
+  | A pending checkout younger than 60 s           | 5 s (the payer is probably scanning)                     |
+  | A pending checkout older than that             | `PAYMENT_RECONCILE_INTERVAL_MS` (15 s)                   |
+  | Just settled / activated / abandoned / errored | `PAYMENT_RECONCILE_INTERVAL_MS`                          |
+  | Nothing pending                                | `PAYMENT_RECONCILE_IDLE_INTERVAL_MS` (60 s safety sweep) |
+
+  Pending attempts are read newest-first with their own cap (100), so a pile of
+  abandoned checkouts cannot push the one a payer is watching past the limit.
+
+- **`reconcilePaymentAttempt`** asks Bakong **first**, then judges the clock:
+  a paid answer settles; an unpaid answer fails the attempt `POLL_EXPIRED`
+  only once `transaction.expires_at` + 30 s has passed (or the 15-minute age
+  backstop, for a row with no recorded expiry). A payer at the deadline, or a
+  poll that ran late, therefore still settles. A gateway error throws — it
+  never fails a paid attempt.
+- **Attempts we gave up on** (`POLL_EXPIRED` / `POLL_GATEWAY_ERROR`) stay
+  re-checkable for `PAYMENT_LATE_PAYMENT_GRACE_MS` (24 h) in case money lands
+  late, but on a slow clock of their own — one look every 5 minutes, capped at
+  50 per pass — never on the tight loop.
+- **`PaymentOnDemandReconciler`** (`../../reconciler/payment-on-demand-reconciler.service.ts`):
+  `GET /payments/:id` (after its owner check) nudges an open attempt along, at
+  most one Bakong call per attempt per 5 s per instance (`ThrottleGate`),
+  waiting no longer than 4 s. The response still comes from the database; it
+  re-reads only if the check resolved something. On a serverless instance this
+  is also what keeps the check running while a payer is on the page.
+- **Legacy drain.** `PaymentPollOutboxHandler` and the `poll-attempt` job
+  branch in `PaymentProcessor` are now no-ops that mark old
+  `payment.attempt.poll_requested` rows / delayed jobs finished. They exist
+  only because an unregistered outbox event type is retried and then marked
+  `failed`. Delete them, with `PAYMENT_ATTEMPT_POLL_OUTBOX_EVENT_TYPE`, once
+  no such row can remain (`OUTBOX_RETENTION_DAYS`).
 
 ## Lifecycle, end to end
 
@@ -153,6 +166,7 @@ sequenceDiagram
     participant Worker as OutboxWorker
     participant BullMQ as BullMQ (payments)
     participant Processor as PaymentProcessor
+    participant Recon as PaymentReconciler
     participant Bakong as BakongProvider
     participant SDK as bakong-khqr (offline)
     participant API as Bakong check_transaction_by_md5
@@ -169,26 +183,24 @@ sequenceDiagram
     Processor->>Bakong: charge({transactionId, amount, currency, ...})
     Bakong->>SDK: generateMerchant(MerchantInfo) — no network call
     SDK-->>Bakong: {qr, md5}
-    Bakong-->>Processor: ChargeResult{status: pending,<br/>providerAttemptId: md5, poll: {intervalMs, expiresAt}}
-    Processor->>Postgres: runInTransaction:<br/>upsert payment_transaction_detail (qr, md5, expiresAt)<br/>update payment_attempt (pending, providerAttemptId = md5)<br/>insert outbox_events (payment.attempt.poll_requested) — round 1
-    Processor->>Worker: wakeupAfterCommit()
+    Bakong-->>Processor: ChargeResult{status: pending,<br/>providerAttemptId: md5, expiresAt}
+    Processor->>Postgres: runInTransaction:<br/>upsert payment_transaction_detail (qr, md5)<br/>update payment_attempt (pending, providerAttemptId = md5)<br/>update payment_transaction (processing, expires_at)
+    Processor-)Recon: payment.issued (local event) → arm()
 
     Note over Client,Bakong: The QR string returned in rawResponse is what a<br/>client renders — out of scope for this provider
 
-    loop every poll.intervalMs, until resolved or expired
-        Worker->>BullMQ: PaymentPollOutboxHandler: queue.add(poll-attempt,<br/>{delay: intervalMs, jobId: outbox event id})
-        BullMQ->>Processor: poll-attempt job (after delay)
-        Processor->>Bakong: reconcile(md5)
+    loop while a checkout is pending (5 s, then 15 s) — otherwise a 60 s safety sweep
+        Recon->>Postgres: read pending attempts (newest first)
+        Recon->>Bakong: reconcile(md5)
         Bakong->>API: POST /v1/check_transaction_by_md5 {md5}
         API-->>Bakong: found (paid) or not found (not yet)
-        Bakong-->>Processor: ChargeResult{status: pending | succeeded}
-        alt still pending, not yet expired
-            Processor->>Postgres: insert outbox_events (payment.attempt.poll_requested) — next round<br/>(no other write — nothing else changed)
-            Processor->>Worker: wakeupAfterCommit()
-        else now >= poll.expiresAt
-            Processor->>Postgres: runInTransaction:<br/>update payment_attempt (failed, POLL_EXPIRED)<br/>update payment_transaction (failed)<br/>insert payment_status_history
-        else succeeded
-            Processor->>Postgres: runInTransaction:<br/>upsert payment_transaction_detail<br/>update payment_attempt (succeeded)<br/>update payment_transaction (succeeded)<br/>insert payment_status_history
+        Bakong-->>Recon: ChargeResult{status: pending | succeeded}
+        alt succeeded
+            Recon->>Postgres: runInTransaction:<br/>upsert payment_transaction_detail<br/>update payment_attempt (succeeded)<br/>update payment_transaction (succeeded)<br/>status history, ledger posting, payment.succeeded outbox row
+        else still pending and now >= expires_at + 30 s
+            Recon->>Postgres: runInTransaction:<br/>update payment_attempt (failed, POLL_EXPIRED)<br/>update payment_transaction (failed)<br/>insert payment_status_history
+        else still pending
+            Note over Recon: nothing is written — the next pass is only a timer
         end
     end
 ```
@@ -201,24 +213,30 @@ Key properties this gives us:
   to check and no payload shape to parse, because Bakong never sends
   either. This is an honest model of "no channel exists", not a stub
   standing in for one that should.
-- **The one durability-critical moment — going from "charging" to
-  "polling" — is atomic.** The first `payment.attempt.poll_requested` row
-  commits in the same transaction as the attempt's own pending-status
-  write. Every subsequent round only ever writes when nothing else changed,
-  so there's no multi-write atomicity to lose there.
-- **A pending attempt cannot poll forever.** `poll.expiresAt` (mirroring
-  the KHQR's own `expirationTimestamp`) is what a stuck-forever attempt
-  would otherwise become without a comparison — it degrades to a normal
-  `failed` transition (`POLL_EXPIRED`) instead of an eternal BullMQ job or
-  an eternally `pending` transaction.
-- **Every poll round is visible in `outbox_events`.** An operator can see
-  exactly how many times, and how recently, a given attempt has been
-  checked — for free, since each round is a real (if short-lived) database
-  row rather than in-memory scheduler state.
+- **Polling exists only while there is demand.** With nothing pending the only
+  activity is the 60 s safety sweep (activation + expiry + candidate queries);
+  an unpaid QR costs a bounded number of Bakong calls — about 12 in its first
+  minute and 15 s-spaced ones until it expires (≈5 minutes), not a fixed timer
+  forever. An abandoned QR then costs one look per 5 minutes inside the grace
+  window.
+- **Durability does not depend on the event, the browser or the timer.** The
+  only thing that must commit is the `pending` attempt with its `md5`; every
+  later step reads that from Postgres. A payer who pays and refreshes, an
+  instance that restarts, or a missed `payment.issued` just means the next pass
+  finds the same row. Settlement is version-guarded, the ledger post is keyed on
+  the transaction id and `payment.succeeded` has a dedupe key, so two instances
+  (or the poller and an on-demand read) racing settle exactly once.
+- **A pending attempt cannot poll forever.** It is abandoned at the KHQR's own
+  expiry (+30 s), with the 15-minute age backstop behind it, and stays only in
+  the slow late-payment tail afterwards.
+- **A serverless instance polls only while it is alive.** Timers and the
+  event live in the process. A QR paid while nobody is on the checkout page
+  and no instance is running waits for the next request or boot (the boot pass
+  runs immediately). Closing that gap needs an external trigger or an
+  always-on worker — an open decision, see Open items.
 - **`reconcile()` is primary here, not a fallback.** Contrast ABA, where
   `reconcile()` only ever corroborates an already-received webhook — for
-  Bakong it's the sole source of truth, which is why it's driven by its own
-  dedicated loop instead of `processProviderEvent`.
+  Bakong it's the sole source of truth.
 
 ## Configuration
 
@@ -233,7 +251,15 @@ Key properties this gives us:
 | `BAKONG_QR_EXPIRY_SECONDS` | How long a generated KHQR stays valid — becomes `poll.expiresAt`. Defaults to `300` (5 minutes).                                                                                   |
 | `BAKONG_API_KEY`           | The only network call this provider makes: `reconcile()` → `check_transaction_by_md5`. A bearer token, not a signing key — nothing here is HMAC-signed the way ABA's requests are. |
 | `BAKONG_BASE_URL`          | Defaults to `https://api-bakong.nbc.gov.kh`.                                                                                                                                       |
-| `BAKONG_POLL_INTERVAL_MS`  | Delay between `poll-attempt` jobs. Defaults to `4000`.                                                                                                                             |
+
+Polling cadence is not configured here. It belongs to the payment module's
+`PAYMENT_RECONCILE_*` variables — `PAYMENT_RECONCILER_ENABLED`,
+`PAYMENT_RECONCILE_PROVIDERS` (default `bakong`),
+`PAYMENT_RECONCILE_INTERVAL_MS` (15 s) and
+`PAYMENT_RECONCILE_IDLE_INTERVAL_MS` (60 s) — plus
+`PAYMENT_PENDING_ABANDON_MS` (15 min age backstop) and
+`PAYMENT_LATE_PAYMENT_GRACE_MS` (24 h). `BAKONG_POLL_INTERVAL_MS` no longer
+exists; a value left in `.env` is ignored.
 
 All are optional at the `ConfigModule` level so the app can boot without
 Bakong credentials, but `charge()` throws immediately if `BAKONG_ACCOUNT_ID`
@@ -252,17 +278,43 @@ failure points are independent and it's worth checking both when Bakong
 
 | Piece                                              | Status                                                                                                                                                                                                                                                                                                                             |
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `charge()` (KHQR generation)                       | Done — fully offline via `bakong-khqr`'s `generateMerchant()`/`generateIndividual()` (`BAKONG_MERCHANT_TYPE`-selected). Always dynamic (carries an amount), so always sets `expirationTimestamp`/`poll.expiresAt`.                                                                                                                 |
+| `charge()` (KHQR generation)                       | Done — fully offline via `bakong-khqr`'s `generateMerchant()`/`generateIndividual()` (`BAKONG_MERCHANT_TYPE`-selected). Always dynamic (carries an amount), so always returns a top-level `expiresAt`, which `processPaymentAttempt` stamps on `payment_transactions.expires_at`.                                                  |
 | `reconcile()` (`check_transaction_by_md5`)         | Done, against the production Bakong Open API base URL by default.                                                                                                                                                                                                                                                                  |
-| Poll loop (`pollPaymentAttempt` + friends)         | Done — schedules itself on `pending`, terminates on `succeeded`/`failed`/expiry. See [Lifecycle](#lifecycle-end-to-end).                                                                                                                                                                                                           |
+| Polling (`PaymentReconciler` + `payment.issued`)   | Done — one demand-driven poller, armed on issue, idle between payments. See [Lifecycle](#lifecycle-end-to-end). Unit-tested with a mocked database and provider; not run against a live Bakong or a booted app.                                                                                                                    |
+| On-demand check (`PaymentOnDemandReconciler`)      | Done — `GET /payments/:id` nudges an open attempt, throttled to one Bakong call per attempt per 5 s per instance. Unit-tested the same way.                                                                                                                                                                                        |
+| Legacy poll-chain drain                            | Done — no-op handler and job branch for rows/jobs written before the switch. Safe to delete later (see [Architecture](#where-the-poller-fits--demand-driven-one-poller)).                                                                                                                                                          |
 | `verifyWebhookSignature()` / `parseWebhookEvent()` | Deliberately always-invalid / throwing — no webhook channel exists for this provider (see [Architecture](#architecture)), not an unimplemented stub.                                                                                                                                                                               |
 | `redact()`                                         | Identity function — `check_transaction_by_md5`'s documented fields (`fromAccountId`/`toAccountId` are account _aliases_, not raw numbers) carry nothing that looks like a secret, but this hasn't been checked against a real response (see [Open items](#open-items)).                                                            |
 | `util/api-client.ts` security hardening            | Baseline only: HTTPS-only base URL enforced, AxiosError sanitized before it becomes `ApiClientError.cause` (so a bearer token can never leak through a logged failure). Response schema validation, retry/backoff, host allowlisting, mTLS, and request signing are explicit `TODO(security)`s in that file, not silently skipped. |
-| Unit tests                                         | None yet for this provider — no `*.spec.ts` files exist under this directory (contrast ABA's signing/encoding/status coverage).                                                                                                                                                                                                    |
-| Live verification                                  | None — no live Bakong sandbox credentials, and no real `check_transaction_by_md5` call, have been exercised in this environment. Verification is `tsc`/`nest build`/`pnpm test` (272 passing, no regressions) only.                                                                                                                |
+| Unit tests                                         | The poller's policy, timer and candidate selection (`reconciler/*.spec.ts`), the throttled read, and the legacy drain. None for the provider itself or the processor's `payment.issued` emit — those import `effect`, which is ESM-only under Jest (see the payment README's Open items).                                          |
+| Live verification                                  | None — no live Bakong sandbox credentials, and no real `check_transaction_by_md5` call, have been exercised in this environment.                                                                                                                                                                                                   |
 
 ## Open items
 
+- **A serverless backend only polls while an instance is alive.** The timer,
+  the `payment.issued` event and the BullMQ consumer all live in the process.
+  Two things keep a payment moving: the boot pass (a payment made while the app
+  was down is settled as soon as it is back) and the on-demand check on
+  `GET /payments/:id` (a payer on the page generates requests). A QR paid while
+  nobody is on the page and no instance is running waits for the next request.
+  Options, owner's decision (`Plans.md` Task 2.1): an external pinger hitting a
+  secret-protected endpoint every 1–5 minutes (free; detection can lag by the
+  interval), or a small always-on worker (`APP_ROLE=worker`; seconds; the only
+  setup where Postgres `LISTEN/NOTIFY` would be viable). `LISTEN/NOTIFY` was
+  considered and rejected for now: it needs a long-lived session connection, a
+  notification is lost if nobody is listening (so a table sweep is still
+  required), and Bakong never notifies us, so something must still ask.
+- **Batching MD5s is not built, and the endpoint is unverified.** Third-party
+  SDKs wrap `POST /v1/check_transaction_by_md5_list` (one call for up to 50
+  hashes), but NBC's published Open API guide does not list it and no source
+  gives a request or response schema. A wrong per-MD5 mapping could mark an
+  unpaid attempt as paid, so it should not be written against a guess: get a
+  real response (needs `BAKONG_API_KEY`) or NBC's confirmation first.
+- **A possible daily request limit on the Bakong Open API is unconfirmed.**
+  One third-party source says the registration portal states 100 requests per
+  day. If true it caps how many checkouts can be polled at all and would
+  change the cadence in this README. Confirm on the Bakong developer portal
+  before real traffic.
 - **`check_transaction_by_md5`'s field names are doc-derived, not
   independently verified.** `bakong.types.ts`'s `CheckTransactionByMd5*`
   interfaces come from NBC's publicly published Bakong Open API
@@ -270,13 +322,17 @@ failure points are independent and it's worth checking both when Bakong
   order (see `../aba-payway/README.md`'s Open items). If a live call comes
   back with different field names or a different `responseCode` convention
   than assumed, `bakong.status.ts`'s `toPaymentAttemptOutcome` is the first
-  place to recheck.
-- **No test coverage at all for this provider or the poll loop it drives.**
-  Neither this directory's handlers/provider nor
-  `poll-payment-attempt.use-case.ts` / `enqueue-payment-attempt-poll.use-case.ts`
-  / `PaymentPollOutboxHandler` have unit tests — this mirrors the
-  module-wide gap the main README already flags for `processPaymentAttempt`
-  etc., just extended to the new pieces.
+  place to recheck. Note it settles on `responseCode === 0 && data` alone: it
+  does not compare the paid amount, currency or destination account with the
+  attempt, which is worth adding once a real response is known.
+- **Late-payment grace is still 24 hours.** An abandoned QR is now re-asked
+  about only every 5 minutes, but for the whole `PAYMENT_LATE_PAYMENT_GRACE_MS`.
+  Shortening it to the QR expiry plus a margin would stop that work, but only
+  if Bakong refuses to pay an expired dynamic KHQR — not verified (`Plans.md`
+  Task 1.3).
+- **ABA checkouts also arm the reconciler.** `payment.issued` is emitted for
+  any `pending` charge; for a webhook-only provider the pass finds no polled
+  candidates and goes back to sleep. Harmless, one cheap pass per checkout.
 - **Deeplink generation isn't wired.** `bakong-khqr` can turn a KHQR string
   into an app-openable shortlink (`BakongKHQR.generateDeepLink`), which
   would be the natural value for `ChargeResult.redirectUrl` (the field
@@ -286,17 +342,10 @@ failure points are independent and it's worth checking both when Bakong
   oversight — `generateDeepLink` needs its own NBC-hosted shortlink
   endpoint plus source-app metadata (`SourceInfo`) this codebase has no
   config for yet.
-- **Poll-round outbox volume scales with `1 / BAKONG_POLL_INTERVAL_MS`.** At
-  the default 4s interval and 5-minute KHQR expiry, one attempt produces up
-  to ~75 `payment.attempt.poll_requested` rows before settling or expiring.
-  Each is cheap and short-lived (deleted `OUTBOX_RETENTION_DAYS` after
-  publishing by the hourly `OutboxRetention` sweep,
-  `src/outbox/outbox-retention.service.ts`), but a much
-  shorter interval or much higher payment volume would be worth revisiting
-  against real load before assuming it's free.
 - **No admin/operator visibility into "how many attempts are currently
-  polling" beyond querying `outbox_events`/`payment_attempts` directly** —
-  there's no dashboard or metric surfacing poll-loop health specifically.
+  polling" beyond querying `payment_attempts` directly** — there's no dashboard
+  or metric surfacing poller health specifically. A pass only logs when it
+  settled, activated, abandoned or errored something.
 - **`api-client.ts`'s `TODO(security)` list applies here in full** — see
   that file directly. The most load-bearing gap for this specific provider
   is the missing response schema validation: `reconcile()` currently trusts

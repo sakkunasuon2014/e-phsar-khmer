@@ -20,16 +20,20 @@ The change — `router.replace(...)` → `router.push(...)`, keeping each call's
 existing `{ scroll: false }` (chips must not jump the viewport; scroll-to-top is
 deliberate for the grid picks only, which change which grids exist):
 
-- `components/filter/LocationSelectorFilter.tsx:110`
-- `components/filter/SortFilter.tsx:87` (the helper is already named `pushSort`)
-- `components/filter/PriceFilter.tsx:96`
-- `components/filter/MoreFilters.tsx:202` (apply) and `:211` (clear all)
+- `components/filter/LocationSelectorFilter.tsx:117`
+- `components/filter/SortFilter.tsx:59`
+- `components/filter/PriceFilter.tsx:72`
+- `components/filter/MoreFilters.tsx:211` (apply) and `:234` (clear all)
+
+(Line numbers re-checked 2026-10-24; all five calls are still `router.replace`.)
 
 Verify (headless CDP recipe in CLAUDE.md → "Web (Next.js)"): from a subcategory,
 pick a Location / Sort / Price value, then `history.back()` must land on the
 previous filter state — never past the subcategory page.
 
-## 2. Grid clicks outside brand/bodyType don't filter the feed
+## 2. ~~Grid clicks outside brand/bodyType don't filter the feed~~ — done
+
+**Done 2026-09-24 (`e70df0c`):** `GET /listings` gained `attrKey` + `attrValue`, and the subcategory page resolves the key from the set type via `SET_FIELD_KEYS`. Recorded in `CHANGELOG.md`. The original note is kept below for context.
 
 Clicking a Network, Job Type, Type, Accessory, … tile highlights it and updates
 `ad_type`, but `GET /listings` accepts only `brand` / `bodyType` attribute

@@ -7,10 +7,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "PingFang SC", "Microsoft YaHei", "Hanuman", sans-serif; */
+  /* Global stack: the system UI stack plus emoji faces, with Koh Santepheap
+     appended as the Khmer fallback for systems without Khmer coverage. The
+     face is loaded through next/font, so it is bound by its CSS variable — a
+     literal "Koh Santepheap" would never match next/font's hashed family. */
   --font-sans:
-    "Times New Roman", Times, "Liberation Serif", var(--font-kantumruy-pro),
-    serif;
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji", var(--font-koh-santepheap);
   --font-Arial: var(--font-Arial);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -50,7 +53,145 @@
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 }
-/* Remove yarl nav button backgrounds to match khmer24 */
+/* ── Typography scale ─────────────────────────────────────────────────────
+   One class per role, from the captain's 14-role scale. They live in
+   @layer components on purpose:
+   - a one-off utility (font-semibold, text-xs, leading-6) must be able to
+     override a role, and utilities beat components in Tailwind's layer order;
+   - the `type-` prefix (not `text-`) keeps tailwind-merge from treating the
+     class as a text COLOR: `cn("text-meta", "text-red-500")` would silently
+     drop the role, while `type-*` passes through untouched.
+   Never add a text-size, font-weight or line-height utility alongside a role
+   class: the utility wins and the role is silently overridden.
+   Never stack two different role classes on one element either — they are
+   same-layer rules, so stylesheet order (not class order) decides which wins.
+   Use the role the element actually is, and let primitives keep their own. */
+
+@theme {
+  /* Only these two steps diverge from the scale's 1.5 rhythm; Tailwind's
+     other defaults already match (base 16/24, lg 18/28, xl 20/28, 2xl 24/32). */
+  --text-xs--line-height: 18px;
+  --text-sm--line-height: 21px;
+}
+
+@layer components {
+  /* Page title — h1: 20/600/28 (captain 2026-10-26: 24/32 reads too big
+     everywhere but the homepage; bold kept from the 2026-10-23 override) */
+  .type-page-title {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+  }
+  /* Section title — h2: 16/600/24 */
+  .type-section-title {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+  /* Homepage display scale — the landing page alone keeps the larger
+     headings (captain 2026-10-26): h1 24/32, h2 20/28. A context class on the
+     page wrapper, so no element stacks two role classes. */
+  .home-type .type-page-title {
+    font-size: 24px;
+    line-height: 32px;
+  }
+  .home-type .type-section-title {
+    font-size: 20px;
+    line-height: 28px;
+  }
+  /* Product spec page — a hero surface, so it keeps larger headings than the
+     app scale (captain 2026-10-30). Section headings become uppercase labels
+     so the 22px h2 and the 14px h3 read as a hierarchy, not competitors. */
+  .product-type .type-page-title {
+    font-size: 32px;
+    line-height: 40px;
+  }
+  .product-type .type-section-title {
+    font-size: 22px;
+    line-height: 30px;
+  }
+  .product-type .type-card-heading {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  @media (max-width: 640px) {
+    .product-type .type-page-title {
+      font-size: 28px;
+      line-height: 36px;
+    }
+  }
+  /* Modal / card heading — h3: 18/500/28 */
+  .type-card-heading {
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 500;
+  }
+  /* Body default, ad title — p: 16/400/24 */
+  .type-body {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+  }
+  /* Category label, location link, struck-through old price: 15/400/22.5 */
+  .type-body-sm {
+    font-size: 15px;
+    line-height: 22.5px;
+    font-weight: 400;
+  }
+  /* Ad meta (time, location, condition, beds/baths): 13/400/19.5 */
+  .type-meta {
+    font-size: 13px;
+    line-height: 19.5px;
+    font-weight: 400;
+  }
+  /* Price — strong: 18/700/28 */
+  .type-price {
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 700;
+  }
+  /* Photo-count badge — strong: 12/700/18 */
+  .type-photo-badge {
+    font-size: 12px;
+    line-height: 18px;
+    font-weight: 700;
+  }
+  /* Discount amount / "Off": 11/400/16.5 */
+  .type-discount {
+    font-size: 11px;
+    line-height: 16.5px;
+    font-weight: 400;
+  }
+  /* Nav links, main buttons — a/button: 14/500/21 */
+  .type-nav {
+    font-size: 14px;
+    line-height: 21px;
+    font-weight: 500;
+  }
+  /* Small buttons (OK, Clear) — button: 12/500/18 */
+  .type-button-sm {
+    font-size: 12px;
+    line-height: 18px;
+    font-weight: 500;
+  }
+  /* Footer headings — p: 16/600/24 */
+  .type-footer-heading {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+  /* Footer links — a: 14/400/20 */
+  .type-footer-link {
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+}
+
+/* Remove yarl nav button backgrounds to match PhsarKhmer */
 .yarl__navigation_prev,
 .yarl__navigation_next {
   background: transparent !important;
@@ -141,6 +282,27 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 400;
+  }
+  /* Preflight resets headings to `font: inherit`, so a bare heading currently
+     reads like body text. Give the scale's top three roles sensible element
+     defaults; components that set their own role/size override these. */
+  h1 {
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 18px;
+    line-height: 28px;
+    font-weight: 500;
   }
 }
 

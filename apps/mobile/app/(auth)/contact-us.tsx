@@ -1,4 +1,5 @@
 import { Colors } from "@/constants/Colors";
+import { CONTACT_EMAIL } from "@/constants/site";
 import SafeAreaView from "@/components/common/SafeAreaView";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -19,7 +20,7 @@ const ContactUsScreen = () => {
   };
 
   const handleEmail = () => {
-    Linking.openURL("mailto:info@psanpic.com");
+    Linking.openURL(`mailto:${CONTACT_EMAIL}`);
   };
 
   const schedule = [
@@ -61,7 +62,7 @@ const ContactUsScreen = () => {
         {/* Email */}
         <View className="flex-row items-center px-4 py-6 border-b border-neutral-border">
           <Ionicons name="mail-outline" size={24} color={Colors.text.sub} />
-          <Text className="ml-4 text-primary text-base">info@psanpic.com</Text>
+          <Text className="ml-4 text-primary text-base">{CONTACT_EMAIL}</Text>
         </View>
 
         {/* Operating Hours */}

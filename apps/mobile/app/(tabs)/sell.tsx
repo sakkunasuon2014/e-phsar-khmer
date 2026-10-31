@@ -95,7 +95,7 @@ const SellScreen = () => {
   const [provinceModalVisible, setProvinceModalVisible] = useState(false);
 
   const [phones, setPhones] = useState<string[]>(["012 345 678"]);
-  const [telegram, setTelegram] = useState("@seller_khmer24");
+  const [telegram, setTelegram] = useState("@seller_phsarkhmer");
   const [description, setDescription] = useState("");
 
   // Handlers
@@ -142,7 +142,7 @@ const SellScreen = () => {
 
     Alert.alert(
       "Success!",
-      "Your ad has been published successfully on Khmer24 Market!",
+      "Your ad has been published successfully on PhsarKhmer!",
       [
         {
           text: "View Listing",
@@ -156,7 +156,7 @@ const SellScreen = () => {
     <SafeAreaView className="bg-neutral-surface flex-1">
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Top Khmer24 Header */}
+      {/* Top PhsarKhmer Header */}
       <View className="flex-row items-center justify-between border-b border-neutral-border bg-white px-4 py-3 shadow-sm">
         <TouchableOpacity
           onPress={() => {

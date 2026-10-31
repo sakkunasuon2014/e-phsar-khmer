@@ -15,13 +15,14 @@ import {
   gte,
   ilike,
   inArray,
+  isNull,
   lt,
   ne,
   or,
   sql,
 } from 'drizzle-orm';
 import { DRIZZLE } from '../db/drizzle.provider';
-import type { DbClient } from '../db/drizzle.provider';
+import type { DbClient, DbExecutor } from '../db/drizzle.provider';
 import { users, userPhones } from '../db/schema/users.schema';
 import type { UserRow } from '../db/schema/users.schema';
 import { listings } from '../db/schema/listings.schema';
@@ -34,6 +35,11 @@ import type { ListUsersDto } from './dto/list-users.dto';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
 import type { StatsRange } from './dto/timeseries-query.dto';
+import {
+  assertCanManageUser,
+  revokesSuperAdmin,
+  type ManageChange,
+} from './admin-user-policy';
 
 const SALT_ROUNDS = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -267,6 +273,7 @@ export class AdminService {
         .where(
           and(
             inArray(userSubscriptions.userId, pageUserIds),
+            isNull(userSubscriptions.supersededAt),
             gt(userSubscriptions.expiresAt, new Date()),
           ),
         );
@@ -353,15 +360,8 @@ export class AdminService {
     dto: UpdateUserDto,
     requester: RequestUser,
   ): Promise<PublicUser> {
-    // Only super_admin can assign admin or super_admin roles.
-    if (
-      dto.role !== undefined &&
-      dto.role !== 'user' &&
-      requester.role !== 'super_admin'
-    ) {
-      throw new ForbiddenException('ONLY_SUPER_ADMIN_CAN_ASSIGN_ADMIN_ROLES');
-    }
-
+    // Who may change what is decided in the transaction below, against the
+    // locked target row (authorizeManage).
     const patch: Partial<UserRow> = {};
     if (dto.username !== undefined) patch.username = dto.username;
     if (dto.role !== undefined) patch.role = dto.role;
@@ -375,13 +375,10 @@ export class AdminService {
 
     try {
       return await this.db.transaction(async (tx) => {
-        const existing = await tx
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.id, id))
-          .limit(1);
-        if (existing.length === 0)
-          throw new NotFoundException('User not found');
+        await this.authorizeManage(tx, requester, id, {
+          role: dto.role,
+          status: dto.status,
+        });
 
         if (Object.keys(patch).length > 0) {
           await tx.update(users).set(patch).where(eq(users.id, id));
@@ -415,14 +412,12 @@ export class AdminService {
     }
   }
 
-  async deleteUser(id: string): Promise<{ id: string }> {
+  async deleteUser(
+    id: string,
+    requester: RequestUser,
+  ): Promise<{ id: string }> {
     return this.db.transaction(async (tx) => {
-      const [user] = await tx
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.id, id))
-        .limit(1);
-      if (!user) throw new NotFoundException('User not found');
+      await this.authorizeManage(tx, requester, id, { delete: true });
 
       // Free globally-unique phone rows so identifiers can be reused. Nulling
       // `primaryPhone` here is also what marks this as an ADMIN deletion:
@@ -437,6 +432,47 @@ export class AdminService {
 
       return { id };
     });
+  }
+
+  /**
+   * Locks the target row and applies `assertCanManageUser`. When the change
+   * would strip a super_admin, every active super_admin row is locked and
+   * counted in the same transaction, so two of them demoting each other
+   * concurrently serialize and the second sees only one left.
+   *
+   * Public so other admin actions that change an account (approving a user
+   * report suspends its target) go through the same rules.
+   */
+  async authorizeManage(
+    tx: DbExecutor,
+    requester: RequestUser,
+    id: string,
+    change: ManageChange,
+  ): Promise<void> {
+    const [target] = await tx
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1)
+      .for('update');
+    if (!target) throw new NotFoundException('User not found');
+
+    let activeSuperAdmins: number | undefined;
+    if (revokesSuperAdmin(target, change)) {
+      const rows = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            eq(users.role, 'super_admin'),
+            eq(users.status, 'active'),
+            isNull(users.deletedAt),
+          ),
+        )
+        .for('update');
+      activeSuperAdmins = rows.length;
+    }
+    assertCanManageUser(requester, target, change, activeSuperAdmins);
   }
 
   private isUniqueViolation(err: unknown): boolean {

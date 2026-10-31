@@ -1,18 +1,28 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { IsArray, IsIn, IsString } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { RequestUser } from '../common/types/api-response.types';
-import { FilesService } from './files.service';
+import { FilesService, STAFF_SCOPES } from './files.service';
+
+const isStaff = (user: RequestUser) =>
+  user.role === 'admin' || user.role === 'super_admin';
 
 class SignUploadDto {
   @IsString()
+  @MaxLength(200)
   filename: string;
 
   @IsIn([
@@ -20,30 +30,35 @@ class SignUploadDto {
     'cover',
     'listing',
     'chat',
-    'resume',
     'report',
+    'resume',
     'category',
     'subcategory',
     'brand',
     'model',
+    'product',
     'attribute',
+    'advertisement',
   ])
   scope:
     | 'avatar'
     | 'cover'
     | 'listing'
     | 'chat'
-    | 'resume'
     | 'report'
+    | 'resume'
     | 'category'
     | 'subcategory'
     | 'brand'
     | 'model'
-    | 'attribute';
+    | 'product'
+    | 'attribute'
+    | 'advertisement';
 }
 
 class DeleteFilesDto {
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
   paths: string[];
 }
@@ -60,17 +75,16 @@ export class FilesController {
     @CurrentUser() user: RequestUser,
     @Body() dto: SignUploadDto,
   ) {
-    // Chat uploads are namespaced per user so ChatService can verify
-    // ownership of an imagePath by its `chat/{userId}/` prefix. Resume photos
-    // are namespaced the same way: this scope is the CV builder's photo only
-    // (a public-bucket image the CV displays) — the CV *file* never travels
-    // through /files, it goes to the private resume-files bucket.
-    // Report evidence is namespaced too: ReportSubmissionService and the
-    // delete guard both rely on `report/{userId}/` to prove ownership.
-    const folder =
-      dto.scope === 'chat' || dto.scope === 'resume' || dto.scope === 'report'
-        ? `${dto.scope}/${user.id}`
-        : dto.scope;
+    const isStaffScope = (STAFF_SCOPES as readonly string[]).includes(
+      dto.scope,
+    );
+    if (isStaffScope && !isStaff(user)) {
+      throw new ForbiddenException('Only admins can upload catalog images');
+    }
+    // User scopes are namespaced per user so ownership can be proven by
+    // prefix later — ChatService checks `chat/{userId}/` on imagePath, and
+    // listings/DELETE /files check `{scope}/{userId}/` the same way.
+    const folder = isStaffScope ? dto.scope : `${dto.scope}/${user.id}`;
     return this.filesService.createSignedUploadUrl(
       this.filesService.getDefaultBucket(),
       folder,
@@ -81,19 +95,16 @@ export class FilesController {
   @Delete()
   @ApiOperation({ summary: 'Delete files by storage paths' })
   deleteFiles(@CurrentUser() user: RequestUser, @Body() dto: DeleteFilesDto) {
-    // `chat/` is the only per-user namespace in this bucket, and the storage
-    // path of a chat image is handed to the OTHER participant on every message
-    // read (MessageRow.imagePath). Without this check the recipient of a photo
-    // could delete it out from under the sender — and so could anyone who ever
-    // saw the path. Other scopes share a flat namespace and are cleaned up by
-    // the admin dashboard, so they stay as-is; see the audit note.
-    for (const path of dto.paths) {
-      if (
-        typeof path === 'string' &&
-        path.startsWith('chat/') &&
-        !path.startsWith(`chat/${user.id}/`)
-      )
-        throw new BadRequestException('Cannot delete another user’s files');
+    // Staff clean up catalog images (and anything else) from the dashboard.
+    // Everyone else may only delete objects in their own folders: a listing
+    // photo's or chat image's path is visible to other users, so without this
+    // anyone who saw a path could delete the object behind it.
+    if (!isStaff(user)) {
+      for (const path of dto.paths) {
+        if (!this.filesService.isOwnedPath(path, user.id)) {
+          throw new ForbiddenException('Cannot delete files you do not own');
+        }
+      }
     }
     return this.filesService
       .remove(this.filesService.getDefaultBucket(), dto.paths)

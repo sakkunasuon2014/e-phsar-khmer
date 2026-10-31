@@ -12,9 +12,9 @@ import { ALL_ADS_PAGE_SIZE } from "@/lib/all-ads";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { loadJobApplyState } from "@/lib/api/job-apply";
+import { getAdvertisements } from "@/lib/api/advertisements";
 import { redirect } from "@/i18n/routing";
 import { notFound } from "next/navigation";
-import { posts } from "@/lib/posts";
 import {
   displayName,
   getFollowStatus,
@@ -39,7 +39,7 @@ export async function generateMetadata({
 
   if (slug?.includes("-adid-")) {
     const actualId = extractId(slug);
-    // Real listings are looked up by UUID; anything else falls back to the mock feed.
+    // Real listings are looked up by UUID; any other id is a dead link.
     if (UUID_RE.test(actualId)) {
       const listing = await getListingById(actualId, "en");
       if (listing) {
@@ -48,13 +48,6 @@ export async function generateMetadata({
           description: listing.description ?? "Post Detail",
         };
       }
-    }
-    const post = posts.find((p) => p.postId.toString() === actualId);
-    if (post) {
-      return {
-        title: `${post.title} - adid-${post.postId}`,
-        description: post.description || "Post Detail",
-      };
     }
     return { title: "404 Not found" };
   }
@@ -65,7 +58,7 @@ export async function generateMetadata({
     const name = displayName(profile);
     const t = await getTranslations("Profile");
     return {
-      title: `${name} - PsaKhmer`,
+      title: name,
       description: t("metaDescription", { name }),
     };
   }
@@ -91,34 +84,38 @@ export default async function SlugPage({
   const rawSubcategory =
     typeof sp.subcategory === "string" ? sp.subcategory : undefined;
 
-  // Handle Post Detail — title-adid-XXX slugs resolve to mock posts; real
-  // listing UUIDs render through the real detail template.
+  // Handle Post Detail — a real listing UUID renders the detail template; any
+  // other id is a dead link.
   if (slug?.includes("-adid-")) {
     const actualId = extractId(slug);
-    const viewer = await getCurrentUser();
+    const [viewer, banners] = await Promise.all([
+      getCurrentUser(),
+      getAdvertisements("listing_detail"),
+    ]);
     if (UUID_RE.test(actualId)) {
       const real = await buildRealDetailData(actualId, await getLocale());
-      if (real) {
-        return (
-          <PostDetail
-            id={actualId}
-            real={real}
-            viewerId={viewer?.id}
-            sellerFollowing={
-              viewer ? await getFollowStatus(real.listing.userId) : false
-            }
-            jobApply={await loadJobApplyState({
-              listingId: real.listing.id,
-              categorySlug: real.cate?.slug,
-              listingStatus: real.listing.status,
-              posterId: real.listing.userId,
-              viewerId: viewer?.id,
-            })}
-          />
-        );
-      }
+      // A real listing that is gone (draft, withdrawn, moderated, unknown id)
+      // must 404 rather than render a fabricated ad at a dead link.
+      if (!real) notFound();
+      return (
+        <PostDetail
+          real={real}
+          banners={banners}
+          viewerId={viewer?.id}
+          sellerFollowing={
+            viewer ? await getFollowStatus(real.listing.userId) : false
+          }
+          jobApply={await loadJobApplyState({
+            listingId: real.listing.id,
+            categorySlug: real.cate?.slug,
+            listingStatus: real.listing.status,
+            posterId: real.listing.userId,
+            viewerId: viewer?.id,
+          })}
+        />
+      );
     }
-    return <PostDetail id={actualId} viewerId={viewer?.id} />;
+    notFound();
   }
 
   // Handle Public Profile — a real account, looked up by handle.

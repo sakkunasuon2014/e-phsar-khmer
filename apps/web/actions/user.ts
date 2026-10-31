@@ -8,6 +8,7 @@ import z from "zod";
 
 /** Profile fields the dashboard chrome (header avatar chip) needs. */
 export type CurrentUser = {
+  id: string;
   username: string;
   role: string;
   email: string;
@@ -15,6 +16,8 @@ export type CurrentUser = {
   firstName: string | null;
   lastName: string | null;
   profilePhotoUrl: string | null;
+  /** The account's primary number — the checkout contact block shows it. */
+  primaryPhone: string | null;
 };
 
 /**
@@ -26,6 +29,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   try {
     const res = await serverFetch<BackendUser>("/users/me");
     return {
+      id: res.data.id,
       username: res.data.username ?? "",
       role: res.data.role,
       email: res.data.email ?? "",
@@ -33,6 +37,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       firstName: res.data.firstName,
       lastName: res.data.lastName,
       profilePhotoUrl: res.data.profilePhotoUrl,
+      primaryPhone: res.data.primaryPhone ?? null,
     };
   } catch {
     /* no valid session — chip stays hidden */
@@ -49,6 +54,7 @@ export async function getUserProfile(): Promise<CurrentUser | null> {
   try {
     const res = await userServerFetch<BackendUser>("/users/me");
     return {
+      id: res.data.id,
       username: res.data.username ?? "",
       role: res.data.role,
       email: res.data.email ?? "",
@@ -56,6 +62,7 @@ export async function getUserProfile(): Promise<CurrentUser | null> {
       firstName: res.data.firstName,
       lastName: res.data.lastName,
       profilePhotoUrl: res.data.profilePhotoUrl,
+      primaryPhone: res.data.primaryPhone ?? null,
     };
   } catch {
     return null;

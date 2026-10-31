@@ -10,6 +10,13 @@ import { ResponseInterceptor } from './common/interceptors/response.interceptor'
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Without this, SIGTERM (every Vercel scale-down and redeploy) killed the
+  // process with no lifecycle hooks: BullMQ workers never closed (an active
+  // payment job was left to the 30 s stalled check), ChatPubSubService never
+  // QUIT its Redis connections, and OutboxWorker's own shutdown grace in
+  // onModuleDestroy never ran.
+  app.enableShutdownHooks();
+
   // Express's default JSON limit is 100 KB, which silently 413'd every E2E
   // history-backup segment above it (AddBackupSegmentDto allows ~900 KB of
   // ciphertext). 1 MB also matches the Next.js server-action body default —
@@ -48,8 +55,8 @@ async function bootstrap() {
   app.useWebSocketAdapter(new WsAdapter(app));
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle('psa-npic API')
-    .setDescription('E-Market API — Khmer24-style marketplace')
+    .setTitle('PhsarKhmer.com API')
+    .setDescription('E-Market API — PhsarKhmer.com marketplace')
     .setVersion('1.0')
     .addBearerAuth()
     .build();

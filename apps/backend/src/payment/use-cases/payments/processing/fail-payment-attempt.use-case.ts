@@ -29,8 +29,8 @@ type FailPaymentAttemptError =
  * Marks a `payment_attempt` and its `payment_transaction` `failed` together,
  * with a status-history entry. The one shared shape behind every "give up
  * on this attempt outright" branch in the processing use-cases —
- * unregistered provider (`processPaymentAttempt`, `pollPaymentAttempt`),
- * poll expiry (`pollPaymentAttempt`), and an abandoned BullMQ job
+ * unregistered provider (`processPaymentAttempt`), checkout expiry
+ * (`reconcilePaymentAttempt`), and an abandoned BullMQ job
  * (`PaymentProcessor`'s `failed` listener) all call this instead of
  * hand-rolling the same three writes. Callers wrap this in
  * `runInTransaction` — it only needs the ambient `DbClientTag`, same as

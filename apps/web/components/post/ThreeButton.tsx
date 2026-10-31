@@ -8,8 +8,9 @@ import {
 } from "@tabler/icons-react";
 import { useState } from "react";
 import ShareModal from "../share/ShareModel";
-import { Post } from "@/lib/posts";
+import type { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
+import { SITE_URL } from "@/lib/site";
 import { ReportPost } from "../report/ReportPost";
 import { useReactions } from "@/components/reactions/reactions-provider";
 import { useTranslations } from "next-intl";
@@ -38,7 +39,7 @@ export function ThreeButton({
             reactions.toggleSave(listingId);
           }}
           disabled={reactions.isPending(listingId)}
-          className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm text-base flex justify-center items-center text-foreground transition-colors cursor-pointer"
+          className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm type-nav flex justify-center items-center text-foreground transition-colors cursor-pointer"
         >
           <IconBookmark
             className={`scale-150 mr-2 ${
@@ -51,7 +52,7 @@ export function ThreeButton({
         {!isOwnListing && (
           <Button
             onClick={() => setReportOpen(true)}
-            className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm text-base flex justify-center items-center text-foreground transition-colors cursor-pointer text-destructive focus:text-destructive"
+            className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm type-nav flex justify-center items-center text-foreground transition-colors cursor-pointer text-destructive focus:text-destructive"
           >
             <IconAlertTriangle
               className="scale-150 mr-2 text-destructive focus:text-destructive"
@@ -62,7 +63,7 @@ export function ThreeButton({
         )}
         <Button
           onClick={() => setShareOpen(true)}
-          className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm text-base flex justify-center items-center text-foreground transition-colors cursor-pointer"
+          className="flex-1 bg-muted-foreground/10 hover:bg-muted-foreground/20 h-11 rounded-sm type-nav flex justify-center items-center text-foreground transition-colors cursor-pointer"
         >
           <IconShare3 className="scale-150 mr-2 text-foreground" stroke={1.5} />{" "}
           {t("share")}
@@ -72,7 +73,7 @@ export function ThreeButton({
       <ShareModal
         open={shareOpen}
         onOpenChange={setShareOpen}
-        url={`https://psakhmer.com/${toSlug(post.title)}-adid-${post.postId}`}
+        url={`${SITE_URL}/${toSlug(post.title)}-adid-${post.postId}`}
       />
     </>
   );

@@ -30,3 +30,26 @@ export async function getAdminUsers(
   );
   return { users: data.map(toUiUser), total: meta?.total ?? data.length };
 }
+
+/** The staff tiers the Team page lists; customers belong to the Users page. */
+const TEAM_ROLES = ["admin", "super_admin"] as const;
+
+/**
+ * Team page feed: every staff account, both tiers. The admin endpoint filters
+ * by a single role, so fetch each tier and merge — newest first, the same
+ * order `listUsers` returns within one role.
+ */
+export async function getTeamUsers(
+  params?: Omit<GetAdminUsersParams, "role">,
+): Promise<AdminUsersResult> {
+  const results = await Promise.all(
+    TEAM_ROLES.map((role) => getAdminUsers({ ...params, role })),
+  );
+  const users = results
+    .flatMap((result) => result.users)
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  return { users, total: users.length };
+}

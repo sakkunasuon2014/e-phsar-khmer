@@ -148,6 +148,58 @@ describe('OutboxService.claimDue', () => {
   });
 });
 
+describe('OutboxService.msUntilNextDue', () => {
+  function serviceReturning(rows: unknown[]) {
+    const where = jest.fn().mockResolvedValue(rows);
+    const from = jest.fn().mockReturnValue({ where });
+    const select = jest.fn().mockReturnValue({ from });
+    const service = new OutboxService(
+      { select } as never,
+      makeConfigService() as never,
+      { emit: jest.fn() } as never,
+    );
+    return { service, select };
+  }
+
+  it('costs a single query', async () => {
+    const { service, select } = serviceReturning([{ ms: '1500' }]);
+
+    await service.msUntilNextDue();
+
+    expect(select).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the number postgres.js returns for numeric as a string', async () => {
+    const { service } = serviceReturning([{ ms: '1500' }]);
+
+    await expect(service.msUntilNextDue()).resolves.toBe(1500);
+  });
+
+  it('is null when nothing is pending or leased', async () => {
+    const { service } = serviceReturning([{ ms: null }]);
+
+    await expect(service.msUntilNextDue()).resolves.toBeNull();
+  });
+
+  it('is null when the query returns no row at all', async () => {
+    const { service } = serviceReturning([]);
+
+    await expect(service.msUntilNextDue()).resolves.toBeNull();
+  });
+
+  it('clamps an already-due row to zero', async () => {
+    const { service } = serviceReturning([{ ms: '-4200' }]);
+
+    await expect(service.msUntilNextDue()).resolves.toBe(0);
+  });
+
+  it('treats an unparseable value as unknown rather than due', async () => {
+    const { service } = serviceReturning([{ ms: 'soon' }]);
+
+    await expect(service.msUntilNextDue()).resolves.toBeNull();
+  });
+});
+
 describe('OutboxService.instanceId', () => {
   it('is unique per instance so a lease can be attributed', () => {
     expect(makeService().instanceId).not.toBe(makeService().instanceId);

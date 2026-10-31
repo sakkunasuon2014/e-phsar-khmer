@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTabAttending } from "@/hooks/use-tab-attention";
 
 /**
  * These are the fallback tiers for when the WebSocket (`use-chat-ws.ts`) is
@@ -46,11 +47,17 @@ export interface AdaptivePolling {
  * mount/reconnect anyway, so there is no state to catch up on beyond the next
  * foreground poll. When visible, the interval degrades 3s → 10s → 30s as the
  * thread goes quiet, and any user activity snaps it back to 3s.
+ *
+ * An abandoned-but-visible tab counts as hidden too: `useTabAttending` goes
+ * false once the attention tracker calls the tab idle, which is also when the
+ * realtime socket closes (see `use-chat-ws.ts`). Without that, closing the
+ * socket would *re-enable* this poll.
  */
 export function useAdaptivePolling(enabled: boolean): AdaptivePolling {
   const [isVisible, setIsVisible] = useState(
     () => typeof document === "undefined" || !document.hidden,
   );
+  const attending = useTabAttending();
   const [intervalMs, setIntervalMs] = useState<number>(CHAT_POLL.activeMs);
   // Seeded on mount, not at render time: `Date.now()` is impure, and calling
   // it during render is unsafe under concurrent rendering (a render may be
@@ -97,7 +104,7 @@ export function useAdaptivePolling(enabled: boolean): AdaptivePolling {
   }, [enabled]);
 
   return {
-    refetchInterval: enabled && isVisible ? intervalMs : false,
+    refetchInterval: enabled && attending ? intervalMs : false,
     isVisible,
     markActivity,
   };

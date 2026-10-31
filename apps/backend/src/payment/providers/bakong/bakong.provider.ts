@@ -20,14 +20,16 @@ import type { BakongAccountConfig } from './bakong.types';
  * entirely offline, and polling `check_transaction_by_md5` is the only way
  * to learn if it was paid. `createBakongTransaction`/`checkBakongTransaction`
  * (`./handlers/`) are the real actions, as `Effect.fn`s; this class is the
- * thin Promise boundary `PaymentGatewayProvider` requires. `charge()` sets
- * `ChargeResult.poll` on `pending`, which schedules the first `reconcile()`
- * poll instead of waiting for a callback that never arrives — see this
+ * thin Promise boundary `PaymentGatewayProvider` requires. `charge()` returns
+ * `pending` with the KHQR's expiry; `PaymentReconciler` (armed by
+ * `payment.issued`) then calls `reconcile()` until it is paid or expires,
+ * instead of waiting for a callback that never arrives — see this
  * directory's `README.md` for the full loop.
  */
 @Injectable()
 export class BakongProvider implements PaymentGatewayProvider {
   readonly name = 'bakong';
+  readonly displayName = 'Bakong KHQR';
 
   private readonly apiClient: ApiClient;
 
@@ -75,18 +77,18 @@ export class BakongProvider implements PaymentGatewayProvider {
 
     // A generated KHQR only means the payer *can* pay — nothing has moved
     // yet, and nothing will ever tell us it did unless something polls.
-    // `poll` is what wires that up (see this class's own doc comment).
+    // `PaymentReconciler` is the poller; it stops at the checkout's own
+    // expiry, so `expiresAt` must land on `payment_transactions.expires_at`
+    // (top level, as ABA's does) — without it an unpaid KHQR would only be
+    // abandoned by the 15-minute age backstop.
     return {
       status: 'pending',
       providerAttemptId: result.md5,
       providerTransactionId: result.md5,
+      expiresAt: result.expiresAt,
       rawResponse: {
         qr: result.qr,
         md5: result.md5,
-        expiresAt: result.expiresAt,
-      },
-      poll: {
-        intervalMs: this.pollIntervalMs(),
         expiresAt: result.expiresAt,
       },
     };
@@ -204,10 +206,6 @@ export class BakongProvider implements PaymentGatewayProvider {
 
   private qrExpirySeconds(): number {
     return this.configService.get<number>('bakong.qrExpirySeconds') ?? 300;
-  }
-
-  private pollIntervalMs(): number {
-    return this.configService.get<number>('bakong.pollIntervalMs') ?? 4000;
   }
 
   private apiKey(): string {

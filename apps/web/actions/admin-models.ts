@@ -15,27 +15,25 @@ interface BackendModel {
   updatedAt: string;
 }
 
-interface BackendBrand {
+interface BackendSubcategory {
   id: string;
-  subcategoryIds: string[];
-  categoryId: string | null;
+  categoryId: string;
 }
 
 export async function getAdminModels(): Promise<Model[]> {
-  const [{ data: models }, { data: brands }] = await Promise.all([
+  const [{ data: models }, { data: subcategories }] = await Promise.all([
     serverFetch<BackendModel[]>("/admin/models"),
-    serverFetch<BackendBrand[]>("/admin/brands"),
+    serverFetch<BackendSubcategory[]>("/admin/subcategories"),
   ]);
 
-  // The model's own links drive the Sub Category column. Until 2026-09-22 this
-  // fell back to the BRAND's links, which is why every Apple row (iPhone
-  // included) showed all eight of Apple's subcategories — the display was
-  // reporting a relationship the schema could not express.
-  const subToCategory = new Map<string, string>();
-  for (const b of brands) {
-    if (!b.categoryId) continue;
-    for (const sub of b.subcategoryIds) subToCategory.set(sub, b.categoryId);
-  }
+  // A model's category comes from its subcategory rows, never from the brand:
+  // a brand's `categoryId` is only the FIRST category among its links, so any
+  // brand spanning two main categories (Apple, Sony…) used to relabel every
+  // shared subcategory — phones rendered under "Computers & Accessories".
+  // The subcategory's own categoryId is the only unambiguous source.
+  const subToCategory = new Map(
+    subcategories.map((sub) => [sub.id, sub.categoryId]),
+  );
 
   return models.map((m) => {
     const subs = m.subcategoryIds ?? [];
@@ -44,12 +42,8 @@ export async function getAdminModels(): Promise<Model[]> {
       name: m.name,
       slug: m.slug,
       brandId: m.brandId,
-      // A model's subcategories all sit in one category by construction; fall
-      // back to the brand's when it has none.
-      categoryId:
-        subToCategory.get(subs[0] ?? "") ??
-        brands.find((b) => b.id === m.brandId)?.categoryId ??
-        "",
+      // A model's subcategories all sit in one category by construction.
+      categoryId: subs.map((id) => subToCategory.get(id)).find(Boolean) ?? "",
       subcategories: subs,
       createdAt: m.createdAt.slice(0, 10),
       updatedAt: m.updatedAt.slice(0, 10),

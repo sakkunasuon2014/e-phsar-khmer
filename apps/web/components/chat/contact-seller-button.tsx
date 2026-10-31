@@ -12,7 +12,7 @@ import { trackEvent } from "@/lib/insights/queue";
 import type { ListingContext } from "@/types/chat";
 
 /**
- * "Message seller" entry point for a listing page.
+ * "Chat" entry point for a listing page.
  *
  * Creates (or resolves) the thread via `POST /chats/with/:userId` FIRST — so
  * the conversation exists and shows up in both inboxes as soon as the buyer
@@ -41,7 +41,7 @@ export function ContactSellerButton({
   /** Pass the signed-in user's id when the host page has it, to hide the
    *  button on your own ad without an extra request. */
   viewerId?: string | null;
-  /** Overrides the default "Message seller" — a job application's poster is
+  /** Overrides the default "Chat" — a job application's poster is
    *  not a seller, and an applicant is not a buyer. */
   label?: string;
   className?: string;

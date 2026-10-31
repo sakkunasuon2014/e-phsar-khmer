@@ -1,5 +1,9 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { ListingsService } from './listings.service';
+import { FilesService } from '../files/files.service';
+import { listingPhotos, listings } from '../db/schema/listings.schema';
+import { trendingEventScoreSql } from './trending';
 
 function makeDb() {
   return {
@@ -17,10 +21,16 @@ function makeService(db: ReturnType<typeof makeDb>) {
   const reactionsService = {
     countLikes: jest.fn().mockResolvedValue(0),
   };
+  const productsService = {
+    assertPublishedModel: jest.fn().mockResolvedValue(undefined),
+    getPublishedRefByModelId: jest.fn().mockResolvedValue(null),
+  };
   return new ListingsService(
     db as never,
     filesService as never,
     reactionsService as never,
+    {} as never,
+    productsService as never,
   );
 }
 
@@ -240,6 +250,26 @@ describe('ListingsService.findFeed filters', () => {
       expect(params).toContain('City Bus');
     });
 
+    it('ANDs every entry of the multi-attribute filter', async () => {
+      const { sql: text, params } = await whereSqlFor({
+        attrs: '{"storage":"128GB","ram":"8GB"}',
+      });
+
+      expect(params).toContain('storage');
+      expect(params).toContain('128GB');
+      expect(params).toContain('ram');
+      expect(params).toContain('8GB');
+      // Two AND'ed reads of the JSONB, each key bound as a parameter.
+      expect((text.match(/->>/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('ignores a malformed multi-attribute filter', async () => {
+      const { sql: text, params } = await whereSqlFor({ attrs: '{oops' });
+
+      expect((text.match(/->>/g) ?? []).length).toBe(0);
+      expect(params.join(',')).not.toContain('oops');
+    });
+
     it('applies no attribute filter when only attrKey is sent', async () => {
       const { params } = await whereSqlFor({ attrKey: 'type' });
 
@@ -264,6 +294,32 @@ describe('ListingsService.findFeed filters', () => {
       expect(text).toContain("->>'bodyType'");
       expect(params).toContain('Toyota');
       expect(params).toContain('Sedan');
+    });
+
+    it('filters model, taxType, color and transmission as bound values', async () => {
+      const { sql: text, params } = await whereSqlFor({
+        model: '3',
+        taxType: 'Tax Paper',
+        color: 'Red',
+        transmission: 'Auto',
+      });
+
+      // Fixed keys in the statement, values bound — same contract as brand.
+      expect(text).toContain("->>'model'");
+      expect(text).toContain("->>'taxType'");
+      expect(text).toContain("->>'color'");
+      expect(text).toContain("->>'transmission'");
+      for (const value of ['3', 'Tax Paper', 'Red', 'Auto']) {
+        expect(params).toContain(value);
+      }
+    });
+
+    it('applies only the dialog filters that were sent', async () => {
+      const { params } = await whereSqlFor({ color: 'Red' });
+
+      expect(params).toContain('Red');
+      expect(params).not.toContain('Tax Paper');
+      expect(params).not.toContain('Auto');
     });
   });
 
@@ -385,69 +441,33 @@ describe('ListingsService.findById seller handle', () => {
     });
   });
 
+  it('reports the seller verified-account flag', async () => {
+    mockListing({
+      listing: { id: 'listing-3', userId: 'user-3' },
+      sellerUsername: 'seller',
+      sellerVerifiedAccount: true,
+    });
+
+    const result = await service.findById('listing-3');
+
+    expect(result.sellerVerifiedAccount).toBe(true);
+  });
+
+  it('defaults the flag to false when the seller has no active plan', async () => {
+    mockListing({
+      listing: { id: 'listing-4', userId: 'user-4' },
+      sellerUsername: 'seller',
+    });
+
+    const result = await service.findById('listing-4');
+
+    expect(result.sellerVerifiedAccount).toBe(false);
+  });
+
   it('throws when the listing does not exist', async () => {
     mockListing(undefined);
 
     await expect(service.findById('nope')).rejects.toThrow('Listing not found');
-  });
-});
-
-describe('ListingsService moderation take-downs', () => {
-  let db: ReturnType<typeof makeDb>;
-  let service: ListingsService;
-
-  /** .select().from().leftJoin().where().limit() — the joined listing query. */
-  const listingQuery = (result: object[]) => ({
-    from: () => ({
-      leftJoin: () => ({
-        where: () => ({ limit: () => Promise.resolve(result) }),
-      }),
-    }),
-  });
-  /** .select().from().where().orderBy() — the photos query that follows it. */
-  const photosQuery = () => ({
-    from: () => ({ where: () => ({ orderBy: () => Promise.resolve([]) }) }),
-  });
-
-  const takenDownListing = {
-    listing: { id: 'listing-9', userId: 'user-9', takenDownAt: new Date() },
-    sellerUsername: 'seller9',
-  };
-
-  function mockListing(row: object) {
-    db.select
-      .mockReturnValueOnce(listingQuery([row]))
-      .mockReturnValueOnce(photosQuery());
-  }
-
-  beforeEach(() => {
-    db = makeDb();
-    service = makeService(db);
-  });
-
-  it('404s a taken-down listing on the public read', async () => {
-    mockListing(takenDownListing);
-
-    await expect(service.findById('listing-9')).rejects.toThrow(
-      'Listing not found',
-    );
-  });
-
-  it('returns it to owner paths that opt in', async () => {
-    mockListing(takenDownListing);
-
-    await expect(
-      service.findById('listing-9', { includeRemoved: true }),
-    ).resolves.toMatchObject({ id: 'listing-9' });
-  });
-
-  it('refuses to republish a taken-down listing', async () => {
-    mockListing(takenDownListing);
-
-    await expect(service.publish('user-9', 'listing-9')).rejects.toThrow(
-      'removed by moderation',
-    );
-    expect(db.update).not.toHaveBeenCalled();
   });
 });
 
@@ -515,6 +535,17 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
+  it('selects the seller verified-account flag for cards', async () => {
+    queue([]);
+
+    await service.findFeed({});
+
+    const calls = db.select.mock.calls as unknown as [
+      [Record<string, unknown>],
+    ];
+    expect(calls[0][0]).toHaveProperty('sellerVerifiedAccount');
+  });
+
   it('filters price on the final (discounted) price', async () => {
     const [page] = queue([]);
     await service.findFeed({ minPrice: 100, maxPrice: 500 });
@@ -554,12 +585,6 @@ describe('ListingsService.findFeed search + facets', () => {
     expect(sql).toMatch(
       /\("listings"\."expires_at" is null or "listings"\."expires_at" > now\(\)\)/,
     );
-  });
-
-  it('hides moderation take-downs from every feed query', async () => {
-    const [page] = queue([]);
-    await service.findFeed({});
-    expect(whereOf(page).sql).toMatch(/"listings"\."taken_down_at" is null/);
   });
 
   it('filters model year numerically and engine type by name', async () => {
@@ -652,6 +677,15 @@ describe('ListingsService.findFeed search + facets', () => {
     const [page] = queue([]);
     await service.findFeed({ deliveryFree: true });
     expect(whereOf(page).sql).toContain('"delivery_free" = $');
+  });
+
+  it('hasDiscount=true filters on a set, positive discount', async () => {
+    const [page] = queue([]);
+    await service.findFeed({ hasDiscount: true });
+    const { sql } = whereOf(page);
+    expect(sql).toMatch(/"discount_value" is not null/);
+    expect(sql).toMatch(/"discount_value" > 0/);
+    expect(sql).toMatch(/"discount_type" is not null/);
   });
 
   describe('commune', () => {
@@ -806,5 +840,666 @@ describe('ListingsService.findFeed search + facets', () => {
       expect(res.meta.facets).toEqual({ categories: [] });
       expect(db.select).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('ListingsService plan enforcement', () => {
+  function setup(existing: Record<string, unknown>) {
+    const returning = jest.fn().mockResolvedValue([{ id: 'l1' }]);
+    const set = jest.fn(() => ({ where: () => ({ returning }) }));
+    const values = jest.fn().mockResolvedValue(undefined);
+    const insert = jest.fn(() => ({ values }));
+    const db: Record<string, unknown> = {
+      ...makeDb(),
+      update: jest.fn(() => ({ set })),
+      insert,
+    };
+    db.transaction = jest.fn((fn: (tx: typeof db) => unknown) => fn(db));
+    const entitlements = {
+      assertPhotos: jest.fn().mockResolvedValue(undefined),
+      assertCanHoldAnotherAd: jest.fn().mockResolvedValue(undefined),
+      assertCanRenew: jest.fn().mockResolvedValue(undefined),
+      reconcileListingsSafely: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new ListingsService(
+      db as never,
+      {} as never,
+      {} as never,
+      entitlements as never,
+      {} as never,
+    );
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      userId: 'u1',
+      status: 'draft',
+      publishedAt: null,
+      expiresAt: null,
+      renewCount: 0,
+      photos: [],
+      ...existing,
+    } as never);
+    return { service, entitlements, set, insert, values };
+  }
+
+  it('checks photos and a free slot when a draft is first published', async () => {
+    const { service, entitlements, set, insert } = setup({});
+    await service.publish('u1', 'l1');
+    expect(entitlements.assertPhotos).toHaveBeenCalled();
+    expect(entitlements.assertCanHoldAnotherAd).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1' }),
+    );
+    expect(entitlements.assertCanRenew).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'active', renewCount: 0 }),
+    );
+    // A first publish is not a renewal: nothing is logged against the window.
+    expect(insert).not.toHaveBeenCalled();
+    expect(entitlements.reconcileListingsSafely).toHaveBeenCalledWith('u1');
+  });
+
+  it('spends a renewal when an ad that already went live is re-published', async () => {
+    const { service, entitlements, set, insert, values } = setup({
+      status: 'active',
+      publishedAt: new Date(Date.now() - 86_400_000),
+      expiresAt: new Date(Date.now() + 86_400_000),
+      renewCount: 1,
+    });
+    await service.publish('u1', 'l1');
+    expect(entitlements.assertCanRenew).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ userId: 'u1' }),
+    );
+    // still live → already counted, so no slot check
+    expect(entitlements.assertCanHoldAnotherAd).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ renewCount: 2 }),
+    );
+    // The rolling window's spend log records exactly one renewal.
+    expect(insert).toHaveBeenCalledTimes(1);
+    expect(values).toHaveBeenCalledWith({ listingId: 'l1', userId: 'u1' });
+  });
+
+  it('refuses to re-publish an ad restricted by the plan', async () => {
+    const { service, set } = setup({
+      status: 'restricted',
+      publishedAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    await expect(service.publish('u1', 'l1')).rejects.toMatchObject({
+      response: { code: 'PLAN_RESTRICTED' },
+    });
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it('renews a restricted ad once its window has lapsed', async () => {
+    const { service, entitlements, set, insert } = setup({
+      status: 'restricted',
+      publishedAt: new Date(Date.now() - 40 * 86_400_000),
+      expiresAt: new Date(Date.now() - 86_400_000),
+      renewCount: 1,
+    });
+    await service.publish('u1', 'l1');
+    expect(entitlements.assertCanRenew).toHaveBeenCalled();
+    // lapsed → it must also find a slot before coming back
+    expect(entitlements.assertCanHoldAnotherAd).toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'active', renewCount: 2 }),
+    );
+    expect(insert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ListingsService photo ownership', () => {
+  type Photo = { url: string; path: string };
+  const url = (path: string) =>
+    `https://x.supabase.co/storage/v1/object/public/listings/${path}`;
+  const real = new FilesService(
+    {} as never,
+    { get: () => 'listings' } as never,
+  );
+  const service = new ListingsService(
+    {} as never,
+    {
+      isOwnedPath: (path: string, userId: string) =>
+        real.isOwnedPath(path, userId),
+      publicUrlFor: url,
+    } as never,
+    {} as never,
+    {} as never,
+    {} as never,
+  ) as unknown as {
+    assertPhotosOwned(u: string, p: Photo[], kept?: Photo[]): void;
+  };
+  const own = { path: 'listing/u1/a.png', url: url('listing/u1/a.png') };
+
+  it('accepts the caller’s own uploads', () => {
+    expect(() => service.assertPhotosOwned('u1', [own])).not.toThrow();
+  });
+
+  it.each([
+    [
+      'another user’s object',
+      { path: 'listing/u2/a.png', url: url('listing/u2/a.png') },
+    ],
+    [
+      'a URL that does not match its path',
+      { path: own.path, url: url('listing/u2/b.png') },
+    ],
+    [
+      'an avatar path',
+      { path: 'avatar/u1/a.png', url: url('avatar/u1/a.png') },
+    ],
+  ])('rejects %s', (_label, photo) => {
+    expect(() => service.assertPhotosOwned('u1', [photo])).toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('keeps legacy photos already on the listing', () => {
+    const legacy = { path: 'listing/old.png', url: url('listing/old.png') };
+    expect(() =>
+      service.assertPhotosOwned('u1', [legacy, own], [legacy]),
+    ).not.toThrow();
+  });
+});
+
+describe('ListingsService.findTrending', () => {
+  type Row = Record<string, unknown>;
+
+  /**
+   * A fake Drizzle client for the trending query. Every chain is thenable, so
+   * the awaited photo load resolves too. `listings` is read twice — the ranked
+   * pass, then the newest-listing fill — so the counter distinguishes them.
+   */
+  function trendingDb(fixture: {
+    ranked?: Row[];
+    fill?: Row[];
+    photos?: Row[];
+  }) {
+    let listingsReads = 0;
+    // Derived-table aliases only need identity for the joins.
+    const alias = () => ({ listingId: {}, score: {} });
+
+    const builder = () => {
+      let value: unknown = [];
+      const node: Record<string, unknown> = {};
+      const chain = () => node;
+      node.from = (table: unknown) => {
+        if (table === listings) {
+          listingsReads++;
+          value =
+            listingsReads === 1 ? (fixture.ranked ?? []) : (fixture.fill ?? []);
+        } else if (table === listingPhotos) {
+          value = fixture.photos ?? [];
+        }
+        return node;
+      };
+      node.leftJoin = chain;
+      node.innerJoin = chain;
+      node.where = chain;
+      node.groupBy = chain;
+      node.orderBy = chain;
+      node.limit = () => Promise.resolve(value);
+      node.as = alias;
+      node.then = (
+        resolve: (v: unknown) => unknown,
+        reject?: (e: unknown) => unknown,
+      ) => Promise.resolve(value).then(resolve, reject);
+      return node;
+    };
+
+    return {
+      select: jest.fn(() => builder()),
+      insert: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    };
+  }
+
+  it('returns ranked listings, strips the score, and attaches photos', async () => {
+    const db = trendingDb({
+      ranked: [
+        { id: 'l1', title: 'Hot', sellerUsername: 'u1', score: 9 },
+        { id: 'l2', title: 'Warm', sellerUsername: 'u2', score: 4 },
+      ],
+      photos: [{ listingId: 'l1', url: 'p1', path: 'listing/u1/p1', sort: 0 }],
+    });
+    const service = makeService(db as never);
+
+    const result = await service.findTrending({ limit: 2 });
+
+    expect(result.meta).toEqual({ limit: 2, windowDays: 7 });
+    expect(result.data.map((row) => row.id)).toEqual(['l1', 'l2']);
+    expect(result.data[0].photos).toHaveLength(1);
+    expect(result.data[1].photos).toEqual([]);
+    expect(result.data[0]).not.toHaveProperty('score');
+    // event, like and save aggregates + the ranked read + the photo load.
+    expect(db.select).toHaveBeenCalledTimes(5);
+  });
+
+  it('selects the seller verified-account flag for cards', async () => {
+    const db = trendingDb({
+      ranked: [{ id: 'l1', sellerUsername: 'u1', score: 3 }],
+      fill: [{ id: 'l2', sellerUsername: 'u2' }],
+    });
+    const service = makeService(db as never);
+
+    await service.findTrending({ limit: 2 });
+
+    const selections = (
+      db.select.mock.calls as unknown as [Record<string, unknown>][]
+    )
+      .map(([selection]) => selection)
+      .filter((selection) => selection && 'sellerUsername' in selection);
+    // Both listing reads — the ranked pass and the newest-listing fill — must
+    // carry the flag; pinning only "one of them" would let the fill regress.
+    expect(selections).toHaveLength(2);
+    for (const selection of selections) {
+      expect(selection).toHaveProperty('sellerVerifiedAccount');
+    }
+  });
+
+  it('fills the tail with the newest live listings when engagement is thin', async () => {
+    const db = trendingDb({
+      ranked: [{ id: 'l1', title: 'Hot', sellerUsername: 'u1', score: 5 }],
+      fill: [
+        { id: 'l2', title: 'New', sellerUsername: 'u2' },
+        { id: 'l3', title: 'Newer', sellerUsername: 'u3' },
+      ],
+    });
+    const service = makeService(db as never);
+
+    const result = await service.findTrending({ limit: 3, windowDays: 30 });
+
+    expect(result.meta).toEqual({ limit: 3, windowDays: 30 });
+    expect(result.data.map((row) => row.id)).toEqual(['l1', 'l2', 'l3']);
+  });
+
+  it('reuses the cached list within the cache window', async () => {
+    const db = trendingDb({
+      ranked: [{ id: 'l1', title: 'Hot', sellerUsername: 'u1', score: 5 }],
+    });
+    const service = makeService(db as never);
+
+    const first = await service.findTrending({ limit: 1 });
+    const callsAfterFirst = db.select.mock.calls.length;
+    const second = await service.findTrending({ limit: 1 });
+
+    expect(db.select.mock.calls.length).toBe(callsAfterFirst);
+    expect(second.data).toEqual(first.data);
+  });
+});
+
+describe('trending score weights', () => {
+  it('weights high-intent actions and leaves impressions out entirely', () => {
+    const query = new PgDialect().sqlToQuery(trendingEventScoreSql());
+
+    expect(query.params).toEqual([
+      'view',
+      1,
+      'chat',
+      3,
+      'call',
+      3,
+      'show_contact',
+      3,
+      'apply_job',
+      5,
+    ]);
+    expect(query.params).not.toContain('impression');
+  });
+});
+
+describe('ListingsService expiry', () => {
+  type Rec = Record<string, unknown[]>;
+  const dialect = new PgDialect();
+
+  let db: ReturnType<typeof makeDb>;
+  let service: ListingsService;
+
+  beforeEach(() => {
+    db = makeDb();
+    service = makeService(db);
+  });
+
+  function chain(result: unknown[], rec: Rec) {
+    const c: Record<string, unknown> = {};
+    for (const m of [
+      'from',
+      'where',
+      'orderBy',
+      'limit',
+      'offset',
+      'leftJoin',
+    ]) {
+      c[m] = (...args: unknown[]) => {
+        rec[m] = args;
+        return c;
+      };
+    }
+    c.then = (
+      resolve: (v: unknown[]) => unknown,
+      reject: (e: unknown) => unknown,
+    ) => Promise.resolve(result).then(resolve, reject);
+    return c;
+  }
+
+  /** Queues one result per db.select() call; returns each call's record. */
+  function queue(...results: unknown[][]): Rec[] {
+    const recs: Rec[] = results.map(() => ({}));
+    let i = 0;
+    db.select.mockImplementation(() => {
+      const rec = recs[i] ?? {};
+      if (i >= recs.length) recs.push(rec);
+      return chain(results[i++] ?? [], rec);
+    });
+    return recs;
+  }
+
+  const whereOf = (rec: Rec) => dialect.sqlToQuery(rec.where[0] as never);
+
+  const lapsed = () => new Date(Date.now() - 60_000);
+  const future = () => new Date(Date.now() + 60_000);
+
+  function listingRow(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'l1',
+      userId: 'u1',
+      status: 'active',
+      expiresAt: lapsed(),
+      ...overrides,
+    };
+  }
+
+  /** findPublicById = the joined detail read, then the photos read. */
+  function mockPublicDetail(row: Record<string, unknown>) {
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      return call === 1
+        ? chain([{ listing: row, sellerUsername: 'seller' }], {})
+        : chain([], {});
+    });
+  }
+
+  it('hides a draft from the public detail route', async () => {
+    mockPublicDetail(listingRow({ status: 'draft' }));
+
+    await expect(service.findPublicById('l1')).rejects.toThrow(
+      'Listing not found',
+    );
+  });
+
+  it('hides an owner-deleted ad from the public detail route', async () => {
+    mockPublicDetail(listingRow({ status: 'deleted' }));
+
+    await expect(service.findPublicById('l1')).rejects.toThrow(
+      'Listing not found',
+    );
+  });
+
+  it('reports a lapsed active ad as expired instead of live', async () => {
+    mockPublicDetail(listingRow());
+
+    await expect(service.findPublicById('l1')).resolves.toMatchObject({
+      id: 'l1',
+      status: 'expired',
+    });
+  });
+
+  it('keeps a still-live ad active', async () => {
+    mockPublicDetail(listingRow({ expiresAt: future() }));
+
+    await expect(service.findPublicById('l1')).resolves.toMatchObject({
+      status: 'active',
+    });
+  });
+
+  it('filters the Expired tab by the date, not only the stored status', async () => {
+    const recs = queue([{ count: 0 }], []);
+
+    await service.findMine('u1', { status: 'expired' });
+
+    const { sql: text, params } = whereOf(recs[1]);
+    expect(text).toContain('"expires_at" <= now()');
+    expect(params).toEqual(expect.arrayContaining(['expired', 'active']));
+  });
+
+  it('keeps lapsed ads out of the Active tab', async () => {
+    const recs = queue([{ count: 0 }], []);
+
+    await service.findMine('u1', { status: 'active' });
+
+    const { sql: text } = whereOf(recs[1]);
+    expect(text).toContain('"expires_at" is null');
+    expect(text).toContain('"expires_at" > now()');
+  });
+
+  it('reports a lapsed ad as expired to its owner', async () => {
+    const recs = queue([{ count: 1 }], [listingRow()], []);
+
+    const result = await service.findMine('u1', {});
+
+    expect(recs[1]).toBeDefined();
+    expect(result.data[0].status).toBe('expired');
+  });
+
+  it('keeps a future-dated ad active for its owner', async () => {
+    queue([{ count: 1 }], [listingRow({ expiresAt: future() })], []);
+
+    const result = await service.findMine('u1', {});
+
+    expect(result.data[0].status).toBe('active');
+  });
+});
+
+describe('ListingsService product spec attachment', () => {
+  const productRef = {
+    modelId: 'm1',
+    brandSlug: 'apple',
+    brandName: 'Apple',
+    modelSlug: 'iphone-16',
+    modelName: 'iPhone 16',
+  };
+
+  function setup() {
+    const db = { ...makeDb(), transaction: jest.fn() };
+    const products = {
+      assertPublishedModel: jest.fn().mockResolvedValue(undefined),
+      getPublishedRefByModelId: jest.fn().mockResolvedValue(productRef),
+    };
+    const entitlements = {
+      assertPhotos: jest.fn().mockResolvedValue(undefined),
+      assertCanHoldAnotherAd: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new ListingsService(
+      db as never,
+      {} as never,
+      { countLikes: jest.fn().mockResolvedValue(0) } as never,
+      entitlements as never,
+      products as never,
+    );
+    return { db, service, products, entitlements };
+  }
+
+  /** `findById`'s own query: listing + owner handle, then photos. */
+  function detailQuery(result: object[]) {
+    const tail = { where: () => ({ limit: () => Promise.resolve(result) }) };
+    return { from: () => ({ ...tail, leftJoin: () => tail }) };
+  }
+  function photosQuery(result: object[]) {
+    return {
+      from: () => ({
+        where: () => ({ orderBy: () => Promise.resolve(result) }),
+      }),
+    };
+  }
+
+  it('rejects a create whose product page is not published', async () => {
+    const { db, service, products } = setup();
+    products.assertPublishedModel.mockRejectedValue(
+      new BadRequestException(
+        'productModelId must reference a published product spec',
+      ),
+    );
+    db.select
+      .mockReturnValueOnce(slugLookup([{ id: 'cat-1' }]))
+      .mockReturnValueOnce(slugLookup([{ id: 'sub-1' }]));
+
+    await expect(
+      service.create('u1', {
+        categoryId: 'cat-1',
+        subcategoryId: 'sub-1',
+        title: 'iPhone 16',
+        productModelId: 'm1',
+      } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('stores the product model id on a valid create', async () => {
+    const { db, service, products } = setup();
+    db.select
+      .mockReturnValueOnce(slugLookup([{ id: 'cat-1' }]))
+      .mockReturnValueOnce(slugLookup([{ id: 'sub-1' }]));
+    const values = jest.fn().mockReturnValue({
+      returning: jest.fn().mockResolvedValue([{ id: 'l1' }]),
+    });
+    db.insert.mockReturnValue({ values });
+    db.transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb({ insert: db.insert }),
+    );
+
+    await service.create('u1', {
+      categoryId: 'cat-1',
+      subcategoryId: 'sub-1',
+      title: 'iPhone 16',
+      productModelId: 'm1',
+    } as never);
+
+    expect(products.assertPublishedModel).toHaveBeenCalledWith('m1', 'sub-1');
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({ productModelId: 'm1' }),
+    );
+  });
+
+  it('rejects an update that points at an unpublished product', async () => {
+    const { db, service, products } = setup();
+    products.assertPublishedModel.mockRejectedValue(
+      new BadRequestException('nope'),
+    );
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      id: 'l1',
+      userId: 'u1',
+      subcategoryId: 'sub-1',
+      photos: [],
+      moderatedAt: null,
+    } as never);
+
+    await expect(
+      service.update('u1', 'l1', { productModelId: 'm1' } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(products.assertPublishedModel).toHaveBeenCalledWith('m1', 'sub-1');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('clears the product link when null is sent', async () => {
+    const { db, service, products } = setup();
+    jest.spyOn(service, 'findById').mockResolvedValue({
+      id: 'l1',
+      userId: 'u1',
+      photos: [],
+      moderatedAt: null,
+    } as never);
+    const set = jest.fn(() => ({
+      where: () => ({
+        returning: jest.fn().mockResolvedValue([{ id: 'l1' }]),
+      }),
+    }));
+    db.transaction.mockImplementation(
+      async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb({
+          update: () => ({ set }),
+          select: () => photosQuery([]),
+        }),
+    );
+
+    await service.update('u1', 'l1', { productModelId: null } as never);
+
+    expect(products.assertPublishedModel).not.toHaveBeenCalled();
+    expect(set).toHaveBeenCalledWith(
+      expect.objectContaining({ productModelId: null }),
+    );
+  });
+
+  it('embeds the published product ref on the detail read', async () => {
+    const { db, service, products } = setup();
+    db.select
+      .mockReturnValueOnce(
+        detailQuery([
+          {
+            listing: { id: 'l1', productModelId: 'm1' },
+            sellerUsername: 'seller',
+          },
+        ]),
+      )
+      .mockReturnValueOnce(photosQuery([]));
+
+    const result = await service.findById('l1');
+
+    expect(result.product).toEqual(productRef);
+    expect(products.getPublishedRefByModelId).toHaveBeenCalledWith('m1');
+  });
+
+  it('reads no product ref when the listing has no link', async () => {
+    const { db, service, products } = setup();
+    db.select
+      .mockReturnValueOnce(
+        detailQuery([
+          { listing: { id: 'l1', productModelId: null }, sellerUsername: null },
+        ]),
+      )
+      .mockReturnValueOnce(photosQuery([]));
+
+    const result = await service.findById('l1');
+
+    expect(result.product).toBeNull();
+    expect(products.getPublishedRefByModelId).not.toHaveBeenCalled();
+  });
+});
+
+describe('ListingsService plan-aware create', () => {
+  it('refuses to create an ad when the plan has no free slot', async () => {
+    const db = makeDb();
+    db.select
+      .mockReturnValueOnce(slugLookup([{ id: 'cat-1' }]))
+      .mockReturnValueOnce(slugLookup([{ id: 'sub-1' }]));
+    const entitlements = {
+      assertPhotos: jest.fn().mockResolvedValue(undefined),
+      assertCanHoldAnotherAd: jest.fn().mockRejectedValue(
+        new ForbiddenException({
+          code: 'PLAN_LIMIT_ADS',
+          message: 'no room',
+        }),
+      ),
+    };
+    const service = new ListingsService(
+      db as never,
+      {} as never,
+      {} as never,
+      entitlements as never,
+      {} as never,
+    );
+
+    await expect(
+      service.create('u1', {
+        categoryId: 'cat-1',
+        subcategoryId: 'sub-1',
+        title: 'No room',
+      } as never),
+    ).rejects.toMatchObject({ response: { code: 'PLAN_LIMIT_ADS' } });
+    // Nothing was ever inserted: no invisible draft can be left behind.
+    expect(db.insert).not.toHaveBeenCalled();
   });
 });

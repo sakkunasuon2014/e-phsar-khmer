@@ -1,5 +1,5 @@
 /**
- * Real listings carry UUID ids; mock cards (home Top Ads, the non-UUID detail
+ * Real listings carry UUID ids; legacy mock cards (the non-UUID detail
  * slugs) carry numeric ids and have no row behind them. Controls render on
  * both, so callers use this guard to keep a mock id inert — without it a demo
  * heart or a tracking batch fires a real request for an id that cannot exist.

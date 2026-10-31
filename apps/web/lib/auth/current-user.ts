@@ -14,6 +14,8 @@ export interface SessionUser {
   profilePhotoUrl: string | null;
   coverPhotoUrl: string | null;
   createdAt: string;
+  /** Paid-plan badge, derived by the backend from active subscriptions. */
+  verifiedAccount?: boolean;
 }
 
 /** The signed-in user's own profile, as `GET /users/me` returns it. */
@@ -36,7 +38,9 @@ export const getSettingsUser = cache(async (): Promise<SettingsUser | null> => {
   if (!accessToken && !refreshToken) return null;
 
   try {
-    const { data } = await userServerFetch<BackendUser>("/users/me");
+    const { data } = await userServerFetch<BackendUser>(
+      "/users/me?includeAuthProviders=1",
+    );
     return data;
   } catch {
     return null;
@@ -68,6 +72,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
       profilePhotoUrl: data.profilePhotoUrl,
       coverPhotoUrl: data.coverPhotoUrl,
       createdAt: data.createdAt,
+      verifiedAccount: data.verifiedAccount,
     };
   } catch {
     return null;

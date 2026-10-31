@@ -137,7 +137,7 @@ const EditProductScreen = () => {
       : ["012 345 678"],
   );
   const [telegram, setTelegram] = useState(
-    existingProduct.telegram?.[0] || "@seller_khmer24",
+    existingProduct.telegram?.[0] || "@seller_phsarkhmer",
   );
   const [description, setDescription] = useState(
     existingProduct.description || "Good condition, smooth user experience.",
@@ -196,7 +196,7 @@ const EditProductScreen = () => {
   const handleDeleteListing = () => {
     Alert.alert(
       "Delete Listing?",
-      "Are you sure you want to permanently delete this ad from Khmer24?",
+      "Are you sure you want to permanently delete this ad from PhsarKhmer?",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -216,7 +216,7 @@ const EditProductScreen = () => {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Top Khmer24 Header */}
+      {/* Top PhsarKhmer Header */}
       <View className="flex-row items-center justify-between border-b border-neutral-border bg-white px-4 py-3 shadow-sm">
         <TouchableOpacity
           onPress={() => router.back()}
@@ -253,7 +253,7 @@ const EditProductScreen = () => {
             <Text className="text-xs text-neutral-text-sub">
               {isSold
                 ? "This ad will not appear in search results"
-                : "Visible to all buyers on Khmer24"}
+                : "Visible to all buyers on PhsarKhmer"}
             </Text>
           </View>
 

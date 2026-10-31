@@ -18,7 +18,7 @@ import { UpdateSubcategoryDto } from './dto/update-subcategory.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/subcategories')
 export class AdminSubcategoriesController {

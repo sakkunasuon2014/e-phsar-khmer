@@ -54,7 +54,7 @@ primitives that have more than one caller (`checkPayment`, `upsertPayment`,
 controller routes, which is what earns a primitive its own file here. Two
 primitives have exactly one caller each — `listPayments`
 (`PaymentsController`) and `findPaymentAttemptByProviderAttemptId`
-(`AbaPaywayWebhookController`, in [`../webhooks/`](../webhooks)) — and both
+(`AbaPaywayWebhookController`, in [`webhooks/`](webhooks)) — and both
 are deliberate exceptions to the single-caller fold below: their only caller
 is a Nest controller, so folding would put a Drizzle query inside a route
 handler. The thin-controller rule wins over file count in that case.
@@ -63,7 +63,7 @@ composes several primitives into one business action —
 `createPaymentTransaction`, `receivePaymentProviderEvent`,
 `checkOwnedPaymentTransaction`, `listOwnedPaymentAttempts`, and the three
 processor flows (`processPaymentAttempt`/`processProviderEvent`/
-`pollPaymentAttempt`) plus their shared failure paths. A primitive that
+`reconcilePaymentAttempt`) plus their shared failure paths. A primitive that
 turned out to have exactly one caller (the original `createPayment`,
 `createPaymentAttempt`, `enqueuePaymentAttempt`, `createPaymentProviderEvent`,
 `enqueuePaymentProviderEvent`, `findPaymentTransactionDetail`,
@@ -152,19 +152,18 @@ jobs, not as alternatives:
   crash between the two used to strand a committed attempt forever (see the
   git history on this file for the pre-outbox version). A provider with no
   webhook at all (Bakong — see
-  [`providers/bakong/README.md`](./providers/bakong/README.md)) adds a
-  third: `processPaymentAttempt` writes a `payment.attempt.poll_requested`
-  row itself, from inside the BullMQ job, whenever `charge()` comes back
-  `pending` with `ChargeResult.poll` set — and that use-case, unlike the
-  other two producers, keeps re-writing this same event type on every
-  "still nothing to report" round. Three thin `OutboxHandler`s
+  [`providers/bakong/README.md`](./providers/bakong/README.md)) needs no
+  third producer: its `pending` attempt is committed in Postgres and
+  `PaymentReconciler` — armed by a local `payment.issued` event, idle
+  otherwise — polls it from there. (An earlier design re-wrote a
+  `payment.attempt.poll_requested` row on every poll round; that chain is
+  retired, and `outbox/payment-poll-outbox-handler.ts` is now a no-op that
+  only drains rows written before the switch.) Two thin `OutboxHandler`s
   (`outbox/payment-attempt-outbox-handler.ts`,
-  `outbox/payment-event-outbox-handler.ts`,
-  `outbox/payment-poll-outbox-handler.ts`) are the only things that read
+  `outbox/payment-event-outbox-handler.ts`) are the only things that read
   these rows — each does nothing but `queue.add()` the corresponding BullMQ
-  job (the poll handler alone passes a `delay`) and report
-  `published`/`retry` back to the outbox worker.
-  **These three event types are internal DB→BullMQ plumbing only** — not to
+  job and report `published`/`retry` back to the outbox worker.
+  **These two event types are internal DB→BullMQ plumbing only** — not to
   be confused with the _business-level_ `payment.succeeded` /
   `payment.refunded` outbox events described below, which don't exist yet.
 - **BullMQ `payments` queue** (`PAYMENT_QUEUE`, defined in
@@ -172,8 +171,9 @@ jobs, not as alternatives:
   items — against the shared Redis connection from `app.module.ts`) is the
   actual concurrent worker pool that calls a gateway. `PaymentProcessor`
   (`processors/payment.processor.ts`, this module's first `@Processor`)
-  consumes all three job kinds and delegates to `processPaymentAttempt` /
-  `processProviderEvent` / `pollPaymentAttempt`. `defaultJobOptions` (attempts + exponential
+  consumes the `process-attempt` and `process-provider-event` jobs and
+  delegates to `processPaymentAttempt` / `processProviderEvent` (a legacy
+  `poll-attempt` job is acknowledged and skipped). `defaultJobOptions` (attempts + exponential
   backoff) come from `PAYMENT_JOB_ATTEMPTS` / `PAYMENT_JOB_BACKOFF_MS`;
   `PAYMENT_WORKER_CONCURRENCY` now drives `@Processor`'s own `concurrency`
   option (read from `process.env` directly, since Nest's DI container isn't
@@ -352,12 +352,12 @@ Key properties this gives us:
 | Payment transaction lifecycle (`use-cases/payments/`)                 | Done — create/check/list/upsert on `payment_transactions`, create/list on `payment_attempts`, all Effect-typed, `tsc`/`nest build`-verified.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `PaymentsController` (REST surface)                                   | Done — `POST/GET /payments`, `GET /payments/:id`, `GET /payments/:id/attempts`, `PATCH /payments/:id` (admin-only), `POST /payments/webhook` (public, generic envelope). `POST /payments` returns immediately with both rows `pending` — `charge()` hasn't run yet, it's dispatched async via the outbox (see below) — so `GET /payments/:id`'s `checkout` field (`findPaymentTransactionDetail`, `null` until a gateway call produces one) is what a client polls right after creating a payment to pick up the QR/redirect artifact.                                                                                                                                                             |
 | Webhook intake (dedupe + durable handoff)                             | Done — `createPaymentProviderEvent` dedupes on `(provider, providerEventId)` via `onConflictDoNothing`; a duplicate never re-enqueues. Runs inside `runInTransaction` with the outbox write.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Durable DB→BullMQ handoff (outbox)                                    | Done — `enqueuePaymentAttempt`/`enqueuePaymentProviderEvent`/`enqueuePaymentAttemptPoll` write `outbox_events` inside the same transaction as the domain insert (the poll one only for its first round — see below); `PaymentAttemptOutboxHandler`/`PaymentEventOutboxHandler`/`PaymentPollOutboxHandler` publish to BullMQ.                                                                                                                                                                                                                                                                                                                                                                       |
+| Durable DB→BullMQ handoff (outbox)                                    | Done — `enqueuePaymentAttempt`/`enqueuePaymentProviderEvent` write `outbox_events` inside the same transaction as the domain insert; `PaymentAttemptOutboxHandler`/`PaymentEventOutboxHandler` publish to BullMQ (`PaymentPollOutboxHandler` is a no-op that only drains poll rows written before the poll chain was retired).                                                                                                                                                                                                                                                                                                                                                                     |
 | BullMQ `payments` queue — consumer                                    | Done — `PaymentProcessor` (`processors/payment.processor.ts`), this module's first `@Processor`, now consuming three job kinds. `PAYMENT_WORKER_CONCURRENCY` wired. `onJobFailed` (an `@OnWorkerEvent('failed')` listener) marks the attempt/transaction `failed` once a `process-attempt`/`poll-attempt` job exhausts BullMQ's retry budget (`failAbandonedPaymentJob`) — without it, a gateway call that keeps throwing (bad credentials, an outage) left the attempt silently stuck at `pending` forever, indistinguishable from a payer who just hasn't paid yet. `payment_attempts.failure_message` carries the underlying error for debugging (`CHARGE_GATEWAY_ERROR`/`POLL_GATEWAY_ERROR`). |
 | Provider gateway abstraction (`providers/`)                           | Interface + registry done. Concrete gateway implementations live one-per-folder under `providers/`, each with its own README covering that provider's wire format, signing/auth, and webhook (or poll) strategy — see [`providers/aba-payway/README.md`](./providers/aba-payway/README.md) and [`providers/bakong/README.md`](./providers/bakong/README.md).                                                                                                                                                                                                                                                                                                                                       |
-| Attempt processing (`processPaymentAttempt`)                          | Done — resolves the gateway, calls `charge()`, persists the result. Also schedules the first poll round when `ChargeResult.poll` is set (see [`providers/bakong/README.md`](./providers/bakong/README.md)). On a `succeeded` transition, also posts the ledger in the same DB transaction (see below).                                                                                                                                                                                                                                                                                                                                                                                             |
+| Attempt processing (`processPaymentAttempt`)                          | Done — resolves the gateway, calls `charge()`, persists the result. For a provider with no webhook it commits the `pending` attempt and the checkout's `expires_at`, and the processor then emits `payment.issued` to arm the poller (see [`providers/bakong/README.md`](./providers/bakong/README.md)). On a `succeeded` transition, also posts the ledger in the same DB transaction (see below).                                                                                                                                                                                                                                                                                                |
 | Provider event processing (`processProviderEvent`)                    | Done — corroborates via `reconcile()` before trusting a webhook's reported status, applies the same transition as attempt processing, including the same ledger posting on `succeeded`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Attempt polling (`pollPaymentAttempt`)                                | Done — the only path to a resolved status for a provider with no webhook at all. Calls `reconcile()`, applies the same transition on a definite outcome (including the ledger posting on `succeeded`), or re-schedules itself (`enqueuePaymentAttemptPoll`) on `pending`. Gives up (attempt `failed`, code `POLL_EXPIRED`) once `ChargeResult.poll.expiresAt` passes. See [`providers/bakong/README.md`](./providers/bakong/README.md) for the full loop.                                                                                                                                                                                                                                          |
+| Attempt polling (`PaymentReconciler`)                                 | Replaced — a provider with no webhook (Bakong) is polled by `PaymentReconciler` alone, armed by a local `payment.issued` event and idle between payments; there is no longer a per-attempt BullMQ chain. `GET /payments/:id` also nudges an open attempt (`PaymentOnDemandReconciler`, one provider call per attempt per 5 s). See [`providers/bakong/README.md`](./providers/bakong/README.md).                                                                                                                                                                                                                                                                                                   |
 | Provider-specific webhook routes (e.g. ABA PayWay's)                  | Pattern established — a provider whose callback payload doesn't fit the generic `PaymentsController.webhook()` envelope gets its own dedicated route. See the individual provider's README for that route's own status.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Ledger posting (`use-cases/ledgers/`)                                 | Done for `payment_transaction.type === 'payment'` — `postPaymentSettlementLedger` resolves/creates the `provider_clearing`/`platform_revenue` system accounts for the transaction's currency (`findOrCreateSystemLedgerAccount`) and posts one balanced `ledger_transaction` + 2 `ledger_entries` (`postLedgerTransaction`) inside the same `runInTransaction` as the status flip, from all three success-transition use-cases above. `refund`/`capture`/`void` are not mapped — see Open items.                                                                                                                                                                                                   |
 | Business-level outbox events (`payment.succeeded`/`payment.refunded`) | `payment.succeeded` done — `enqueuePaymentSettledEvent` writes an `outbox_events` row (dedupeKey `payment-succeeded:<transactionId>`) in the same transaction as the ledger posting, from all three success-transition use-cases, **and now has a registered consumer** — `PaymentSettledOutboxHandler` (see next row). `payment.refunded` not started — no `refund` transaction type exists yet to settle (see Open items).                                                                                                                                                                                                                                                                       |
@@ -367,12 +367,10 @@ Key properties this gives us:
 
 ## Open items
 
-- `payment_transactions.tenantId` and `.orderId` are plain UUIDs with no FK
-  — there's no `tenants` or `orders` table in this codebase yet (see
-  [`../tenant/README.md`](../tenant/README.md)). `PaymentsController.create()`
-  currently writes a hardcoded `DEFAULT_TENANT_ID` placeholder
-  (`00000000-…`) to every transaction — real values only make sense once a
-  `tenants` table exists.
+- `payment_transactions.orderId` is a loose UUID pointer. Subscription
+  checkout stores its purchase ID there; other order types can define their
+  own relationship when implemented. Organization tenancy is not part of
+  current user-owned subscription billing (see [`../tenant/README.md`](../tenant/README.md)).
 - No admin/reporting surface for the ledger (e.g. a trial-balance view) —
   the posting service exists now, but nothing reads it back yet.
 - **System ledger accounts (`provider_clearing`, `platform_revenue`) are

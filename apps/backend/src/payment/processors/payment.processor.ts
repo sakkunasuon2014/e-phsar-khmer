@@ -1,5 +1,6 @@
 import { Inject, Logger } from '@nestjs/common';
 import { OnWorkerEvent, Processor, WorkerHost } from '@nestjs/bullmq';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import type { Job } from 'bullmq';
 import { Cause, Effect, Exit, Layer, Option } from 'effect';
 import { DRIZZLE } from '../../db/drizzle.provider';
@@ -8,20 +9,18 @@ import { DbClientTag } from '../../db/db.provider';
 import { OutboxService } from '../../outbox/outbox.service';
 import { PaymentGatewayRegistry } from '../providers/payment-gateway.registry';
 import { PaymentGatewayRegistryTag } from '../providers/payment-gateway-registry.provider';
-import { PAYMENT_QUEUE } from '../payment.constants';
+import { PAYMENT_ISSUED_EVENT, PAYMENT_QUEUE } from '../payment.constants';
 import {
   PAYMENT_ATTEMPT_JOB,
   PAYMENT_EVENT_JOB,
   PAYMENT_POLL_JOB,
   type PaymentJobData,
-  type PollAttemptJobData,
   type ProcessAttemptJobData,
   type ProcessProviderEventJobData,
 } from '../queue/payment-queue.types';
 import {
   processPaymentAttempt,
   processProviderEvent,
-  pollPaymentAttempt,
   failAbandonedPaymentJob,
   type PaymentProcessingError,
 } from '../use-cases';
@@ -30,7 +29,7 @@ import {
 const FAILURE_MESSAGE_MAX_LENGTH = 2000;
 
 /**
- * Consumes all three job kinds on the `payments` queue. Deliberately thin —
+ * Consumes the job kinds on the `payments` queue. Deliberately thin —
  * every decision belongs to the use-case; this only turns a modeled failure
  * into a throw, which asks BullMQ's `attempts`/`backoff` for a retry (no
  * `HttpException` mapping here, unlike `PaymentEffectRunner.run()` — there's
@@ -52,6 +51,7 @@ export class PaymentProcessor extends WorkerHost {
     @Inject(DRIZZLE) private readonly db: DbClient,
     private readonly registry: PaymentGatewayRegistry,
     private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super();
   }
@@ -65,12 +65,20 @@ export class PaymentProcessor extends WorkerHost {
             job.data as ProcessAttemptJobData,
           ),
         );
-        // Any of the three job kinds can now have written a new outbox row
-        // — either the existing poll-scheduling (this one, PAYMENT_POLL_JOB)
-        // or a `payment.succeeded` settlement announcement (all three, on a
-        // success transition — see enqueuePaymentSettledEvent). Waking
-        // unconditionally is harmless: an idle worker just finds nothing due.
+        // Either job kind can have written a `payment.succeeded` settlement
+        // announcement on a success transition — see enqueuePaymentSettledEvent.
+        // Waking unconditionally is harmless: an idle worker just finds
+        // nothing due.
         this.outboxService.wakeupAfterCommit();
+        // A checkout is now waiting on the payer: tell the one poller to start
+        // looking. Local and advisory — the attempt is already committed, so a
+        // missed event only delays the reconciler's next safety sweep.
+        if (result === 'pending') {
+          this.eventEmitter.emit(PAYMENT_ISSUED_EVENT, {
+            paymentAttemptId: (job.data as ProcessAttemptJobData)
+              .paymentAttemptId,
+          });
+        }
         return result;
       }
       case PAYMENT_EVENT_JOB: {
@@ -83,16 +91,12 @@ export class PaymentProcessor extends WorkerHost {
         this.outboxService.wakeupAfterCommit();
         return result;
       }
-      case PAYMENT_POLL_JOB: {
-        const result = await this.run(
-          pollPaymentAttempt(
-            this.outboxService,
-            job.data as PollAttemptJobData,
-          ),
-        );
-        this.outboxService.wakeupAfterCommit();
-        return result;
-      }
+      case PAYMENT_POLL_JOB:
+        // Legacy: the self-rescheduling poll chain is retired — the reconciler
+        // is the one poller and reads open attempts from Postgres. A delayed
+        // job queued before the switch just completes; the attempt it named
+        // is still `pending` in the database and is picked up from there.
+        return 'skipped';
       default:
         this.logger.warn(`Ignoring unknown job "${job.name}" (${job.id})`);
         return 'skipped';
@@ -102,10 +106,9 @@ export class PaymentProcessor extends WorkerHost {
   /**
    * Fires on every failed attempt, not just the final one — the
    * `attemptsMade < maxAttempts` check below is what distinguishes "will
-   * retry" from "BullMQ has given up." Only `process-attempt`/`poll-attempt`
-   * jobs carry enough context to act on; a `process-provider-event` job
-   * exhausting its retries is left alone, staying `received` for an
-   * operator to investigate. Errors here are logged, not thrown — this runs
+   * retry" from "BullMQ has given up." Only `process-attempt` jobs carry
+   * enough context to act on; a `process-provider-event` job exhausting its
+   * retries is left alone, staying `received` for an operator to investigate. Errors here are logged, not thrown — this runs
    * outside `process()`, so a throw would just be an unhandled rejection.
    */
   @OnWorkerEvent('failed')
@@ -113,10 +116,7 @@ export class PaymentProcessor extends WorkerHost {
     job: Job<PaymentJobData> | undefined,
     error: Error,
   ): Promise<void> {
-    if (
-      !job ||
-      (job.name !== PAYMENT_ATTEMPT_JOB && job.name !== PAYMENT_POLL_JOB)
-    ) {
+    if (!job || job.name !== PAYMENT_ATTEMPT_JOB) {
       return;
     }
 
@@ -125,15 +125,12 @@ export class PaymentProcessor extends WorkerHost {
       return;
     }
 
-    const data = job.data as ProcessAttemptJobData | PollAttemptJobData;
-    const failureCode =
-      job.name === PAYMENT_POLL_JOB
-        ? 'POLL_GATEWAY_ERROR'
-        : 'CHARGE_GATEWAY_ERROR';
+    const data = job.data as ProcessAttemptJobData;
+    const failureCode = 'CHARGE_GATEWAY_ERROR';
 
     try {
       // No outbox write happens here (a failed attempt schedules nothing
-      // further), so unlike the two branches in process(), there's no
+      // further), so unlike the branches in process(), there's no
       // wakeupAfterCommit() call needed.
       await this.run(
         failAbandonedPaymentJob({

@@ -194,7 +194,7 @@ export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
           <Button
             variant="outline"
             className={cn(
-              "flex items-center bg-muted rounded-sm gap-2 h-12 py-1.5 text-sm cursor-pointer whitespace-nowrap",
+              "flex items-center bg-muted rounded-sm gap-2 h-12 py-1.5 type-nav cursor-pointer whitespace-nowrap",
               hasSelection ? "text-foreground border-muted pr-7 pl-3" : "px-3",
             )}
           >
@@ -224,7 +224,7 @@ export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
                 <ChevronLeft className="h-4 w-4" />
               </button>
             )}
-            <span className="text-sm flex-1 text-center pr-4">
+            <span className="type-nav flex-1 text-center pr-4">
               {t("Filters.location.label")}
             </span>
           </div>
@@ -235,13 +235,13 @@ export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
             {showAllLabel && (
               <button
                 onClick={showAll}
-                className="flex w-full items-center px-4 py-2.5 text-left text-sm text-[#00a0e9] border-b hover:bg-muted/50 transition-colors cursor-pointer"
+                className="flex w-full items-center px-4 py-2.5 text-left type-nav text-[#00a0e9] border-b hover:bg-muted/50 transition-colors cursor-pointer"
               >
                 {showAllLabel}
               </button>
             )}
             {current.isLoading && (
-              <p className="px-4 py-2.5 text-sm text-muted-foreground">
+              <p className="px-4 py-2.5 type-body-sm text-muted-foreground">
                 {t("Common.loading")}
               </p>
             )}
@@ -249,7 +249,7 @@ export function LocationSelectorFilter({ placeholder }: LocationSelectorProps) {
               <button
                 key={item.id}
                 onClick={() => onPick(item)}
-                className="flex items-center justify-between w-full px-4 py-2.5 text-sm hover:bg-muted/50 transition-colors text-left cursor-pointer"
+                className="flex items-center justify-between w-full px-4 py-2.5 type-nav hover:bg-muted/50 transition-colors text-left cursor-pointer"
               >
                 <span>{item.name}</span>
                 {step !== "commune" && (

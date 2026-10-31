@@ -50,7 +50,7 @@ export interface AttachmentDownloadUrl {
  *
  * The server only ever handles ciphertext. Keys, MIME types, names and the
  * ciphertext hash live in the E2E message; the recipient verifies integrity.
- * See tasks/plan-e2e-attachments.md.
+ * See docs/e2e-attachments.md.
  */
 @Injectable()
 export class ChatAttachmentsService {

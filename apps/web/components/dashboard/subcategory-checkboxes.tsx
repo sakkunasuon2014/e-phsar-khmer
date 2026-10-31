@@ -28,7 +28,7 @@ export function SubcategoryCheckboxes({
 
   if (filteredSubcategories.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+      <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
         No subcategories available for this category.
       </p>
     );
@@ -38,7 +38,7 @@ export function SubcategoryCheckboxes({
       {filteredSubcategories.map((sub) => (
         <label
           key={sub.subId}
-          className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm"
+          className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer type-body-sm"
         >
           <Checkbox
             checked={selectedIds.includes(sub.subId)}

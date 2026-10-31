@@ -75,13 +75,13 @@ export default async function InsightPage() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4">
-        <h1 className="text-2xl font-semibold text-foreground mb-4">
+        <h1 className="type-page-title text-foreground mb-4">
           {tInsight("title")}
         </h1>
         <div className="bg-card border rounded-sm shadow-sm overflow-hidden">
           {/* Section Header */}
           <div className="px-4 py-4">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className="type-section-title text-foreground">
               {tInsight("summary")}
             </h2>
             {summary === null ? (
@@ -98,7 +98,7 @@ export default async function InsightPage() {
                 className="px-4 py-4 flex items-start justify-between group transition-colors"
               >
                 <div className="space-y-1">
-                  <h3 className="text-md font-medium text-foreground">
+                  <h3 className="type-card-heading text-foreground">
                     {tInsight(item.labelKey)}
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed max-w-md">

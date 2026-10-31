@@ -15,10 +15,10 @@ export default function AttributePage() {
     <main className="flex-1 overflow-auto p-6 min-w-0">
       <div className="flex flex-col gap-6">
         <div>
-          <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
+          <h1 className="type-page-title text-[#00a0e9] tracking-tight">
             Attributes
           </h1>
-          <p className="text-sm text-muted-foreground mt-2">
+          <p className="type-body-sm text-muted-foreground mt-2">
             Manage the option sets used by listing forms.
           </p>
         </div>
@@ -27,7 +27,7 @@ export default function AttributePage() {
             <Link
               key={a.href}
               href={a.href}
-              className="rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium hover:border-[#00a0e9] hover:text-[#00a0e9] transition-colors"
+              className="rounded-lg border border-border bg-card px-4 py-3 type-nav hover:border-[#00a0e9] hover:text-[#00a0e9] transition-colors"
             >
               {a.title}
             </Link>

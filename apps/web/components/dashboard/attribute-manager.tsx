@@ -1,30 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-  MoreHorizontal,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
-import DbImage, { NoImageCell } from "@/components/common/DbImage";
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -33,12 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -59,6 +34,17 @@ import {
   deleteAttribute,
   type AdminAttribute,
 } from "@/actions/admin-attributes";
+import { AdminPage } from "@/components/dashboard/admin-page";
+import {
+  AdminSearch,
+  AdminTable,
+  ChipList,
+  DateCell,
+  EntityChip,
+  PrimaryCell,
+  RowActions,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 
 interface FormState {
   name: string;
@@ -79,8 +65,10 @@ const EMPTY: FormState = {
 };
 
 /**
- * Generic admin CRUD table for any attribute-option `type`
- * (colors, rams, cpus, body types, …), backed by `/admin/attributes/:type`.
+ * Generic admin CRUD for any attribute-option `type` (body types, accessories,
+ * job types, …), backed by `/admin/attributes/:type`. It renders on the shared
+ * admin table kit, so an image-led option (Body Types) leads with its icon
+ * instead of a raw UUID row.
  */
 export function AttributeManager({
   type,
@@ -94,7 +82,7 @@ export function AttributeManager({
   readOnly?: boolean;
 }) {
   const queryClient = useQueryClient();
-  const { data: items = [] } = useQuery({
+  const { data: items = [], isLoading } = useQuery({
     queryKey: ["admin", "attributes", type],
     queryFn: () => getAdminAttributes(type),
   });
@@ -116,8 +104,6 @@ export function AttributeManager({
   const [selected, setSelected] = useState<AdminAttribute | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY);
   const [saving, setSaving] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const availableSubcategories = allSubcategories.filter(
     (s) => s.categoryId === form.categoryId,
@@ -130,27 +116,38 @@ export function AttributeManager({
         : [...prev.subcategories, subId],
     }));
 
-  const filtered = items.filter((i) => {
-    const q = searchQuery.toLowerCase();
-    if (!q) return true;
-    const categoryName =
-      allCategories.find((c) => c.cateId === i.categoryId)?.name ?? "";
-    const subNames = i.subcategories
-      .map((id) => allSubcategories.find((s) => s.subId === id)?.name ?? "")
-      .join(" ");
-    return (
-      i.name.toLowerCase().includes(q) ||
-      (i.nameKm ?? "").toLowerCase().includes(q) ||
-      i.slug.toLowerCase().includes(q) ||
-      categoryName.toLowerCase().includes(q) ||
-      subNames.toLowerCase().includes(q)
-    );
-  });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / rowsPerPage));
-  const paginated = filtered.slice(
-    (currentPage - 1) * rowsPerPage,
-    currentPage * rowsPerPage,
+  const categoryById = useMemo(
+    () => new Map(allCategories.map((category) => [category.cateId, category])),
+    [allCategories],
   );
+  const subcategoryById = useMemo(
+    () => new Map(allSubcategories.map((sub) => [sub.subId, sub])),
+    [allSubcategories],
+  );
+
+  const subcategoryNames = (item: AdminAttribute) =>
+    item.subcategories
+      .map((id) => subcategoryById.get(id)?.name)
+      .filter((name): name is string => Boolean(name));
+
+  const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => {
+      const categoryName = categoryById.get(item.categoryId)?.name ?? "";
+      return [
+        item.name,
+        item.nameKm ?? "",
+        item.slug,
+        categoryName,
+        ...subcategoryNames(item),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- subcategoryNames is a pure lookup over the map below
+  }, [items, searchQuery, categoryById, subcategoryById]);
 
   const submit = async (id?: string) => {
     setSaving(true);
@@ -266,11 +263,11 @@ export function AttributeManager({
       <div className="grid gap-2">
         <Label>Subcategories</Label>
         {!form.categoryId ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             Choose a category first
           </p>
         ) : availableSubcategories.length === 0 ? (
-          <p className="text-sm text-muted-foreground border rounded-md px-3 py-2">
+          <p className="type-body-sm text-muted-foreground border rounded-md px-3 py-2">
             No subcategories available
           </p>
         ) : (
@@ -278,7 +275,7 @@ export function AttributeManager({
             {availableSubcategories.map((sub) => (
               <label
                 key={sub.subId}
-                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer text-sm"
+                className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted cursor-pointer type-body-sm"
               >
                 <Checkbox
                   checked={form.subcategories.includes(sub.subId)}
@@ -293,250 +290,128 @@ export function AttributeManager({
     </div>
   );
 
+  const columns = useMemo<AdminColumn<AdminAttribute>[]>(
+    () => [
+      {
+        key: "name",
+        header: "Name",
+        sortValue: (item) => item.name,
+        cell: (item) => (
+          <PrimaryCell
+            image={hasImage ? item.image : undefined}
+            alt={item.name}
+            title={item.name}
+            subtitle={item.nameKm || undefined}
+            imageClassName="object-contain p-0.5"
+          />
+        ),
+      },
+      {
+        key: "slug",
+        header: "Slug",
+        sortValue: (item) => item.slug,
+        cell: (item) => (
+          <span className="text-muted-foreground">{item.slug}</span>
+        ),
+      },
+      {
+        key: "category",
+        header: "Category",
+        sortValue: (item) => categoryById.get(item.categoryId)?.name ?? "",
+        cell: (item) => (
+          <EntityChip tone="category">
+            {categoryById.get(item.categoryId)?.name ?? "—"}
+          </EntityChip>
+        ),
+      },
+      {
+        key: "subcategories",
+        header: "Sub Categories",
+        sortValue: (item) => subcategoryNames(item).join(", "),
+        cell: (item) => <ChipList items={subcategoryNames(item)} max={3} />,
+      },
+      {
+        key: "updated",
+        header: "Updated",
+        sortValue: (item) => item.updatedAt,
+        cell: (item) => <DateCell value={item.updatedAt} />,
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (item) =>
+          readOnly ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <RowActions
+              id={item.id}
+              actions={[
+                {
+                  label: "Edit",
+                  icon: <Pencil className="mr-2 size-4" />,
+                  tone: "warning",
+                  onSelect: () => openEdit(item),
+                },
+                {
+                  label: "Delete",
+                  icon: <Trash2 className="mr-2 size-4" />,
+                  tone: "danger",
+                  onSelect: () => {
+                    setSelected(item);
+                    setIsDeleteOpen(true);
+                  },
+                },
+              ]}
+            />
+          ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- openEdit only sets state
+    [categoryById, subcategoryById],
+  );
+
   return (
     <>
-      <main className="flex-1 overflow-auto p-6 min-w-0">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
-                {title}
-              </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Manage {title} here.
-              </p>
-            </div>
-            {readOnly ? (
-              <p className="text-sm text-muted-foreground">
-                Years are generated automatically (1980 –{" "}
-                {new Date().getFullYear() + 1}) and cannot be edited.
-              </p>
-            ) : (
-              <Button
-                className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
-                onClick={openAdd}
-              >
-                <Plus className="mr-2 size-4" />
-                Add {title}
-              </Button>
-            )}
-          </div>
-
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                // Back to page 1 so a shrinking result set can't leave the
-                // pagination pointing past the end (matches rowsPerPage reset).
-                setCurrentPage(1);
-              }}
-              className="pl-9"
-            />
-          </div>
-
-          <div className="rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center">ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Khmer Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  {hasImage && <TableHead>Image</TableHead>}
-                  <TableHead>Category</TableHead>
-                  <TableHead>Sub Category</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginated.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={hasImage ? 9 : 8}
-                      className="h-32 text-center"
-                    >
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Search className="size-8" />
-                        <p>No {title} found</p>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  paginated.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-center font-mono text-xs text-muted-foreground">
-                        {item.id.slice(0, 8)}
-                      </TableCell>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell>{item.nameKm ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {item.slug}
-                      </TableCell>
-                      {hasImage && (
-                        <TableCell>
-                          <DbImage
-                            src={item.image ?? ""}
-                            alt={item.name}
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 object-contain rounded border bg-muted/30 p-0.5"
-                            fallback={<NoImageCell />}
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell>
-                        {allCategories.find(
-                          (c) => c.cateId === item.categoryId,
-                        ) && (
-                          <span className="rounded bg-sky-200 px-2 py-1 text-sm text-black">
-                            {
-                              allCategories.find(
-                                (c) => c.cateId === item.categoryId,
-                              )?.name
-                            }
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {item.subcategories.map((id) => {
-                            const sub = allSubcategories.find(
-                              (s) => s.subId === id,
-                            );
-                            return (
-                              <span
-                                key={id}
-                                className="rounded bg-sky-100 px-2 py-1 text-sm text-black"
-                              >
-                                {sub?.name ?? id.slice(0, 8)}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.createdAt}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {item.updatedAt}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {readOnly ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="rounded-full cursor-pointer"
-                              >
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="center">
-                              <DropdownMenuItem
-                                className="text-orange-500 cursor-pointer"
-                                onClick={() => openEdit(item)}
-                              >
-                                <Pencil className="mr-2 size-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-destructive cursor-pointer"
-                                onClick={() => {
-                                  setSelected(item);
-                                  setIsDeleteOpen(true);
-                                }}
-                              >
-                                <Trash2 className="mr-2 size-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-
-            <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                Rows per page
-                <Select
-                  value={rowsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setRowsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronsLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+      <AdminPage
+        title={title}
+        description={
+          readOnly
+            ? `Years are generated automatically (1980 – ${new Date().getFullYear() + 1}) and cannot be edited.`
+            : `Manage ${title} here.`
+        }
+        action={
+          readOnly ? undefined : (
+            <Button
+              className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+              onClick={openAdd}
+            >
+              <Plus className="mr-2 size-4" />
+              Add {title}
+            </Button>
+          )
+        }
+        toolbar={
+          <AdminSearch
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search name, Khmer name, slug, category..."
+          />
+        }
+      >
+        <AdminTable
+          columns={columns}
+          rows={filtered}
+          rowKey={(item) => item.id}
+          isLoading={isLoading}
+          pageSize={20}
+          resetKey={searchQuery}
+          emptyTitle={`No ${title} found`}
+          emptyHint={
+            searchQuery ? `No results for "${searchQuery}"` : undefined
+          }
+        />
+      </AdminPage>
 
       {/* Add / Edit dialogs share the same field set */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
@@ -549,7 +424,7 @@ export function AttributeManager({
           <DialogFooter>
             <Button
               variant="outline"
-              className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+              className="h-9 rounded-sm cursor-pointer"
               onClick={() => setIsAddOpen(false)}
             >
               Cancel
@@ -575,7 +450,7 @@ export function AttributeManager({
           <DialogFooter>
             <Button
               variant="outline"
-              className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+              className="h-9 rounded-sm cursor-pointer"
               onClick={() => setIsEditOpen(false)}
             >
               Cancel
@@ -603,7 +478,7 @@ export function AttributeManager({
           <DialogFooter>
             <Button
               variant="outline"
-              className="h-9 bg-sky-500 text-white rounded-sm hover:bg-sky-600 hover:text-white cursor-pointer"
+              className="h-9 rounded-sm cursor-pointer"
               onClick={() => setIsDeleteOpen(false)}
             >
               Cancel

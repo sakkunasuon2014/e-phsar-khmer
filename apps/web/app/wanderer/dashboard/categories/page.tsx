@@ -1,17 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, Pencil, Trash2, Search, MoreHorizontal } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -21,16 +12,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Loader2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAdminCategories } from "@/actions/admin-categories";
-import DbImage, { NoImageCell } from "@/components/common/DbImage";
+import { getAdminSubcategories } from "@/actions/admin-subcategories";
 import { ImageUpload } from "@/components/dashboard/image-upload";
 import type { Category } from "@/types/category";
 import {
@@ -42,6 +26,15 @@ import { useAppForm } from "@/components/form/hooks";
 import { categorySchema } from "@/schemas/category";
 import { FieldGroup } from "@/components/ui/field";
 import { toast } from "@/components/ui/sonner";
+import { AdminPage } from "@/components/dashboard/admin-page";
+import {
+  AdminSearch,
+  AdminTable,
+  DateCell,
+  PrimaryCell,
+  RowActions,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 import { z } from "zod";
 
 type CategoryFormData = z.infer<typeof categorySchema>;
@@ -114,7 +107,7 @@ function AddCategoryForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -196,7 +189,7 @@ function EditCategoryForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -257,7 +250,7 @@ function DeleteCategoryForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
           disabled={isDeleting}
         >
@@ -280,9 +273,13 @@ function DeleteCategoryForm({
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient();
-  const { data: categoryList = [] } = useQuery({
+  const { data: categoryList = [], isLoading } = useQuery({
     queryKey: ["admin", "categories"],
     queryFn: getAdminCategories,
+  });
+  const { data: subcategories = [] } = useQuery({
+    queryKey: ["admin", "subcategories"],
+    queryFn: getAdminSubcategories,
   });
   const refreshCategories = () =>
     queryClient.invalidateQueries({ queryKey: ["admin", "categories"] });
@@ -294,12 +291,27 @@ export default function CategoriesPage() {
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryWithDates | null>(null);
 
-  const filteredCategories = categoryList.filter(
-    (category) =>
-      category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      category.nameKm.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      category.slug.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const subcategoryCount = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const subcategory of subcategories) {
+      counts.set(
+        subcategory.categoryId,
+        (counts.get(subcategory.categoryId) ?? 0) + 1,
+      );
+    }
+    return counts;
+  }, [subcategories]);
+
+  const filteredCategories = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return categoryList;
+    return categoryList.filter((category) =>
+      [category.name, category.nameKm, category.slug]
+        .join(" ")
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [categoryList, searchQuery]);
 
   const handleAddSuccess = (data: CategoryFormData) => {
     refreshCategories();
@@ -334,158 +346,124 @@ export default function CategoriesPage() {
     setIsDeleteDialogOpen(true);
   };
 
+  const columns = useMemo<AdminColumn<CategoryWithDates>[]>(
+    () => [
+      {
+        key: "category",
+        header: "Category",
+        sortValue: (category) => category.name,
+        cell: (category) => (
+          <PrimaryCell
+            image={category.cateIcon}
+            alt={category.name}
+            title={category.name}
+            subtitle={category.nameKm || category.slug}
+          />
+        ),
+      },
+      {
+        key: "slug",
+        header: "Slug",
+        sortValue: (category) => category.slug,
+        cell: (category) => (
+          <span className="text-muted-foreground">{category.slug}</span>
+        ),
+      },
+      {
+        key: "subcategories",
+        header: "Sub Categories",
+        align: "center",
+        sortValue: (category) => subcategoryCount.get(category.cateId) ?? 0,
+        cell: (category) => (
+          <span className="type-body-sm">
+            {subcategoryCount.get(category.cateId) ?? 0}
+          </span>
+        ),
+      },
+      {
+        key: "updated",
+        header: "Updated",
+        sortValue: (category) => category.updatedAt,
+        cell: (category) => <DateCell value={category.updatedAt} />,
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (category) => (
+          <RowActions
+            id={category.cateId}
+            actions={[
+              {
+                label: "Edit",
+                icon: <Pencil className="mr-2 size-4" />,
+                tone: "warning",
+                onSelect: () => openEditDialog(category),
+              },
+              {
+                label: "Delete",
+                icon: <Trash2 className="mr-2 size-4" />,
+                tone: "danger",
+                onSelect: () => openDeleteDialog(category),
+              },
+            ]}
+          />
+        ),
+      },
+    ],
+    [subcategoryCount],
+  );
+
   return (
     <>
-      <main className="flex-1 overflow-auto p-6 min-w-0">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
-                Categories
-              </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Manage product categories
-              </p>
-            </div>
+      <AdminPage
+        title="Categories"
+        description="Manage product categories"
+        action={
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
+                <Plus className="mr-2 size-4" />
+                Add Category
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Category</DialogTitle>
+                <DialogDescription>
+                  Create a new category for your products.
+                </DialogDescription>
+              </DialogHeader>
 
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
-                  <Plus className="mr-2 size-4" />
-                  Add Category
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Category</DialogTitle>
-                  <DialogDescription>
-                    Create a new category for your products.
-                  </DialogDescription>
-                </DialogHeader>
-
-                {isAddDialogOpen && (
-                  <AddCategoryForm
-                    onSuccess={handleAddSuccess}
-                    onCancel={() => setIsAddDialogOpen(false)}
-                  />
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9 border-border bg-card text-foreground focus-visible:ring-1 focus-visible:ring-[#00a0e9] focus-visible:border-[#00a0e9] transition-all"
-            />
-          </div>
-
-          <div className="rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center">ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead className="text-start">Image</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {filteredCategories.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Search className="size-8" />
-                        <p>No category found</p>
-
-                        {searchQuery && (
-                          <p className="text-sm">
-                            No results for &quot;{searchQuery}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredCategories.map((category) => (
-                    <TableRow key={category.cateId}>
-                      <TableCell className="text-center">
-                        {category.cateId}
-                      </TableCell>
-
-                      <TableCell>
-                        <div>{category.name}</div>
-                        {category.nameKm && (
-                          <div className="text-xs text-muted-foreground">
-                            {category.nameKm}
-                          </div>
-                        )}
-                      </TableCell>
-
-                      <TableCell>{category.slug}</TableCell>
-
-                      <TableCell className="flex justify-start">
-                        <DbImage
-                          src={category.cateIcon}
-                          alt={category.name}
-                          width={56}
-                          height={56}
-                          className="h-12 w-12 object-cover"
-                          fallback={<NoImageCell />}
-                        />
-                      </TableCell>
-
-                      <TableCell className="text-xs text-muted-foreground">
-                        {category.createdAt}
-                      </TableCell>
-
-                      <TableCell className="text-xs text-muted-foreground">
-                        {category.updatedAt}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="rounded-full cursor-pointer"
-                            >
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="center">
-                            <DropdownMenuItem
-                              className="cursor-pointer text-orange-500"
-                              onClick={() => openEditDialog(category)}
-                            >
-                              <Pencil className="mr-2 size-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="cursor-pointer text-destructive"
-                              onClick={() => openDeleteDialog(category)}
-                            >
-                              <Trash2 className="mr-2 size-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </main>
+              {isAddDialogOpen && (
+                <AddCategoryForm
+                  onSuccess={handleAddSuccess}
+                  onCancel={() => setIsAddDialogOpen(false)}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        }
+        toolbar={
+          <AdminSearch
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search category name, Khmer name, slug..."
+          />
+        }
+      >
+        <AdminTable
+          columns={columns}
+          rows={filteredCategories}
+          rowKey={(category) => category.cateId}
+          isLoading={isLoading}
+          resetKey={searchQuery}
+          emptyTitle="No category found"
+          emptyHint={
+            searchQuery ? `No results for "${searchQuery}"` : undefined
+          }
+        />
+      </AdminPage>
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>

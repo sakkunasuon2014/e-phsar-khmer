@@ -15,14 +15,14 @@ import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LocationSelectorFilter } from "@/components/filter/LocationSelectorFilter";
 import SortFilter from "@/components/filter/SortFilter";
 import PriceFilter from "@/components/filter/PriceFilter";
+import YearFilter from "@/components/filter/YearFilter";
 import MoreFilters from "@/components/filter/MoreFilters";
 import { cn } from "@/lib/utils";
 import {
   CONDITION_OPTIONS,
   CONDITION_PARAM,
+  ENGINE_LABEL_KEYS,
   ENGINE_PARAM,
-  YEAR_MAX_PARAM,
-  YEAR_MIN_PARAM,
 } from "@/lib/search-params";
 
 export interface LSPCYEHeaderProps {
@@ -41,6 +41,11 @@ export interface LSPCYEHeaderProps {
    * the post form stores in `attributes.engineType` (e.g. "Petrol").
    */
   engineOptions?: string[];
+  /**
+   * Model years from the generated `years` set (current year + 1 → 1980),
+   * newest first — the Year chip's Minimum / Maximum options.
+   */
+  yearOptions?: string[];
 }
 
 interface ChipOption {
@@ -92,7 +97,7 @@ function ChipSelect({
               onSelect(opt.key);
               setOpen(false);
             }}
-            className="flex w-full items-center justify-between rounded-sm px-3 py-2 text-left text-sm hover:bg-muted/60 transition-colors cursor-pointer"
+            className="flex w-full items-center justify-between rounded-sm px-3 py-2 text-left type-nav hover:bg-muted/60 transition-colors cursor-pointer"
           >
             <span>{opt.label}</span>
             {value === opt.key && <Check className="size-4 text-sky-600" />}
@@ -103,32 +108,6 @@ function ChipSelect({
   );
 }
 
-/**
- * Year buckets: each of the last few model years on its own, then one
- * "& older" bucket. A bucket is a `year_min`/`year_max` pair; the key encodes
- * both so a URL-driven range can be matched back to its row.
- */
-function yearOptions(): {
-  key: string;
-  min?: number;
-  max?: number;
-  kind: "all" | "single" | "older";
-}[] {
-  const newest = new Date().getFullYear() + 1; // next model year is sold already
-  const singles = Array.from({ length: 8 }, (_, i) => newest - i).map((y) => ({
-    key: `${y}-${y}`,
-    min: y,
-    max: y,
-    kind: "single" as const,
-  }));
-  const older = newest - 8;
-  return [
-    { key: "", kind: "all" },
-    ...singles,
-    { key: `-${older}`, max: older, kind: "older" },
-  ];
-}
-
 export default function LSPYCEHeader({
   title,
   year = true,
@@ -137,8 +116,13 @@ export default function LSPYCEHeader({
   price = true,
   priceLabel,
   engineOptions = [],
+  yearOptions = [],
 }: LSPCYEHeaderProps) {
   const t = useTranslations();
+  const engineLabel = (value: string) => {
+    const key = ENGINE_LABEL_KEYS[value];
+    return key ? t(`PostForm.options.${key}`) : value;
+  };
   const resolvedPriceLabel = priceLabel ?? t("Filters.price.label");
   const router = useRouter();
   const pathname = usePathname();
@@ -159,34 +143,15 @@ export default function LSPYCEHeader({
 
   const conditionValue = searchParams.get(CONDITION_PARAM) ?? "";
   const engineValue = searchParams.get(ENGINE_PARAM) ?? "";
-  const yearMin = searchParams.get(YEAR_MIN_PARAM) ?? "";
-  const yearMax = searchParams.get(YEAR_MAX_PARAM) ?? "";
-  const yearKey = yearMin || yearMax ? `${yearMin}-${yearMax}` : "";
   const conditionOption = CONDITION_OPTIONS.find(
     (o) => o.value === conditionValue,
   );
-  const years = yearOptions().map((o) => ({
-    ...o,
-    label:
-      o.kind === "all"
-        ? t("Filters.year.all")
-        : o.kind === "older"
-          ? t("Filters.year.older", { year: o.max ?? "" })
-          : o.key,
-  }));
-  const yearLabel =
-    years.find((o) => o.key === yearKey)?.label ??
-    (yearMin && yearMax
-      ? `${yearMin}–${yearMax}`
-      : yearMin
-        ? t("Filters.year.from", { year: yearMin })
-        : t("Filters.year.older", { year: yearMax }));
 
   return (
     <>
       {/* HEADER */}
       <div className="px-6 py-3 bg-card rounded-t-sm border">
-        <h1 className="font-semibold text-lg md:text-lg">
+        <h1 className="type-page-title">
           {t("Common.inCambodia", { name: title })}
         </h1>
       </div>
@@ -201,27 +166,19 @@ export default function LSPYCEHeader({
           <SortFilter />
           {price && <PriceFilter label={resolvedPriceLabel} />}
 
-          {year && (
-            <ChipSelect
-              label={t("Filters.year.label")}
-              activeLabel={yearLabel}
-              value={yearKey}
-              options={years}
-              onSelect={(key) => {
-                const opt = years.find((o) => o.key === key);
-                replaceParams({
-                  [YEAR_MIN_PARAM]: opt?.min ? String(opt.min) : null,
-                  [YEAR_MAX_PARAM]: opt?.max ? String(opt.max) : null,
-                });
-              }}
-            />
+          {year && yearOptions.length > 0 && (
+            <YearFilter options={yearOptions} />
           )}
 
           {condition && (
             <ChipSelect
               label={t("Filters.condition.label")}
               activeLabel={
-                conditionOption ? t(conditionOption.labelKey) : undefined
+                conditionOption
+                  ? t("Filters.condition.activeChip", {
+                      label: t(conditionOption.labelKey),
+                    })
+                  : undefined
               }
               value={conditionValue}
               options={[
@@ -238,17 +195,26 @@ export default function LSPYCEHeader({
           {engine && engineOptions.length > 0 && (
             <ChipSelect
               label={t("Filters.engine.label")}
-              activeLabel={engineValue}
+              activeLabel={
+                engineValue
+                  ? t("Filters.engine.activeChip", {
+                      label: engineLabel(engineValue),
+                    })
+                  : undefined
+              }
               value={engineValue}
               options={[
                 { key: "", label: t("Filters.engine.all") },
-                ...engineOptions.map((name) => ({ key: name, label: name })),
+                ...engineOptions.map((name) => ({
+                  key: name,
+                  label: engineLabel(name),
+                })),
               ]}
               onSelect={(key) => replaceParams({ [ENGINE_PARAM]: key })}
             />
           )}
 
-          <MoreFilters />
+          <MoreFilters priceLabel={resolvedPriceLabel} />
         </div>
         <TabsList className="h-9 shrink-0">
           <TabsTrigger value="grid" className="cursor-pointer px-3">

@@ -1,62 +1,79 @@
 "use server";
 
-import { ApiError, userServerFetch } from "@/lib/api/client";
+import { API_URL, ApiError, userServerFetch } from "@/lib/api/client";
 
-export type ReportTargetType = "user" | "listing";
-
-export interface ReportReasonOption {
+export interface PublicReportReason {
   id: string;
   reason: string;
 }
 
-export interface CreateReportInput {
-  targetType: ReportTargetType;
-  targetId: string;
-  reasonId: string;
-  description?: string;
-  imagePaths?: string[];
-}
-
-export type CreateReportResult =
+type ReportResult =
   | { success: true }
-  | { success: false; error: string; status?: number };
+  | { success: false; error: string; code?: "AUTH" | "DUPLICATE" };
 
-/**
- * Read the moderation picklist. Public on the backend (the dialogs must render
- * before a session exists), so this works for anonymous visitors too. Fails
- * soft to an empty list — the dialog renders "reasons unavailable" rather
- * than an error boundary.
- */
-export async function loadReportReasons(
-  targetType: ReportTargetType,
-): Promise<ReportReasonOption[]> {
+/** Admin-managed reasons for the report dialogs (public, fail-soft to []). */
+export async function getPublicReportReasons(
+  targetType: "user" | "listing",
+): Promise<PublicReportReason[]> {
   try {
-    const { data } = await userServerFetch<ReportReasonOption[]>(
-      `/reports/reasons?targetType=${targetType}`,
+    const res = await fetch(
+      `${API_URL}/reports/reasons?targetType=${targetType}`,
+      { cache: "no-store" },
     );
-    return data;
+    if (!res.ok) return [];
+    const body = (await res.json()) as { data?: PublicReportReason[] };
+    return body.data ?? [];
   } catch {
     return [];
   }
 }
 
-/**
- * File a report. MUST use `userServerFetch`: the admin twin would submit every
- * visitor's report as the logged-in admin.
- */
-export async function createReport(
-  input: CreateReportInput,
-): Promise<CreateReportResult> {
+function toResult(err: unknown, fallback: string): ReportResult {
+  if (err instanceof ApiError) {
+    if (err.status === 401) {
+      return { success: false, error: "Sign in to report", code: "AUTH" };
+    }
+    if (err.status === 409) {
+      return {
+        success: false,
+        error: "You have already reported this — it is being reviewed.",
+        code: "DUPLICATE",
+      };
+    }
+    return { success: false, error: err.message };
+  }
+  return { success: false, error: fallback };
+}
+
+export async function reportListing(input: {
+  listingId: string;
+  reasonId: string;
+  description?: string;
+}): Promise<ReportResult> {
   try {
-    await userServerFetch("/reports", {
+    await userServerFetch("/reports/listings", {
       method: "POST",
       body: JSON.stringify(input),
     });
     return { success: true };
   } catch (err) {
-    if (err instanceof ApiError) {
-      return { success: false, error: err.message, status: err.status };
-    }
-    return { success: false, error: "Failed to submit the report" };
+    return toResult(err, "Failed to send report");
+  }
+}
+
+export async function reportUser(input: {
+  targetUserId: string;
+  reasonId: string;
+  description?: string;
+  imagePaths?: string[];
+}): Promise<ReportResult> {
+  try {
+    await userServerFetch("/reports/users", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return { success: true };
+  } catch (err) {
+    return toResult(err, "Failed to send report");
   }
 }

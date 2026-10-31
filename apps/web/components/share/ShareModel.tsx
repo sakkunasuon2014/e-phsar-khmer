@@ -50,7 +50,7 @@ export default function ShareModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg pb-8">
         <DialogHeader>
-          <DialogTitle className="font-semibold">{t("title")}</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
         <Separator className="my-1" />
         <div className="flex justify-center gap-4 py-4">

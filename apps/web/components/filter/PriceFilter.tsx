@@ -129,7 +129,9 @@ export default function PriceFilter({ label }: { label?: string } = {}) {
       </PopoverTrigger>
       <PopoverContent align="center" className="rounded-sm w-xs p-0 mt-3 pb-3">
         <div className="space-y-4 px-4">
-          <h3 className="text-center text-base mt-3">{resolvedLabel}</h3>
+          <h3 className="text-center type-card-heading mt-3">
+            {resolvedLabel}
+          </h3>
           <Separator />
           <div className="flex gap-3">
             <Input

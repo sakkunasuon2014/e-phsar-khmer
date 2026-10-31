@@ -23,12 +23,6 @@ function makeDb() {
 }
 
 function makeService(db: ReturnType<typeof makeDb>) {
-  const supabase = {
-    getPublicUrl: jest.fn(() => ({
-      data: { publicUrl: 'https://cdn.example.com/img.jpg' },
-    })),
-  };
-  const config = { get: jest.fn(() => 'listings') };
   const pubsub = { publish: jest.fn(() => Promise.resolve()) };
   const metrics = { beginSend: jest.fn(), endSend: jest.fn() };
   const attachments = {
@@ -40,14 +34,23 @@ function makeService(db: ReturnType<typeof makeDb>) {
   };
   const service = new ChatService(
     db as never,
-    supabase as never,
-    config as never,
     pubsub as never,
     metrics as never,
     attachments as never,
   );
-  return { service, supabase, pubsub, attachments };
+  return { service, pubsub, attachments };
 }
+
+const e2eHeader = {
+  v: 1 as const,
+  dh: 'ratchet-pub-key',
+  pn: 0,
+  n: 0,
+  identityKey: 'idkey',
+  ephemeralKey: 'ephkey',
+  oneTimePrekeyId: 3,
+  signedPrekeyId: 1,
+};
 
 // .from().where().limit() → rows
 function limitQuery(rows: unknown[]) {
@@ -121,6 +124,35 @@ function collectStrings(value: unknown, seen = new Set<unknown>()): string[] {
   );
 }
 
+/**
+ * Column names a drizzle predicate actually references. A Column also carries
+ * its whole table (every column on it), so a full deep scan would report
+ * `deleted_at` even when the predicate never filters on it. Walk the SQL
+ * chunks and stop at Column values instead.
+ */
+function predicateColumns(value: unknown): string[] {
+  const names: string[] = [];
+  const visit = (v: unknown): void => {
+    if (Array.isArray(v)) {
+      v.forEach(visit);
+      return;
+    }
+    if (typeof v !== 'object' || v === null) return;
+    const maybe = v as {
+      name?: unknown;
+      table?: unknown;
+      queryChunks?: unknown;
+    };
+    if (typeof maybe.name === 'string' && maybe.table) {
+      names.push(maybe.name);
+      return;
+    }
+    if (Array.isArray(maybe.queryChunks)) maybe.queryChunks.forEach(visit);
+  };
+  visit(value);
+  return names;
+}
+
 function encodeCursor(createdAt: Date, id: string): string {
   return Buffer.from(JSON.stringify({ createdAt, id })).toString('base64');
 }
@@ -133,6 +165,8 @@ function decodeCursor(cursor: string): { createdAt: string; id: string } {
 }
 
 const NOW = new Date('2026-07-13T10:00:00.000Z');
+// Distinct from NOW so a mistaken pass-through of some other timestamp shows up.
+const SEEN_AT = new Date('2026-07-13T09:30:00.000Z');
 
 // Cursor ids are compared against `uuid` columns, so decodeCursor only accepts
 // UUIDs. Tests that put an id INSIDE a cursor must use these; ids that are only
@@ -145,9 +179,6 @@ const UUID = {
 
 // A real UUID for the sender, so imagePath ownership tests exercise the same
 // shape production does (`chat/{uuid}/{uuid}-{name}`).
-const SENDER = '11111111-1111-4111-8111-111111111111';
-const VICTIM = '22222222-2222-4222-8222-222222222222';
-
 const conversation = {
   id: 'c1',
   userAId: 'u1',
@@ -177,11 +208,10 @@ function makeMessage(
 describe('ChatService.sendMessage', () => {
   let db: ReturnType<typeof makeDb>;
   let service: ChatService;
-  let supabase: { getPublicUrl: jest.Mock };
 
   beforeEach(() => {
     db = makeDb();
-    ({ service, supabase } = makeService(db));
+    ({ service } = makeService(db));
   });
 
   function mockInserts(captured: Record<string, unknown>[]) {
@@ -236,7 +266,7 @@ describe('ChatService.sendMessage', () => {
     db.select.mockReturnValue(limitQuery([]));
 
     await expect(
-      service.sendMessage('u1', { recipientId: 'u2', body: 'hi' }),
+      service.sendMessage('u1', { recipientId: 'u2', body: 'hi', e2eHeader }),
     ).rejects.toThrow(NotFoundException);
   });
 
@@ -249,7 +279,7 @@ describe('ChatService.sendMessage', () => {
     });
 
     await expect(
-      service.sendMessage('u1', { recipientId: 'u2', body: 'hi' }),
+      service.sendMessage('u1', { recipientId: 'u2', body: 'hi', e2eHeader }),
     ).rejects.toThrow(ForbiddenException);
   });
 
@@ -265,7 +295,8 @@ describe('ChatService.sendMessage', () => {
     await expect(
       service.sendMessage('u1', {
         recipientId: 'u2',
-        body: 'hi',
+        body: 'ciphertext',
+        e2eHeader,
         listingId: 'l1',
       }),
     ).rejects.toThrow(BadRequestException);
@@ -284,7 +315,8 @@ describe('ChatService.sendMessage', () => {
 
     const result = await service.sendMessage('u1', {
       recipientId: 'u2',
-      body: 'hi',
+      body: 'ciphertext',
+      e2eHeader,
     });
 
     expect(result.conversationId).toBe('c1');
@@ -294,7 +326,7 @@ describe('ChatService.sendMessage', () => {
     expect(captured[1]).toMatchObject({
       conversationId: 'c1',
       senderId: 'u1',
-      body: 'hi',
+      body: 'ciphertext',
       imageUrl: null,
     });
   });
@@ -318,7 +350,11 @@ describe('ChatService.sendMessage', () => {
       },
     }));
 
-    await service.sendMessage('u1', { recipientId: 'u2', body: 'hi' });
+    await service.sendMessage('u1', {
+      recipientId: 'u2',
+      body: 'hi',
+      e2eHeader,
+    });
 
     expect(sets).toEqual([{ lastMessageAt: NOW }]);
   });
@@ -333,35 +369,23 @@ describe('ChatService.sendMessage', () => {
     const captured: Record<string, unknown>[] = [];
     mockInserts(captured);
 
-    await service.sendMessage('u2', { recipientId: 'u1', body: 'yo' });
+    await service.sendMessage('u2', {
+      recipientId: 'u1',
+      body: 'yo',
+      e2eHeader,
+    });
 
     expect(captured[0]).toMatchObject({ userAId: 'u1', userBId: 'u2' });
   });
 
-  it('derives imageUrl from imagePath on image send', async () => {
-    let callCount = 0;
-    db.select.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) return limitQuery([{ id: 'u2' }]);
-      return limitQuery([]);
-    });
-    const captured: Record<string, unknown>[] = [];
-    mockInserts(captured);
-
-    await service.sendMessage('u1', {
-      recipientId: 'u2',
-      imagePath: 'chat/u1/pic.jpg',
-    });
-
-    expect(supabase.getPublicUrl).toHaveBeenCalledWith(
-      'listings',
-      'chat/u1/pic.jpg',
-    );
-    expect(captured[1]).toMatchObject({
-      imageUrl: 'https://cdn.example.com/img.jpg',
-      imagePath: 'chat/u1/pic.jpg',
-      body: null,
-    });
+  it('rejects the legacy public-image send path', async () => {
+    await expect(
+      service.sendMessage('u1', {
+        recipientId: 'u2',
+        imagePath: 'chat/u1/pic.jpg',
+      }),
+    ).rejects.toThrow(BadRequestException);
+    expect(db.select).not.toHaveBeenCalled();
   });
 
   it('attaches the listing context card on listing send', async () => {
@@ -388,7 +412,8 @@ describe('ChatService.sendMessage', () => {
 
     const result = await service.sendMessage('u1', {
       recipientId: 'u2',
-      body: 'Is this available?',
+      body: 'ciphertext',
+      e2eHeader,
       listingId: 'l1',
     });
 
@@ -401,17 +426,6 @@ describe('ChatService.sendMessage', () => {
       thumbnailUrl: 'https://cdn/p1.jpg',
     });
   });
-
-  const e2eHeader = {
-    v: 1 as const,
-    dh: 'ratchet-pub-key',
-    pn: 0,
-    n: 0,
-    identityKey: 'idkey',
-    ephemeralKey: 'ephkey',
-    oneTimePrekeyId: 3,
-    signedPrekeyId: 1,
-  };
 
   it('throws BadRequestException when e2eHeader is combined with imagePath', async () => {
     await expect(
@@ -447,19 +461,12 @@ describe('ChatService.sendMessage', () => {
     });
   });
 
-  it('stores isE2e: false and a null e2eHeader on a plaintext send', async () => {
-    let callCount = 0;
-    db.select.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) return limitQuery([{ id: 'u2' }]);
-      return limitQuery([]);
-    });
-    const captured: Record<string, unknown>[] = [];
-    mockInserts(captured);
-
-    await service.sendMessage('u1', { recipientId: 'u2', body: 'hi' });
-
-    expect(captured[1]).toMatchObject({ isE2e: false, e2eHeader: null });
+  it('rejects a plaintext body instead of persisting it', async () => {
+    await expect(
+      service.sendMessage('u1', { recipientId: 'u2', body: 'hi' }),
+    ).rejects.toThrow(BadRequestException);
+    expect(db.select).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   // ── v1 stale-identity check (Phase 0) ─────────────────────────────────────
@@ -526,14 +533,22 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
     ({ service, pubsub } = makeService(db));
   });
 
+  /** A non-revoked device row as loadTargetDevices reads it. */
+  const device = (id: string, userId: string, fresh = true, seenDay = 25) => ({
+    id,
+    userId,
+    lastSeenAt: new Date(Date.UTC(2026, 9, seenDay)),
+    fresh,
+  });
+
   /** Active devices: u1 = [d-me, d-me2], u2 = [d-peer]. */
-  function selectsWithDevices(
-    devices = [
-      { id: 'd-me', userId: 'u1' },
-      { id: 'd-me2', userId: 'u1' },
-      { id: 'd-peer', userId: 'u2' },
-    ],
-  ) {
+  const activeDevices = [
+    device('d-me', 'u1'),
+    device('d-me2', 'u1'),
+    device('d-peer', 'u2'),
+  ];
+
+  function selectsWithDevices(devices = activeDevices) {
     let callCount = 0;
     db.select.mockImplementation(() => {
       callCount++;
@@ -541,6 +556,23 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
       if (callCount === 2) return limitQuery([]); // no block
       return whereQuery(devices); // active devices of both users
     });
+  }
+
+  /**
+   * The v2 insert transaction. A send takes the per-user device advisory locks
+   * and re-reads the active set inside it, so the tx mock needs `execute` for
+   * the locks and a `select` reporting what the locked re-read sees.
+   */
+  function mockSendTx(devices = activeDevices) {
+    const tx = {
+      execute: jest.fn(() => Promise.resolve([])),
+      select: jest.fn(() => whereQuery(devices)),
+      insert: jest.fn(),
+    };
+    db.transaction.mockImplementation((cb: (t: typeof tx) => unknown) =>
+      cb(tx),
+    );
+    return tx;
   }
 
   function send(envelopes: ReturnType<typeof env>[], senderDeviceId = 'd-me') {
@@ -597,15 +629,83 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
   });
 
   it('rejects a sending device that is not active with 403', async () => {
-    selectsWithDevices([{ id: 'd-peer', userId: 'u2' }]);
+    selectsWithDevices([device('d-peer', 'u2')]);
 
     await expect(send([env('d-peer')])).rejects.toThrow(ForbiddenException);
   });
 
   it('returns 404 E2E_NO_RECIPIENT_DEVICES when the peer has no active device', async () => {
-    selectsWithDevices([{ id: 'd-me', userId: 'u1' }]);
+    selectsWithDevices([device('d-me', 'u1')]);
 
     await expect(send([env('d-peer')])).rejects.toThrow(NotFoundException);
+  });
+
+  describe('recipient whose every device is stale', () => {
+    // u2 went quiet past DEVICE_STALE_DAYS on three browsers. The fallback
+    // keeps their two most recently seen devices targetable instead of
+    // answering E2E_NO_RECIPIENT_DEVICES.
+    const quietPeer = [
+      device('d-me', 'u1'),
+      device('p-old', 'u2', false, 1),
+      device('p-new', 'u2', false, 9),
+      device('p-mid', 'u2', false, 5),
+    ];
+
+    function mockConversationUpsert() {
+      db.insert.mockImplementation(() => ({
+        values: () => ({
+          onConflictDoUpdate: () => ({
+            returning: () => Promise.resolve([conversation]),
+          }),
+        }),
+      }));
+    }
+
+    it('accepts envelopes for exactly the newest two devices', async () => {
+      selectsWithDevices(quietPeer);
+      mockConversationUpsert();
+      const tx = mockSendTx(quietPeer);
+      let txInsert = 0;
+      tx.insert.mockImplementation(() => ({
+        values: (v: unknown) => ({
+          returning: () =>
+            Promise.resolve(
+              ++txInsert === 1
+                ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                : (v as Record<string, unknown>[]),
+            ),
+        }),
+      }));
+
+      const result = await send([env('p-new'), env('p-mid')]);
+
+      expect(result.message.envelopes).toHaveLength(2);
+    });
+
+    it('rejects an envelope for a stale device outside the fallback', async () => {
+      selectsWithDevices(quietPeer);
+
+      const err = await send([env('p-new'), env('p-mid'), env('p-old')]).catch(
+        (e: unknown) => e,
+      );
+
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: 'E2E_DEVICES_MISMATCH',
+        details: { missing: [], stale: ['p-old'] },
+      });
+      expect(db.insert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a send missing one of the fallback devices', async () => {
+      selectsWithDevices(quietPeer);
+
+      const err = await send([env('p-new')]).catch((e: unknown) => e);
+
+      expect((err as ConflictException).getResponse()).toMatchObject({
+        code: 'E2E_DEVICES_MISMATCH',
+        details: { missing: [{ userId: 'u2', deviceId: 'p-mid' }], stale: [] },
+      });
+    });
   });
 
   it('stores message + envelopes in one transaction and pushes to both users', async () => {
@@ -623,28 +723,24 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
       },
     }));
     const txInserts: unknown[] = [];
-    const tx = {
-      insert: jest.fn(() => ({
-        values: (v: unknown) => {
-          txInserts.push(v);
-          return {
-            returning: () =>
-              Promise.resolve(
-                txInserts.length === 1
-                  ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
-                  : (v as Record<string, unknown>[]).map((e) => ({
-                      recipientDeviceId: e.recipientDeviceId,
-                      header: e.header,
-                      wrappedKey: e.wrappedKey,
-                    })),
-              ),
-          };
-        },
-      })),
-    };
-    db.transaction.mockImplementation((cb: (t: typeof tx) => unknown) =>
-      cb(tx),
-    );
+    const tx = mockSendTx();
+    tx.insert.mockImplementation(() => ({
+      values: (v: unknown) => {
+        txInserts.push(v);
+        return {
+          returning: () =>
+            Promise.resolve(
+              txInserts.length === 1
+                ? [makeMessage('m1', { senderId: 'u1', e2eVersion: 2 })]
+                : (v as Record<string, unknown>[]).map((e) => ({
+                    recipientDeviceId: e.recipientDeviceId,
+                    header: e.header,
+                    wrappedKey: e.wrappedKey,
+                  })),
+            ),
+        };
+      },
+    }));
 
     const result = await send([env('d-peer'), env('d-me2')]);
 
@@ -666,6 +762,36 @@ describe('ChatService.sendMessage — v2 multi-device', () => {
       .filter((e) => e.type === 'message')
       .map((e) => e.targetUserId);
     expect(targets.sort()).toEqual(['u1', 'u2']);
+  });
+
+  it('rejects 409 and writes nothing when a device registers between the outer check and the insert', async () => {
+    // The fast-fail read passes: the envelopes cover the outer active set.
+    selectsWithDevices();
+    // The locked re-read inside the transaction sees the device registered
+    // after that read. Inserting now would hand every recipient a message the
+    // new device has no envelope for — reject instead.
+    const tx = mockSendTx([...activeDevices, device('d-new', 'u2')]);
+    db.insert.mockImplementation(() => ({
+      values: () => ({
+        onConflictDoUpdate: () => ({
+          returning: () => Promise.resolve([conversation]),
+        }),
+      }),
+    }));
+
+    const err = await send([env('d-peer'), env('d-me2')]).catch(
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(ConflictException);
+    expect((err as ConflictException).getResponse()).toMatchObject({
+      code: 'E2E_DEVICES_MISMATCH',
+      details: { missing: [{ userId: 'u2', deviceId: 'd-new' }], stale: [] },
+    });
+    expect(tx.execute).toHaveBeenCalledTimes(1);
+    expect(tx.insert).not.toHaveBeenCalled();
+    // The only insert is the conversation upsert; no message row is written.
+    expect(db.insert).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -705,6 +831,13 @@ describe('ChatService.sendMessage — attachments', () => {
   function mockTx() {
     let n = 0;
     const tx = {
+      execute: jest.fn(() => Promise.resolve([])),
+      select: jest.fn(() =>
+        whereQuery([
+          { id: 'd-me', userId: 'u1' },
+          { id: 'd-peer', userId: 'u2' },
+        ]),
+      ),
       insert: jest.fn(() => ({
         values: () => ({
           returning: () =>
@@ -1115,7 +1248,12 @@ describe('ChatService.getInbox', () => {
       if (callCount === 2)
         return groupByQuery([{ conversationId: 'c1', count: 3 }]);
       return whereQuery([
-        { id: 'u2', username: 'dara', profilePhotoUrl: null },
+        {
+          id: 'u2',
+          username: 'dara',
+          profilePhotoUrl: null,
+          lastSeenAt: SEEN_AT,
+        },
       ]);
     });
     db.selectDistinctOn.mockReturnValue(orderByQuery([lastMessage]));
@@ -1125,11 +1263,79 @@ describe('ChatService.getInbox', () => {
     expect(result.data).toHaveLength(1);
     expect(result.data[0]).toMatchObject({
       id: 'c1',
-      otherUser: { id: 'u2', username: 'dara', profilePhotoUrl: null },
+      otherUser: {
+        id: 'u2',
+        username: 'dara',
+        profilePhotoUrl: null,
+        lastSeenAt: SEEN_AT,
+      },
       unreadCount: 3,
     });
     expect(result.data[0].lastMessage).toEqual(lastMessage);
     expect(result.meta.hasMore).toBe(false);
+  });
+
+  it('preserves a null lastSeenAt for a peer who has never been active', async () => {
+    let callCount = 0;
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return pageQuery([conversation]);
+      if (callCount === 2) return groupByQuery([]);
+      return whereQuery([
+        {
+          id: 'u2',
+          username: 'dara',
+          profilePhotoUrl: null,
+          lastSeenAt: null,
+        },
+      ]);
+    });
+    db.selectDistinctOn.mockReturnValue(orderByQuery([]));
+
+    const result = await service.getInbox('u1', {});
+
+    // Never-active is a real state, not "missing": keep the null instead of
+    // substituting a timestamp the server never observed.
+    expect(result.data[0].otherUser).toEqual({
+      id: 'u2',
+      username: 'dara',
+      profilePhotoUrl: null,
+      lastSeenAt: null,
+    });
+  });
+
+  it('still returns a soft-deleted peer’s lastSeenAt (no deletedAt filter)', async () => {
+    let callCount = 0;
+    const summaryWheres: unknown[] = [];
+    db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return pageQuery([conversation]);
+      if (callCount === 2) return groupByQuery([]);
+      return {
+        from: () => ({
+          where: (predicate: unknown) => {
+            summaryWheres.push(predicate);
+            return Promise.resolve([
+              {
+                id: 'u2',
+                username: 'dara',
+                profilePhotoUrl: null,
+                lastSeenAt: SEEN_AT,
+              },
+            ]);
+          },
+        }),
+      };
+    });
+    db.selectDistinctOn.mockReturnValue(orderByQuery([]));
+
+    const result = await service.getInbox('u1', {});
+
+    // The only column the summary lookup reads is id: no deleted_at IS NULL
+    // clause, because history with a soft-deleted peer must stay renderable
+    // (new sends to them are rejected in sendMessage instead).
+    expect(predicateColumns(summaryWheres[0])).toEqual(['id']);
+    expect(result.data[0].otherUser?.lastSeenAt).toEqual(SEEN_AT);
   });
 });
 
@@ -1172,7 +1378,12 @@ describe('ChatService.getConversationWith', () => {
       callCount++;
       if (callCount === 1)
         return limitQuery([
-          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+          {
+            id: 'u2',
+            username: 'dara',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
         ]);
       if (callCount === 2) return whereQuery([]); // no blocks
       return limitQuery([]); // no conversation
@@ -1182,7 +1393,12 @@ describe('ChatService.getConversationWith', () => {
 
     expect(result).toEqual({
       conversation: null,
-      otherUser: { id: 'u2', username: 'dara', profilePhotoUrl: null },
+      otherUser: {
+        id: 'u2',
+        username: 'dara',
+        profilePhotoUrl: null,
+        lastSeenAt: SEEN_AT,
+      },
       blockedByMe: false,
       canMessage: true,
     });
@@ -1194,7 +1410,12 @@ describe('ChatService.getConversationWith', () => {
       callCount++;
       if (callCount === 1)
         return limitQuery([
-          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+          {
+            id: 'u2',
+            username: 'dara',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
         ]);
       if (callCount === 2)
         return whereQuery([{ blockerId: 'u1', blockedId: 'u2' }]);
@@ -1213,7 +1434,12 @@ describe('ChatService.getConversationWith', () => {
       callCount++;
       if (callCount === 1)
         return limitQuery([
-          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+          {
+            id: 'u2',
+            username: 'dara',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
         ]);
       if (callCount === 2) return whereQuery([]);
       return limitQuery([]);
@@ -1229,101 +1455,42 @@ describe('ChatService.getConversationWith', () => {
 
   it('exposes only the narrow ChatUserSummary allow-list', async () => {
     let callCount = 0;
-    db.select.mockImplementation(() => {
+    let projection: Record<string, unknown> | undefined;
+    db.select.mockImplementation((fields?: Record<string, unknown>) => {
       callCount++;
-      if (callCount === 1)
+      if (callCount === 1) {
+        projection = fields;
         return limitQuery([
-          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+          {
+            id: 'u2',
+            username: 'dara',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
         ]);
+      }
       if (callCount === 2) return whereQuery([]);
       return limitQuery([]);
     });
 
     const result = await service.getConversationWith('u1', 'u2');
 
-    // No phone, email, deletedAt or verification timestamps may ride along.
-    expect(Object.keys(result.otherUser).sort()).toEqual([
+    // The SELECT itself is the allow-list: asserting the projection (not just
+    // the mocked row's keys) is what proves phone/email/role/deletedAt cannot
+    // ride along. lastSeenAt is deliberately allowed: coarse last activity,
+    // only ever shown to a participant, never derived into online status.
+    expect(Object.keys(projection ?? {}).sort()).toEqual([
       'id',
+      'lastSeenAt',
       'profilePhotoUrl',
       'username',
     ]);
-  });
-});
-
-describe('ChatService imagePath ownership (security)', () => {
-  let db: ReturnType<typeof makeDb>;
-  let service: ChatService;
-
-  beforeEach(() => {
-    db = makeDb();
-    ({ service } = makeService(db));
-  });
-
-  // Every one of these attaches an object the sender does not own. They must
-  // all be rejected BEFORE any DB work happens — hence the `db.select`
-  // assertion: the check is the first gate in sendMessage.
-  const attacks: [string, string][] = [
-    ["another user's folder", `chat/${VICTIM}/pic.jpg`],
-    ['literal traversal', `chat/${SENDER}/../${VICTIM}/pic.jpg`],
-    ['deep literal traversal', `chat/${SENDER}/../../chat/${VICTIM}/pic.jpg`],
-    ['percent-encoded traversal', `chat/${SENDER}/%2e%2e/${VICTIM}/pic.jpg`],
-    ['double percent-encoded traversal', `chat/${SENDER}/%252e%252e/x.jpg`],
-    ['encoded separator', `chat/${SENDER}%2f..%2f${VICTIM}/pic.jpg`],
-    ['backslash traversal', `chat/${SENDER}/..\\${VICTIM}\\pic.jpg`],
-    ['backslash separator', `chat\\${VICTIM}\\pic.jpg`],
-    ['fullwidth-dot traversal', `chat/${SENDER}/．．/${VICTIM}/p.jpg`],
-    ['nested subfolder', `chat/${SENDER}/sub/pic.jpg`],
-    ['trailing slash', `chat/${SENDER}/pic.jpg/`],
-    ['bare folder', `chat/${SENDER}/`],
-    ['dot segment', `chat/${SENDER}/.`],
-    ['dotdot segment', `chat/${SENDER}/..`],
-    ['leading slash', `/chat/${SENDER}/pic.jpg`],
-    ['other scope', `avatar/${VICTIM}/pic.jpg`],
-    ['absolute url', `https://evil.example.com/chat/${SENDER}/pic.jpg`],
-    ['null byte', `chat/${SENDER}/pic.jpg\u0000.txt`],
-    ['space in name', `chat/${SENDER}/pic .jpg`],
-    ['empty path', ''],
-    ['over-long name', `chat/${SENDER}/${'a'.repeat(201)}.jpg`],
-    ['newline', `chat/${SENDER}/pic\n.jpg`],
-  ];
-
-  it.each(attacks)('rejects %s', async (_label, imagePath) => {
-    await expect(
-      service.sendMessage(SENDER, { recipientId: VICTIM, imagePath }),
-    ).rejects.toThrow(BadRequestException);
-    expect(db.select).not.toHaveBeenCalled();
-  });
-
-  it('rejects a sender id that is merely a prefix of the path segment', async () => {
-    // Equality, not startsWith: `chat/{SENDER}extra/` must not pass for SENDER.
-    await expect(
-      service.sendMessage(SENDER, {
-        recipientId: VICTIM,
-        imagePath: `chat/${SENDER}extra/pic.jpg`,
-      }),
-    ).rejects.toThrow(BadRequestException);
-  });
-
-  it('accepts the exact path shape the signer produces', async () => {
-    let callCount = 0;
-    db.select.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) return limitQuery([{ id: VICTIM }]);
-      return limitQuery([]); // no block
-    });
-    db.insert.mockImplementation(() => ({
-      values: () => ({
-        onConflictDoUpdate: () => ({
-          returning: () => Promise.resolve([conversation]),
-        }),
-        returning: () => Promise.resolve([makeMessage('m1')]),
-      }),
-    }));
-
-    const path = `chat/${SENDER}/3f1a9c22-0d4e-4a11-9f80-2b7c6de51aa4-my_photo.jpg`;
-    await expect(
-      service.sendMessage(SENDER, { recipientId: VICTIM, imagePath: path }),
-    ).resolves.toBeDefined();
+    expect(Object.keys(result.otherUser).sort()).toEqual([
+      'id',
+      'lastSeenAt',
+      'profilePhotoUrl',
+      'username',
+    ]);
   });
 });
 
@@ -1497,7 +1664,12 @@ describe('ChatService.startConversation', () => {
       callCount++;
       if (callCount === 1)
         return limitQuery([
-          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+          {
+            id: 'u2',
+            username: 'dara',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
         ]);
       return limitQuery([{ id: 'b1' }]); // isBlockedEitherWay
     });
@@ -1514,12 +1686,22 @@ describe('ChatService.startConversation', () => {
       selectCount++;
       if (selectCount === 1)
         return limitQuery([
-          { id: 'u2', username: 'dara', profilePhotoUrl: null },
+          {
+            id: 'u2',
+            username: 'dara',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
         ]);
       if (selectCount === 2) return limitQuery([]); // not blocked
       if (selectCount === 3) return groupByQuery([]); // unread counts
       return whereQuery([
-        { id: 'u2', username: 'dara', profilePhotoUrl: null },
+        {
+          id: 'u2',
+          username: 'dara',
+          profilePhotoUrl: null,
+          lastSeenAt: SEEN_AT,
+        },
       ]); // user summaries
     });
 
@@ -1544,6 +1726,7 @@ describe('ChatService.startConversation', () => {
       id: 'u2',
       username: 'dara',
       profilePhotoUrl: null,
+      lastSeenAt: SEEN_AT,
     });
     expect(result.canMessage).toBe(true);
     expect(result.blockedByMe).toBe(false);
@@ -1556,7 +1739,12 @@ describe('ChatService.startConversation', () => {
       selectCount++;
       if (selectCount === 1)
         return limitQuery([
-          { id: 'u3', username: 'sopha', profilePhotoUrl: null },
+          {
+            id: 'u3',
+            username: 'sopha',
+            profilePhotoUrl: null,
+            lastSeenAt: SEEN_AT,
+          },
         ]);
       if (selectCount === 2) return limitQuery([]);
       if (selectCount === 3) return groupByQuery([]);

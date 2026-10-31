@@ -100,7 +100,7 @@ const EditProfileScreen = () => {
   const sanitizedPhone = user?.phone || "015 455 758";
   const sanitizedEmail = user?.email || "bansreypov@gmail.com";
   const sanitizedLocation = user?.location || "Phnom Penh, Cambodia";
-  const sanitizedBio = user?.bio || "Marketplace seller & buyer on PsaKhmer";
+  const sanitizedBio = user?.bio || "Marketplace seller & buyer on PhsarKhmer";
   const sanitizedAccountType = user?.accountType || "Normal account";
 
   const [name, setName] = useState(sanitizedName);
@@ -651,7 +651,7 @@ const EditProfileScreen = () => {
                 />
                 <View className="bg-sky-50 dark:bg-sky-950 px-2 py-0.5 rounded-md">
                   <Text className="text-[10px] text-primary font-bold">
-                    PsaKhmer ID
+                    PhsarKhmer ID
                   </Text>
                 </View>
               </View>

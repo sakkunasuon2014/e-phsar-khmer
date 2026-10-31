@@ -44,6 +44,8 @@ export const routing = defineRouting({
 
     "/search": {},
 
+    "/product/[brand]/[model]": {},
+
     "/insight": {},
 
     "/me": {},

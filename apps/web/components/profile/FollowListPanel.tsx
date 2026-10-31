@@ -68,7 +68,7 @@ export default function FollowListPanel({
   if (error) {
     return (
       <Frame>
-        <p className="py-8 text-center text-sm text-muted-foreground">
+        <p className="py-8 text-center type-body-sm text-muted-foreground">
           {error}
         </p>
       </Frame>
@@ -78,7 +78,7 @@ export default function FollowListPanel({
   if (items === null) {
     return (
       <Frame>
-        <p className="py-8 text-center text-sm text-muted-foreground">
+        <p className="py-8 text-center type-body-sm text-muted-foreground">
           {t("loading")}
         </p>
       </Frame>

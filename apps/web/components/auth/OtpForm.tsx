@@ -138,7 +138,7 @@ export function InputOTPForm({
           >
             Verify
           </Button>
-          <div className="text-sm text-muted-foreground text-center">
+          <div className="type-body-sm text-muted-foreground text-center">
             Having trouble signing in?{" "}
             <a
               href="#"

@@ -32,7 +32,7 @@ export function Breadcrumbs({
   return (
     <nav
       aria-label={t("breadcrumb")}
-      className={cn("flex items-center space-x-2 text-base", className)}
+      className={cn("flex items-center space-x-2 type-body", className)}
     >
       {items.map((item, index) => {
         const isFirst = index === 0;
@@ -67,7 +67,7 @@ export function Breadcrumbs({
             ) : (
               <h1
                 className={cn(
-                  "text-gray-500 dark:text-gray-400",
+                  "type-body text-gray-500 dark:text-gray-400",
                   item.className,
                 )}
               >

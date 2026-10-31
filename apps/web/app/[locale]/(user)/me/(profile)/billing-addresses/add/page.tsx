@@ -1,11 +1,10 @@
-import AddAddress from "@/components/profile/Add-Address";
+import { getLocale } from "next-intl/server";
+import { redirect } from "@/i18n/routing";
 
-import type { Metadata } from "next";
-
-export const metadata: Metadata = {
-  title: "Add Address - Psakhmer",
-  description: "Add Address - Psakhmer",
-};
-export default function AddAddressPage() {
-  return <AddAddress />;
+/**
+ * Adding a billing address is a dialog on the list page now; this route stays
+ * so links written against the old full-page form keep working.
+ */
+export default async function AddAddressPage() {
+  return redirect({ href: "/me/billing-addresses", locale: await getLocale() });
 }

@@ -1,24 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-  MoreHorizontal,
-  Loader2,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -28,31 +12,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+import { SelectItem } from "@/components/ui/select";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getAdminCategories,
   type AdminCategory,
 } from "@/actions/admin-categories";
-import { getAdminSubcategories } from "@/actions/admin-subcategories";
+import {
+  getAdminSubcategories,
+  type AdminSubcategory,
+} from "@/actions/admin-subcategories";
 import {
   createsubcategories,
   updatesubcategories,
@@ -64,8 +33,18 @@ import { subCategory } from "@/types/subcategory";
 import { z } from "zod";
 import { toast } from "@/components/ui/sonner";
 import { FieldGroup } from "@/components/ui/field";
-import DbImage, { NoImageCell } from "@/components/common/DbImage";
 import { ImageUpload } from "@/components/dashboard/image-upload";
+import { AdminPage } from "@/components/dashboard/admin-page";
+import {
+  AdminFilter,
+  AdminSearch,
+  AdminTable,
+  DateCell,
+  EntityChip,
+  PrimaryCell,
+  RowActions,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 
 type SubCategoryFormData = z.infer<typeof subCategorySchema>;
 
@@ -161,7 +140,7 @@ function AddSubCategoryForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -257,7 +236,7 @@ function EditSubCategoryForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -305,7 +284,7 @@ function DeleteSubCategoryForm({
   return (
     <>
       <DialogHeader>
-        <DialogTitle>Delete Category</DialogTitle>
+        <DialogTitle>Delete Subcategory</DialogTitle>
         <DialogDescription>
           Are you sure you want to delete &quot;{category?.name}&quot;? This
           action cannot be undone.
@@ -316,7 +295,7 @@ function DeleteSubCategoryForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
           disabled={isDeleting}
         >
@@ -338,7 +317,7 @@ function DeleteSubCategoryForm({
 }
 export default function SubCategoriesClient() {
   const queryClient = useQueryClient();
-  const { data: subCategories = [] } = useQuery({
+  const { data: subCategories = [], isLoading } = useQuery({
     queryKey: ["admin", "subcategories"],
     queryFn: getAdminSubcategories,
   });
@@ -350,29 +329,44 @@ export default function SubCategoriesClient() {
     queryClient.invalidateQueries({ queryKey: ["admin", "subcategories"] });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedSubCategory, setSelectedSubCategory] =
     useState<SubcategoryWithMeta | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
-
-  const filteredSubCategories = subCategories.filter(
-    (subcategory) =>
-      subcategory.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      subcategory.nameKm.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      subcategory.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      subcategory.categoryId.toLowerCase().includes(searchQuery.toLowerCase()),
+  const categoryById = useMemo(
+    () => new Map(categoryList.map((category) => [category.cateId, category])),
+    [categoryList],
   );
 
-  const totalPages = Math.ceil(filteredSubCategories.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedSubCategories = filteredSubCategories.slice(
-    startIndex,
-    startIndex + rowsPerPage,
-  );
+  const filteredSubCategories = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return subCategories.filter((subcategory) => {
+      if (
+        categoryFilter !== "all" &&
+        subcategory.categoryId !== categoryFilter
+      ) {
+        return false;
+      }
+      if (!query) return true;
+      return [
+        subcategory.name,
+        subcategory.nameKm,
+        subcategory.slug,
+        categoryById.get(subcategory.categoryId)?.name ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [subCategories, searchQuery, categoryFilter, categoryById]);
+
+  const categoryOptions = categoryList.map((category) => ({
+    value: category.cateId,
+    label: category.name,
+  }));
 
   const handleAddSuccess = () => {
     refreshSubcategories();
@@ -407,226 +401,133 @@ export default function SubCategoriesClient() {
     setIsDeleteDialogOpen(true);
   };
 
+  const columns = useMemo<AdminColumn<AdminSubcategory>[]>(
+    () => [
+      {
+        key: "subcategory",
+        header: "Sub Category",
+        sortValue: (subcategory) => subcategory.name,
+        cell: (subcategory) => (
+          <PrimaryCell
+            image={subcategory.subIcon}
+            alt={subcategory.name}
+            title={subcategory.name}
+            subtitle={subcategory.nameKm || undefined}
+          />
+        ),
+      },
+      {
+        key: "category",
+        header: "Category",
+        sortValue: (subcategory) =>
+          categoryById.get(subcategory.categoryId)?.name ?? "",
+        cell: (subcategory) => (
+          <EntityChip tone="category">
+            {categoryById.get(subcategory.categoryId)?.name ?? "Unknown"}
+          </EntityChip>
+        ),
+      },
+      {
+        key: "slug",
+        header: "Slug",
+        sortValue: (subcategory) => subcategory.slug,
+        cell: (subcategory) => (
+          <span className="text-muted-foreground">{subcategory.slug}</span>
+        ),
+      },
+      {
+        key: "updated",
+        header: "Updated",
+        sortValue: (subcategory) => subcategory.updatedAt,
+        cell: (subcategory) => <DateCell value={subcategory.updatedAt} />,
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (subcategory) => (
+          <RowActions
+            id={subcategory.subId}
+            actions={[
+              {
+                label: "Edit",
+                icon: <Pencil className="mr-2 size-4" />,
+                tone: "warning",
+                onSelect: () => openEditDialog(subcategory),
+              },
+              {
+                label: "Delete",
+                icon: <Trash2 className="mr-2 size-4" />,
+                tone: "danger",
+                onSelect: () => openDeleteDialog(subcategory),
+              },
+            ]}
+          />
+        ),
+      },
+    ],
+    [categoryById],
+  );
+
   return (
     <>
-      <main className="flex-1 overflow-auto p-6 min-w-0">
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
-                Sub Categories
-              </h1>
-              <p className="text-sm mt-2 text-muted-foreground">
-                Manage product subcategories
-              </p>
-            </div>
-
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
-                  <Plus className="mr-2 size-4" />
-                  Add Sub Category
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Sub Category</DialogTitle>
-                  <DialogDescription>
-                    Create a new sub category for your products.
-                  </DialogDescription>
-                </DialogHeader>
-                {isAddDialogOpen && (
-                  <AddSubCategoryForm
-                    categories={categoryList}
-                    onSuccess={handleAddSuccess}
-                    onCancel={() => setIsAddDialogOpen(false)}
-                  />
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search..."
+      <AdminPage
+        title="Sub Categories"
+        description="Manage product subcategories"
+        action={
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer">
+                <Plus className="mr-2 size-4" />
+                Add Sub Category
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Sub Category</DialogTitle>
+                <DialogDescription>
+                  Create a new sub category for your products.
+                </DialogDescription>
+              </DialogHeader>
+              {isAddDialogOpen && (
+                <AddSubCategoryForm
+                  categories={categoryList}
+                  onSuccess={handleAddSuccess}
+                  onCancel={() => setIsAddDialogOpen(false)}
+                />
+              )}
+            </DialogContent>
+          </Dialog>
+        }
+        toolbar={
+          <>
+            <AdminSearch
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 pl-9 border-border bg-card text-foreground focus-visible:ring-1 focus-visible:ring-[#00a0e9] focus-visible:border-[#00a0e9] transition-all"
+              onChange={setSearchQuery}
+              placeholder="Search sub category, category, slug..."
             />
-          </div>
-
-          <div className="rounded-lg border border-border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-center">ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead className="text-start">Image</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-center">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedSubCategories.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Search className="size-8" />
-                        <p>No sub category found</p>
-                        {searchQuery && (
-                          <p className="text-sm">
-                            No results for &quot;{searchQuery}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-                {paginatedSubCategories.map((subcategory) => (
-                  <TableRow key={subcategory.subId}>
-                    <TableCell className="text-center">
-                      {subcategory.subId}
-                    </TableCell>
-                    <TableCell>
-                      <div>{subcategory.name}</div>
-                      {subcategory.nameKm && (
-                        <div className="text-xs text-muted-foreground">
-                          {subcategory.nameKm}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{subcategory.slug}</TableCell>
-                    <TableCell className="flex justify-start">
-                      <DbImage
-                        src={subcategory?.subIcon}
-                        alt={subcategory.name}
-                        width={56}
-                        height={56}
-                        className="h-12 w-12 object-cover"
-                        fallback={<NoImageCell />}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <span className="rounded-sm bg-sky-200 text-black px-2 py-1">
-                        {categoryList.find(
-                          (cat) => cat.cateId === subcategory.categoryId,
-                        )?.name ?? "Unknown"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {subcategory.createdAt}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {subcategory.updatedAt}
-                    </TableCell>
-                    <TableCell className="text-center align-middle">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="rounded-full cursor-pointer"
-                          >
-                            <MoreHorizontal />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center">
-                          <DropdownMenuItem
-                            className="text-orange-500 cursor-pointer"
-                            onClick={() => openEditDialog(subcategory)}
-                          >
-                            <Pencil className="mr-2 size-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive cursor-pointer"
-                            onClick={() => openDeleteDialog(subcategory)}
-                          >
-                            <Trash2 className="mr-2 size-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {/* Pagination */}
-            <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                Rows per page
-                <Select
-                  value={rowsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setRowsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronsLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+            <AdminFilter
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              allLabel="All Categories"
+              options={categoryOptions}
+            />
+          </>
+        }
+      >
+        <AdminTable
+          columns={columns}
+          rows={filteredSubCategories}
+          rowKey={(subcategory) => subcategory.subId}
+          isLoading={isLoading}
+          pageSize={20}
+          resetKey={`${searchQuery}:${categoryFilter}`}
+          emptyTitle="No sub category found"
+          emptyHint={
+            searchQuery ? `No results for "${searchQuery}"` : undefined
+          }
+        />
+      </AdminPage>
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>

@@ -82,8 +82,8 @@ export default function ImageUpload({
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <label className="text-base font-bold text-foreground">{title}</label>
-        <span className="text-xs text-muted-foreground">
+        <label className="type-card-heading text-foreground">{title}</label>
+        <span className="type-meta text-muted-foreground">
           {t("maxPhotos", { count: images.length, max })}
         </span>
       </div>
@@ -108,7 +108,7 @@ export default function ImageUpload({
                 <X className="w-3 h-3" />
               </button>
               {i === 0 && (
-                <span className="absolute bottom-0 left-0 right-0 bg-[#00a0e9] text-white text-[9px] text-center py-0.5 font-medium">
+                <span className="absolute bottom-0 left-0 right-0 bg-[#00a0e9] text-white type-discount text-center py-0.5">
                   {t("cover")}
                 </span>
               )}
@@ -133,13 +133,13 @@ export default function ImageUpload({
           className="border-2 border-dashed border-gray-200 bg-gray-50 rounded-sm p-12 flex flex-col items-center gap-2 cursor-pointer hover:border-[#00a0e9] hover:bg-[#e1f3fb] transition-all"
         >
           <Upload className="w-10 h-10 text-[#00a0e9]" />
-          <p className="text-sm text-gray-500">
+          <p className="type-body-sm text-gray-500">
             {t("dropTitle")}{" "}
             <span className="text-[#00a0e9] font-semibold underline">
               {t("browse")}
             </span>
           </p>
-          <p className="text-xs text-gray-400">{t("supported")}</p>
+          <p className="type-meta text-gray-400">{t("supported")}</p>
         </div>
       )}
 

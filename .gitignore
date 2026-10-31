@@ -43,3 +43,11 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# lavish review artifacts
+.lavish/
+
+# Local Claude Code harness state (sessions, transcripts, runtime)
+.claude/
+docs/
+.harness/

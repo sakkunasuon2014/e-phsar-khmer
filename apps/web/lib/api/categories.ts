@@ -5,6 +5,7 @@ import type { RealDetailData } from "@/components/post/Post-Detail";
 import type { Post } from "@/lib/posts";
 import type { User } from "@/lib/user";
 import { applyDiscount, shortLocation } from "@/lib/utils";
+import { placeDisplayName } from "@/lib/places";
 import type { FeedQuery } from "@/lib/search-params";
 
 const slugify = (s: string) =>
@@ -50,11 +51,10 @@ async function toSellerView(l: BackendListing): Promise<User> {
     username,
     name,
     company,
-    // The uploaded photo when there is one; the generated circle is a fallback
-    // for an account with none, not a stand-in for a photo that exists.
-    avatar:
-      profile?.profilePhotoUrl ??
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00a0e9&color=fff`,
+    // The uploaded photo when there is one; an empty value otherwise, which
+    // the avatar component renders as an initials circle. No generated
+    // third-party image: a missing photo is not a photo.
+    avatar: profile?.profilePhotoUrl ?? "",
     cover: profile?.coverPhotoUrl ?? "",
     locations: "",
     following: profile?.following ?? 0,
@@ -64,14 +64,31 @@ async function toSellerView(l: BackendListing): Promise<User> {
     phone: l.contactPhones,
     email: l.contactEmail ?? undefined,
     userlink: username ? `@${username}` : undefined,
+    // The public profile is the authoritative read; the listing's own flag
+    // covers a failed profile fetch (both derive from the same subscription).
+    verifiedAccount:
+      profile?.verifiedAccount ?? l.sellerVerifiedAccount ?? false,
   };
 }
 
 /**
  * Build the template's `RealDetailData` for a real listing — shared by the
  * two detail entry points (`[slug]` root-slug and `post/[slug]`). Returns
- * null when the id is unknown (caller falls back to the mock render).
+ * null when the id is unknown (both callers `notFound()`).
  */
+/** Hardcoded pickers with no `attribute_options` rows to read `nameKm` from. */
+const DETAIL_VALUE_KM: Record<string, Record<string, string>> = {
+  taxType: { "Tax Paper": "ក្រដាសពន្ធ", "Plate Number": "ផ្លាកលេខ" },
+  engineType: {
+    Diesel: "ម៉ាស៊ូត",
+    Electric: "អគ្គិសនី",
+    Hybrid: "ហាយប្រីត/Hybrid",
+    LPG: "ហ្គាស/LPG",
+    Petrol: "សាំង",
+  },
+  transmission: { Auto: "ស្វ័យប្រវត្តិ", Manual: "លេខដៃ" },
+};
+
 export async function buildRealDetailData(
   id: string,
   locale: string,
@@ -92,13 +109,56 @@ export async function buildRealDetailData(
     return { slug: slugify(name), name };
   };
 
+  // Km detail: the listing stores its location/attributes as English display
+  // strings, so resolve the geo ids and the admin `nameKm` values for display.
+  // The stored values stay untouched (filters still match the English names).
+  let viewListing = listing;
+  let valueLabels: Record<string, string> | undefined;
+  if (locale === "km") {
+    const [place, linked, colors] = await Promise.all([
+      listing.provinceId
+        ? resolvePlaceSelection(
+            listing.provinceId,
+            listing.districtId,
+            listing.communeId,
+          )
+        : Promise.resolve(null),
+      sub
+        ? getLinkedAttributeOptions(sub.id)
+        : Promise.resolve([] as BackendAttributeRow[]),
+      attributes.color
+        ? getColors()
+        : Promise.resolve([] as BackendAttributeRow[]),
+    ]);
+    if (place) {
+      const localized = [place.province, place.district, place.commune]
+        .map((p) => (p ? placeDisplayName(p, locale) : null))
+        .filter((v): v is string => !!v)
+        .join(", ");
+      if (localized) viewListing = { ...listing, location: localized };
+    }
+    const byName = new Map<string, string>();
+    for (const row of [...linked, ...colors]) {
+      if (row.nameKm) byName.set(row.name, row.nameKm);
+    }
+    valueLabels = {};
+    for (const [key, raw] of Object.entries(attributes)) {
+      if (typeof raw !== "string") continue;
+      const value = raw.trim();
+      const km = byName.get(value) ?? DETAIL_VALUE_KM[key]?.[value];
+      if (km) valueLabels[key] = km;
+    }
+  }
+
   return {
-    listing,
+    listing: viewListing,
+    valueLabels,
     cate: cate ? { slug: cate.slug, name: cate.name } : undefined,
     subcate: sub ? { slug: sub.slug, name: sub.name } : undefined,
     brand: toBreadcrumb("brand"),
     model: toBreadcrumb("model"),
     seller: await toSellerView(listing),
+    product: listing.product ?? null,
   };
 }
 
@@ -166,6 +226,15 @@ export interface BackendListingPhoto {
   sort: number;
 }
 
+/** Trusted product spec page linked to a listing (embedded by the backend). */
+export interface BackendProductRef {
+  modelId: string;
+  brandSlug: string;
+  brandName: string;
+  modelSlug: string;
+  modelName: string;
+}
+
 /** Subset of the backend `GET /listings/:id` row the detail page renders. */
 export interface BackendListing {
   id: string;
@@ -181,7 +250,12 @@ export interface BackendListing {
   condition: "new" | "used" | null;
   attributes: Record<string, unknown> | null;
   location: string | null;
+  /** Km short `district, province` resolved for cards by `getListingsFeed`. */
+  locationKm?: string | null;
   address: string | null;
+  provinceId: string | null;
+  districtId: string | null;
+  communeId: string | null;
   /** Drizzle returns numeric columns as strings; parse before use. */
   latitude: string | null;
   longitude: string | null;
@@ -194,14 +268,22 @@ export interface BackendListing {
    * rows (they do not join `users`) and null when the owner is gone.
    */
   sellerUsername?: string | null;
+  /** The seller holds an active paid subscription — the badge on cards. */
+  sellerVerifiedAccount?: boolean;
   /**
    * How many users liked this listing — joined on by `GET /listings/:id`,
    * absent from feed rows. Drives the detail page's "N Likes" control.
    */
   likeCount?: number | null;
+  /** Trusted spec page id stored on the listing (always a column, may be null). */
+  productModelId?: string | null;
+  /** Resolved by the backend only while the linked page is published. */
+  product?: BackendProductRef | null;
   status: string;
   viewsCount: number;
   publishedAt: string | null;
+  /** End of the ad's 30-day window; null on legacy/seeded rows (always live). */
+  expiresAt: string | null;
   createdAt: string;
   photos: BackendListingPhoto[];
 }
@@ -364,7 +446,7 @@ export async function getListingsFeed(
   locale: string,
 ): Promise<ListingsFeed | null> {
   const qs = new URLSearchParams();
-  const { attrKey, attrValue, limit, ...rest } = params;
+  const { attrKey, attrValue, attrs, limit, ...rest } = params;
   for (const [key, value] of Object.entries(rest)) {
     if (value === undefined || value === "" || value === false) continue;
     qs.set(key, String(value));
@@ -372,6 +454,9 @@ export async function getListingsFeed(
   if (attrKey && attrValue) {
     qs.set("attrKey", attrKey);
     qs.set("attrValue", attrValue);
+  }
+  if (attrs && Object.keys(attrs).length > 0) {
+    qs.set("attrs", JSON.stringify(attrs));
   }
   qs.set("limit", String(limit ?? 20));
   try {
@@ -392,7 +477,7 @@ export async function getListingsFeed(
     };
     if (!body.success) return null;
     return {
-      items: body.data ?? [],
+      items: await localizeFeedLocations(body.data ?? [], locale),
       nextCursor: body.meta?.nextCursor ?? null,
       total: body.meta?.total,
       facets: body.meta?.facets,
@@ -400,6 +485,86 @@ export async function getListingsFeed(
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * The home page's "Trending" strip: live listings ranked by buyer engagement
+ * (views, chats, calls, contact reveals, job applications, likes and saves)
+ * over a rolling window. The backend fills the tail with the newest live ads,
+ * so an empty array means there are no live ads at all.
+ */
+export async function getTrendingListings(
+  locale: string,
+  limit = 10,
+): Promise<Post[]> {
+  try {
+    const res = await fetch(
+      `${API_URL}/listings/trending?limit=${encodeURIComponent(String(limit))}`,
+      {
+        headers: { "Accept-Language": locale },
+        cache: "no-store",
+      },
+    );
+    if (!res.ok) return [];
+    const body = (await res.json()) as {
+      success: boolean;
+      data?: BackendListing[];
+    };
+    if (!body.success) return [];
+    const rows = await localizeFeedLocations(body.data ?? [], locale);
+    return rows.map(toCardPost);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Cards show `district, province`, and the stored `location` is English. For
+ * `/km`, resolve the feed's geo ids to `nameKm` once per page: the province
+ * list plus one district call per province present in the slice — never a
+ * call per card. Fail-soft: a lookup failure leaves the stored string.
+ */
+async function localizeFeedLocations(
+  items: BackendListing[],
+  locale: string,
+): Promise<BackendListing[]> {
+  if (locale !== "km" || items.length === 0) return items;
+  const provinceIds = [
+    ...new Set(
+      items.map((item) => item.provinceId).filter((id): id is string => !!id),
+    ),
+  ];
+  if (provinceIds.length === 0) return items;
+  try {
+    const provinces = await getProvinces();
+    const provinceById = new Map(provinces.map((p) => [p.id, p]));
+    const districtNameKm = new Map<string, string>();
+    await Promise.all(
+      provinceIds.map(async (id) => {
+        const province = provinceById.get(id);
+        if (!province) return;
+        const districts = await getDistricts(province.slug);
+        for (const district of districts) {
+          if (district.nameKm) districtNameKm.set(district.id, district.nameKm);
+        }
+      }),
+    );
+    return items.map((item) => {
+      const province = item.provinceId
+        ? provinceById.get(item.provinceId)
+        : undefined;
+      if (!province) return item;
+      const district = item.districtId
+        ? districtNameKm.get(item.districtId)
+        : undefined;
+      const locationKm = [district, province.nameKm]
+        .filter((part): part is string => !!part)
+        .join(", ");
+      return locationKm ? { ...item, locationKm } : item;
+    });
+  } catch {
+    return items;
   }
 }
 
@@ -416,6 +581,18 @@ export function toCardPost(l: BackendListing): Post {
     l.price !== null && Number.isFinite(Number(l.price))
       ? Number(l.price)
       : null;
+  // A zero/negative discount means "no discount": `applyDiscount` already
+  // leaves the price untouched, but the strikethrough price and the %-OFF /
+  // $-OFF badges derive from `oldPrice` separately, so they must be gated on a
+  // positive discount too (a `-0%` / `$0 OFF` badge on a normal ad).
+  const discountNumber =
+    l.discountValue !== null ? Number(l.discountValue) : null;
+  const hasDiscount =
+    price !== null &&
+    l.discountType !== null &&
+    discountNumber !== null &&
+    Number.isFinite(discountNumber) &&
+    discountNumber > 0;
   return {
     postId: l.id,
     userId: l.userId,
@@ -423,6 +600,7 @@ export function toCardPost(l: BackendListing): Post {
     // the seller up in mock data by id, which never hit for a real listing, so
     // the control silently did nothing.
     sellerUsername: l.sellerUsername ?? null,
+    sellerVerifiedAccount: l.sellerVerifiedAccount ?? false,
     title: l.title,
     images: l.photos.map((p) => p.url),
     // The listing price is the ORIGINAL; the discount applies on top — the
@@ -444,9 +622,8 @@ export function toCardPost(l: BackendListing): Post {
     freeDelivery: l.deliveryFree,
     // The card shows the design's short `district, province` — the commune and
     // the street address belong to the detail page (see `shortLocation`).
-    location: shortLocation(l.location),
-    oldPrice:
-      price !== null && l.discountValue && l.discountType ? price : undefined,
+    location: l.locationKm ?? shortLocation(l.location),
+    oldPrice: hasDiscount && price !== null ? price : undefined,
   };
 }
 

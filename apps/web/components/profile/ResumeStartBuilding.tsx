@@ -306,7 +306,7 @@ export function ResumeStartBuilding({
       ) : (
         <div className="max-w-7xl mx-auto w-full px-4 pt-4">
           <div className="rounded-2xl bg-card p-6 sm:p-10">
-            <h1 className="text-center text-3xl font-bold text-foreground">
+            <h1 className="type-page-title text-center text-foreground">
               {t("form.startTitle")}
             </h1>
 
@@ -317,10 +317,10 @@ export function ResumeStartBuilding({
                     <IconPencil size={24} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-semibold text-foreground">
+                    <h2 className="type-section-title text-foreground">
                       {t("form.createTitle")}
                     </h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
+                    <p className="mt-1 type-body-sm text-muted-foreground">
                       {t("form.createDesc")}
                     </p>
                   </div>
@@ -330,9 +330,9 @@ export function ResumeStartBuilding({
                   {RESUME_STEPS.map((label, i) => (
                     <li
                       key={label}
-                      className="flex items-center gap-2 rounded-full border bg-background px-3.5 py-1.5 text-sm text-foreground/80"
+                      className="flex items-center gap-2 rounded-full border bg-background px-3.5 py-1.5 type-body-sm text-foreground/80"
                     >
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full border text-[11px] text-muted-foreground">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full border type-discount text-muted-foreground">
                         {i + 1}
                       </span>
                       {t(label)}
@@ -343,7 +343,7 @@ export function ResumeStartBuilding({
                 <button
                   type="button"
                   onClick={openWizard}
-                  className="mt-6 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90"
+                  className="mt-6 inline-flex h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#00a0e9] type-nav text-white transition-colors hover:bg-[#00a0e9]/90"
                 >
                   {t("form.startBuilding")}
                   <IconArrowRight size={20} />

@@ -320,30 +320,82 @@ describe('UsersService phone management', () => {
   });
 
   describe('removePhone', () => {
-    it('throws NotFoundException when delete returns no rows', async () => {
-      db.delete.mockReturnValue({
-        where: () => ({ returning: () => Promise.resolve([]) }),
-      });
+    const phone = (id: string, isPrimary: boolean) => ({
+      id,
+      userId: 'u1',
+      phone: `+855${id}`,
+      isPrimary,
+    });
+    const phonesQuery = (rows: object[]) => ({
+      from: () => ({ where: () => ({ for: () => Promise.resolve(rows) }) }),
+    });
+
+    it('throws NotFoundException for a phone the user does not own', async () => {
+      db.select.mockReturnValue(phonesQuery([phone('p2', true)]));
 
       await expect(service.removePhone('u1', 'p1')).rejects.toThrow(
         NotFoundException,
       );
     });
 
-    it('returns { removed: true } when phone deleted', async () => {
-      const deleted = {
-        id: 'p1',
-        userId: 'u1',
-        phone: '+855123',
-        isPrimary: false,
-      };
-      db.delete.mockReturnValue({
-        where: () => ({ returning: () => Promise.resolve([deleted]) }),
+    it('refuses to remove the only phone', async () => {
+      db.select.mockReturnValue(phonesQuery([phone('p1', true)]));
+
+      await expect(service.removePhone('u1', 'p1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(db.delete).not.toHaveBeenCalled();
+    });
+
+    it('removes a secondary phone without touching the primary', async () => {
+      db.select.mockReturnValue(
+        phonesQuery([phone('p1', true), phone('p2', false)]),
+      );
+      db.delete.mockReturnValue({ where: () => Promise.resolve([]) });
+
+      const result = await service.removePhone('u1', 'p2');
+      expect(result).toEqual({ removed: true });
+      expect(db.update).not.toHaveBeenCalled();
+    });
+
+    it('promotes another phone and moves primaryPhone when the primary goes', async () => {
+      db.select.mockReturnValue(
+        phonesQuery([phone('p1', true), phone('p2', false)]),
+      );
+      db.delete.mockReturnValue({ where: () => Promise.resolve([]) });
+      const sets: unknown[] = [];
+      db.update.mockReturnValue({
+        set: (v: unknown) => {
+          sets.push(v);
+          return { where: () => Promise.resolve([]) };
+        },
       });
 
-      const result = await service.removePhone('u1', 'p1');
-      expect(result).toEqual({ removed: true });
+      await service.removePhone('u1', 'p1');
+      expect(sets[0]).toEqual({ isPrimary: true });
+      expect(sets[1]).toMatchObject({ primaryPhone: '+855p2' });
     });
+  });
+
+  it('addPhone maps a concurrent duplicate (23505) to ConflictException', async () => {
+    db.select.mockReturnValue({
+      from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }),
+    });
+    db.update.mockReturnValue({
+      set: () => ({ where: () => Promise.resolve([]) }),
+    });
+    db.insert.mockReturnValue({
+      values: () => ({
+        returning: () =>
+          Promise.reject(
+            Object.assign(new Error('duplicate'), { code: '23505' }),
+          ),
+      }),
+    });
+
+    await expect(service.addPhone('u1', { phone: '+855123' })).rejects.toThrow(
+      ConflictException,
+    );
   });
 });
 
@@ -593,7 +645,7 @@ describe('UsersService updateProfile ads contact sync', () => {
     expect(updateSet?.longitude).toBeNull();
   });
 
-  it('copies the contact trio to the user listings when asked', async () => {
+  it('copies the contact block and location to the user listings when asked', async () => {
     const user = {
       ...fakeUser,
       username: 'sokdara',
@@ -601,6 +653,12 @@ describe('UsersService updateProfile ads contact sync', () => {
       lastName: 'Dara',
       email: 'dara@example.com',
       primaryPhone: '+855111',
+      provinceId: 'p1',
+      districtId: 'd1',
+      communeId: 'c1',
+      address: 'House no. 1',
+      latitude: '11.5564000',
+      longitude: '104.9282000',
     };
     const sets: Record<string, unknown>[] = [];
     db.update.mockReturnValue({
@@ -627,7 +685,37 @@ describe('UsersService updateProfile ads contact sync', () => {
       contactName: 'Sok Dara',
       contactPhones: ['+855111', '+855222'],
       contactEmail: 'dara@example.com',
+      provinceId: 'p1',
+      districtId: 'd1',
+      communeId: 'c1',
+      address: 'House no. 1',
+      latitude: '11.5564000',
+      longitude: '104.9282000',
     });
+  });
+
+  it('leaves an ad pin alone when the profile has no pin', async () => {
+    const user = { ...fakeUser, username: 'sokdara', primaryPhone: '+855111' };
+    const sets: Record<string, unknown>[] = [];
+    db.update.mockReturnValue({
+      set: (arg: Record<string, unknown>) => {
+        sets.push(arg);
+        return {
+          where: () => ({
+            returning: () => Promise.resolve([user]),
+          }),
+        };
+      },
+    });
+    db.select.mockReturnValue(chain([]));
+
+    await service.updateProfile('u1', { updateAdsContact: true });
+
+    // The cascade and address still mirror the profile (here: cleared), but a
+    // pinless account must never wipe the coordinate pair an ad carries.
+    expect(sets[1]).toMatchObject({ provinceId: null, address: null });
+    expect(sets[1]).not.toHaveProperty('latitude');
+    expect(sets[1]).not.toHaveProperty('longitude');
   });
 
   it('falls back to primaryPhone when the account has no phone rows', async () => {
@@ -1698,5 +1786,94 @@ describe('UsersService public profile visibility', () => {
     const { sql } = new PgDialect().sqlToQuery(where as never);
     expect(sql).toContain('"status" = $');
     expect(sql).toContain('"deleted_at" is null');
+  });
+});
+
+describe('UsersService verified account flag', () => {
+  it('marks a public profile with an active paid subscription', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      // 1: the user row, 2-3: follower/following counts, 4: subscription probe.
+      if (call === 1) return chain([fakeUser]);
+      if (call === 4) return chain([{ id: 'sub-1' }]);
+      return chain([{ value: 0 }]);
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('sokdara');
+
+    expect(profile.verifiedAccount).toBe(true);
+  });
+
+  it('leaves a public profile without a paid subscription unverified', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      if (call === 1) return chain([fakeUser]);
+      if (call === 4) return chain([]);
+      return chain([{ value: 0 }]);
+    });
+    const service = makeService(db);
+
+    const profile = await service.getPublicProfile('sokdara');
+
+    expect(profile.verifiedAccount).toBe(false);
+  });
+
+  it('carries the flag on the signed-in user read', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1 ? [fakeUser] : [{ id: 'sub-1' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1');
+
+    expect(me.verifiedAccount).toBe(true);
+  });
+
+  it('omits linked providers unless the caller opts in', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1 ? [fakeUser] : [{ id: 'sub-1' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1');
+
+    expect(me).not.toHaveProperty('authProviders');
+    expect(db.select).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns the linked providers in a stable order when requested', async () => {
+    const db = makeDb();
+    let call = 0;
+    db.select.mockImplementation(() => {
+      call++;
+      const rows: Record<string, unknown>[] =
+        call === 1
+          ? [fakeUser]
+          : call === 2
+            ? [{ id: 'sub-1' }]
+            : [{ provider: 'telegram' }, { provider: 'google' }];
+      return chain(rows);
+    });
+    const service = makeService(db);
+
+    const me = await service.findById('u1', true);
+
+    expect(me.authProviders).toEqual(['google', 'telegram']);
+    expect(db.select).toHaveBeenCalledTimes(3);
   });
 });

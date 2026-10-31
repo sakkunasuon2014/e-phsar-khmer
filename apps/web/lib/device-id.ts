@@ -7,7 +7,10 @@
  * localStorage value into it; the server can then forward it on the requests
  * whose browser context it would otherwise not see (RSC fetch, token refresh).
  */
-export const DEVICE_ID_COOKIE = "psa_device_id";
+export const DEVICE_ID_COOKIE = "phsarkhmer_device_id";
+
+/** Pre-rebrand cookie. Read once, then expired by lib/device.ts. */
+export const LEGACY_DEVICE_ID_COOKIE = "psa_device_id";
 
 /** Mirrors the backend's `readClientDevice` validation. */
 export const DEVICE_ID_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { DRIZZLE } from '../../db/drizzle.provider';
 import type { DbClient } from '../../db/drizzle.provider';
 import {
@@ -18,7 +18,12 @@ import type { RegisterE2eKeysDto } from './dto/register-e2e-keys.dto';
 import type { RegisterE2eDeviceDto } from './dto/register-e2e-device.dto';
 import type { AddDevicePrekeysDto } from './dto/add-device-prekeys.dto';
 import type { E2eDeviceBundle, E2eKeyBundle } from './e2e-keys.types';
-import { activeDeviceCondition, MAX_ACTIVE_DEVICES } from './e2e-devices.util';
+import {
+  loadTargetDevices,
+  lockE2eDeviceKeys,
+  MAX_ACTIVE_DEVICES,
+} from './e2e-devices.util';
+import type { ActiveDevice } from './e2e-devices.util';
 
 @Injectable()
 export class E2eKeysService {
@@ -213,6 +218,12 @@ export class E2eKeysService {
     dto: RegisterE2eDeviceDto,
   ): Promise<{ deviceId: string }> {
     return this.db.transaction(async (tx) => {
+      // Serializes with v2 sends for this user: a send holds the same
+      // transaction-scoped lock while it re-reads the active set and inserts
+      // its envelopes, so this device is either visible to that re-read or
+      // waits until the send commits (sorted keys → no deadlock).
+      await lockE2eDeviceKeys(tx, [userId]);
+
       const [device] = await tx
         .insert(userE2eDevices)
         .values({
@@ -355,8 +366,9 @@ export class E2eKeysService {
   }
 
   /**
-   * Active device ids for `targetUserId` — the set a sender must encrypt to.
-   * Claims no prekey. Block-gated like getBundle, except for the caller's
+   * Active device ids for `targetUserId`, newest first — the set a sender
+   * must encrypt to (loadTargetDevices: fresh devices, else the newest two
+   * stale ones). Claims no prekey. Block-gated like getBundle, except for the caller's
    * own devices (the send path fans out to those too).
    */
   async listActiveDevices(
@@ -369,26 +381,13 @@ export class E2eKeysService {
     )
       throw new ForbiddenException('Messaging unavailable');
 
-    const rows = await this.db
-      .select({ id: userE2eDevices.id })
-      .from(userE2eDevices)
-      .where(
-        and(eq(userE2eDevices.userId, targetUserId), activeDeviceCondition()),
-      )
-      .orderBy(desc(userE2eDevices.lastSeenAt));
-    return rows.map((r) => r.id);
+    const devices = await loadTargetDevices(this.db, [targetUserId]);
+    return devices.map((d) => d.id);
   }
 
   /** Active devices of several users in one query — the send path's set check. */
-  loadActiveDevices(
-    userIds: string[],
-  ): Promise<{ id: string; userId: string }[]> {
-    return this.db
-      .select({ id: userE2eDevices.id, userId: userE2eDevices.userId })
-      .from(userE2eDevices)
-      .where(
-        and(inArray(userE2eDevices.userId, userIds), activeDeviceCondition()),
-      );
+  loadActiveDevices(userIds: string[]): Promise<ActiveDevice[]> {
+    return loadTargetDevices(this.db, userIds);
   }
 
   /** Bundle for ONE device, claiming one of its one-time prekeys (SKIP LOCKED). */
@@ -399,9 +398,20 @@ export class E2eKeysService {
     const [device] = await this.db
       .select()
       .from(userE2eDevices)
-      .where(and(eq(userE2eDevices.id, deviceId), activeDeviceCondition()))
+      .where(
+        and(eq(userE2eDevices.id, deviceId), isNull(userE2eDevices.revokedAt)),
+      )
       .limit(1);
-    if (!device) throw new NotFoundException('Device not active');
+    // Same rule as the devices list: a stale device is served only while it
+    // is in its owner's fallback set, so a sender can always fetch a bundle
+    // for every id listActiveDevices returned.
+    if (
+      !device ||
+      !(await loadTargetDevices(this.db, [device.userId])).some(
+        (d) => d.id === device.id,
+      )
+    )
+      throw new NotFoundException('Device not active');
     if (
       device.userId !== callerId &&
       (await isBlockedEitherWay(this.db, callerId, device.userId))

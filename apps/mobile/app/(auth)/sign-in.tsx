@@ -98,7 +98,7 @@ const SignInScreen = () => {
           onPress: () => {
             login({
               name: "Sokha (Telegram)",
-              email: "sokha.telegram@psakhmer.com",
+              email: "sokha.telegram@phsarkhmer.com",
               phone: identifier || "012 889 900",
               bio: "Verified seller • Connected via Telegram",
               avatar:

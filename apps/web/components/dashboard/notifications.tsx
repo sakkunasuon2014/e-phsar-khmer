@@ -1,5 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, Flag, Loader2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Drawer,
@@ -9,208 +13,167 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { Bell, Package, AlertTriangle, Briefcase, Zap } from "lucide-react";
-import { useState } from "react";
-import { cn } from "@/lib/utils";
+import {
+  getListingReports,
+  getUserReports,
+  type ListingReportView,
+  type UserReportView,
+} from "@/actions/admin-reports";
 
-// Define notification types and data structure
-type Notification = {
-  id: number;
-  type: "order" | "task" | "alert" | "update";
+/**
+ * The bell is the moderation review queue, not decoration: it reads the same
+ * two report lists the queues themselves use (same react-query keys, so a page
+ * visit and the bell share one fetch and an approve/reject refresh reaches
+ * both). Nothing to review ⇒ no badge.
+ */
+type QueueItem = {
+  id: string;
+  kind: "user" | "listing";
   title: string;
   description: string;
-  time: string;
-  isUnread: boolean;
+  createdAt: string;
+  href: string;
 };
 
-// Placeholder data for the notifications
-const notificationsData: Notification[] = [
-  {
-    id: 1,
-    type: "order",
-    title: "Order #4592 Shipped!",
-    description: "Your recent purchase is on its way. Track your package.",
-    time: "5 min ago",
-    isUnread: true,
-  },
-  {
-    id: 2,
-    type: "task",
-    title: "New Team Task Assigned",
-    description: "Project 'Phoenix' deadline updated. Review the brief.",
-    time: "1 hour ago",
-    isUnread: true,
-  },
-  {
-    id: 3,
-    type: "alert",
-    title: "Weekly Summary Available",
-    description: "Your performance overview for last week is ready.",
-    time: "3 hours ago",
-    isUnread: true,
-  },
-  {
-    id: 4,
-    type: "update",
-    title: "System Update Complete",
-    description: "New features applied successfully. View release notes.",
-    time: "5 hours ago",
-    isUnread: false,
-  },
-  {
-    id: 5,
-    type: "alert",
-    title: "Security Alert: Unusual Login",
-    description: "A new device was used to access your account.",
-    time: "2 days ago",
-    isUnread: false,
-  },
-  {
-    id: 6,
-    type: "alert",
-    title: "Security Alert: Unusual Login",
-    description: "A new device was used to access your account.",
-    time: "2 days ago",
-    isUnread: false,
-  },
-  {
-    id: 7,
-    type: "alert",
-    title: "Security Alert: Unusual Login",
-    description: "A new device was used to access your account.",
-    time: "2 days ago",
-    isUnread: false,
-  },
-];
+function timeAgo(iso: string): string {
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) return "";
+  const minutes = Math.floor((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.floor(hours / 24)} d ago`;
+}
 
-// Helper component for different notification type icons
-const NotificationIcon = ({ type }: { type: Notification["type"] }) => {
-  switch (type) {
-    case "order":
-      return <Package className="h-6 w-6 text-blue-500" />;
-    case "task":
-      return <Briefcase className="h-6 w-6 text-orange-500" />;
-    case "alert":
-      return <AlertTriangle className="h-6 w-6 text-red-500" />;
-    case "update":
-      return <Zap className="h-6 w-6 text-green-500" />;
-    default:
-      return <Bell className="h-6 w-6 text-gray-500" />;
-  }
-};
+function buildQueue(
+  userReports: UserReportView[],
+  listingReports: ListingReportView[],
+): QueueItem[] {
+  const items: QueueItem[] = [
+    ...userReports
+      .filter((report) => report.status === "pending")
+      .map((report) => ({
+        id: report.id,
+        kind: "user" as const,
+        title: `Report on ${report.targetName}`,
+        description: `${report.reasonText ?? "User report"} — reported by ${report.reporterName}`,
+        createdAt: report.createdAt,
+        href: "/wanderer/dashboard/report/users",
+      })),
+    ...listingReports
+      .filter((report) => report.status === "pending")
+      .map((report) => ({
+        id: report.id,
+        kind: "listing" as const,
+        title: `Report on ${report.listingTitle ?? "listing"}`,
+        description: `${report.reasonText ?? "Listing report"} — reported by ${report.reporterName}`,
+        createdAt: report.createdAt,
+        href: "/wanderer/dashboard/report/posts",
+      })),
+  ];
+  return items
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, 20);
+}
 
 export default function Notifications() {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
 
-  // Dynamically calculate the unread count
-  const unreadCount = notificationsData.filter((n) => n.isUnread).length;
+  const { data: userReports, isLoading: loadingUserReports } = useQuery({
+    queryKey: ["admin", "reports", "users"],
+    queryFn: getUserReports,
+    retry: false,
+  });
+  const { data: listingReports, isLoading: loadingListingReports } = useQuery({
+    queryKey: ["admin", "reports", "listings"],
+    queryFn: getListingReports,
+    retry: false,
+  });
+
+  const isLoading = loadingUserReports || loadingListingReports;
+  const items = useMemo(
+    () => buildQueue(userReports ?? [], listingReports ?? []),
+    [userReports, listingReports],
+  );
+  const pendingCount = items.length;
+
+  const openQueue = (href: string) => {
+    setOpen(false);
+    router.push(href);
+  };
 
   return (
-    <Drawer open={open} onOpenChange={setOpen} direction="left">
+    <Drawer open={open} onOpenChange={setOpen} direction="right">
       <DrawerTrigger asChild>
         <Button
           variant="ghost"
-          size="icon" // Use "icon" instead of "icon-lg" for standard shadcn sizing
-          className="relative rounded-full cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          size="icon"
+          aria-label="Notifications"
+          className="relative cursor-pointer rounded-full hover:bg-muted/60"
         >
-          <Bell
-            className="h-5 w-5 text-zinc-700 dark:text-zinc-300"
-            size={20}
-          />
-
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-[11px] font-bold text-white antialiased">
-              {unreadCount > 99 ? "99+" : unreadCount}
+          <Bell className="size-5 text-muted-foreground" />
+          {pendingCount > 0 ? (
+            <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 type-photo-badge text-white antialiased">
+              {pendingCount > 99 ? "99+" : pendingCount}
             </span>
-          )}
+          ) : null}
         </Button>
       </DrawerTrigger>
 
-      <DrawerContent className="max-w-md ml-auto h-screen border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
-        <DrawerHeader className="border-b border-zinc-200 dark:border-zinc-800 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <DrawerTitle className="text-xl font-semibold text-zinc-950 dark:text-zinc-50">
-                Notifications Center
-              </DrawerTitle>
-              <DrawerDescription className="text-sm text-zinc-600 dark:text-zinc-400">
-                You have {unreadCount} unread notifications
-              </DrawerDescription>
-            </div>
-            {unreadCount > 0 && (
-              <Button variant="outline" size="sm" className="text-xs h-8 px-3">
-                Mark all as read
-              </Button>
-            )}
-          </div>
+      <DrawerContent className="ml-auto h-full w-full max-w-md border-l border-border bg-card">
+        <DrawerHeader className="border-b border-border px-6 py-4">
+          <DrawerTitle>Notifications</DrawerTitle>
+          <DrawerDescription>
+            {isLoading
+              ? "Checking the review queues…"
+              : pendingCount === 0
+                ? "Nothing waiting — you're all caught up."
+                : `${pendingCount} report${pendingCount === 1 ? "" : "s"} waiting for review.`}
+          </DrawerDescription>
         </DrawerHeader>
 
-        <div className="no-scrollbar overflow-y-auto h-full px-2 py-3 space-y-3">
-          {notificationsData.map((notification) => (
-            <div
-              key={notification.id}
-              className={cn(
-                "relative flex items-start gap-4 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors cursor-pointer",
-                notification.isUnread
-                  ? "bg-white dark:bg-zinc-950"
-                  : "bg-zinc-50 dark:bg-zinc-900",
-              )}
-            >
-              {/* Unread Indicator Dot */}
-              {notification.isUnread && (
-                <div className="absolute top-4 right-4 h-2.5 w-2.5 rounded-full bg-red-600" />
-              )}
-
-              {/* Left Side: Icon and Indicator */}
-              <div
-                className={cn(
-                  "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full",
-                  notification.isUnread
-                    ? "bg-zinc-100 dark:bg-zinc-800"
-                    : "bg-white dark:bg-zinc-950",
-                )}
-              >
-                <NotificationIcon type={notification.type} />
-              </div>
-
-              {/* Right Side: Content and Time */}
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h4
-                    className={cn(
-                      "text-sm font-semibold text-zinc-950 dark:text-zinc-50 pr-6", // Added padding right for the dot
-                      notification.isUnread
-                        ? ""
-                        : "text-zinc-700 dark:text-zinc-300",
-                    )}
-                  >
-                    {notification.title}
-                  </h4>
-                </div>
-                <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
-                  {notification.description}
-                </p>
-                <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                  {notification.time}
-                </span>
-              </div>
+        <div className="no-scrollbar space-y-2 overflow-y-auto px-3 py-3">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
             </div>
-          ))}
-
-          {/* Placeholder for "Load More" or "No More Notifications" */}
-          <div className="text-center pt-6 pb-4">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Showing 5 of 28 notifications
-            </p>
-          </div>
+          ) : items.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-12 text-muted-foreground">
+              <Bell className="size-8" />
+              <p className="type-body-sm">No pending reports.</p>
+            </div>
+          ) : (
+            items.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => openQueue(item.href)}
+                className="flex w-full items-start gap-3 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-muted/50"
+              >
+                <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-muted">
+                  {item.kind === "user" ? (
+                    <UserRound className="size-4 text-[#00a0e9]" />
+                  ) : (
+                    <Flag className="size-4 text-orange-500" />
+                  )}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="truncate font-medium">{item.title}</span>
+                    <span className="type-meta shrink-0 text-muted-foreground">
+                      {timeAgo(item.createdAt)}
+                    </span>
+                  </span>
+                  <span className="mt-0.5 line-clamp-2 whitespace-normal type-meta text-muted-foreground">
+                    {item.description}
+                  </span>
+                </span>
+              </button>
+            ))
+          )}
         </div>
-
-        {/* Optional Footer (keep commented if unused) */}
-        {/* <DrawerFooter className="border-t border-zinc-200 dark:border-zinc-800 p-4">
-                    <DrawerClose asChild>
-                        <Button className="w-full">Close Center</Button>
-                    </DrawerClose>
-                </DrawerFooter> */}
       </DrawerContent>
     </Drawer>
   );

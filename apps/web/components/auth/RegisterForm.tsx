@@ -71,7 +71,7 @@
 //       <div className="absolute inset-0 flex items-center">
 //         <div className="w-full border-t border-border"></div>
 //       </div>
-//       <div className="relative flex justify-center text-sm">
+//       <div className="relative flex justify-center type-body-sm">
 //         <span className="px-2 bg-background text-foreground">Or</span>
 //       </div>
 //     </div>
@@ -82,7 +82,7 @@
 
 //       <div className="w-full max-w-[580px] mx-auto bg-card rounded-sm shadow-sm border border-border p-8">
 //       <div className="mb-6">
-//         <h1 className="text-lg font-semibold text-center mb-4 text-foreground">
+//         <h1 className="type-page-title text-center mb-4 text-foreground">
 //           Register to post free ad
 //         </h1>
 //         <div className="border-b border-border w-full">
@@ -95,7 +95,7 @@
 //           <div>
 //           <label
 //               htmlFor="username"
-//               className="block text-sm font-medium text-foreground mb-4"
+//               className="block type-nav text-foreground mb-4"
 //             >
 //               First Name <span className="text-red-500">*</span>
 //             </label>
@@ -109,19 +109,19 @@
 //                   errors.firstName
 //                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
 //                     : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-//                 } focus:outline-none focus:ring-1 transition-colors text-sm`}
+//                 } focus:outline-none focus:ring-1 transition-colors type-body-sm`}
 //                 placeholder=""
 //               />
 //               {errors.firstName && (
 //                 <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
 //               )}
 //             </div>
-//             {errors.firstName && <p className="text-red-500 text-xs mt-1">Please enter your first name</p>}
+//             {errors.firstName && <p className="text-red-500 type-meta mt-1">Please enter your first name</p>}
 //           </div>
 
 //           {/* Last Name Field */}
 //           <div>
-//             <label htmlFor="lastName" className="block text-xs font-medium text-foreground mb-1">
+//             <label htmlFor="lastName" className="block type-meta font-medium text-foreground mb-1">
 //               Last Name <span className="text-red-500">*</span>
 //             </label>
 //             <div className="relative">
@@ -134,19 +134,19 @@
 //                   errors.lastName
 //                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
 //                     : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-//                 } focus:outline-none focus:ring-1 transition-colors text-sm`}
+//                 } focus:outline-none focus:ring-1 transition-colors type-body-sm`}
 //                 placeholder=""
 //               />
 //               {errors.lastName && (
 //                 <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
 //               )}
 //             </div>
-//             {errors.lastName && <p className="text-red-500 text-xs mt-1">Please enter your last name</p>}
+//             {errors.lastName && <p className="text-red-500 type-meta mt-1">Please enter your last name</p>}
 //           </div>
 
 //           {/* Phone Number Field */}
 //           <div>
-//             <label htmlFor="phoneNumber" className="block text-xs font-medium text-foreground mb-1">
+//             <label htmlFor="phoneNumber" className="block type-meta font-medium text-foreground mb-1">
 //               Phone Number <span className="text-red-500">*</span>
 //             </label>
 //             <div className="relative">
@@ -159,19 +159,19 @@
 //                   errors.phoneNumber
 //                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
 //                     : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-//                 } focus:outline-none focus:ring-1 transition-colors text-sm`}
+//                 } focus:outline-none focus:ring-1 transition-colors type-body-sm`}
 //                 placeholder=""
 //               />
 //               {errors.phoneNumber && (
 //                 <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
 //               )}
 //             </div>
-//             {errors.phoneNumber && <p className="text-red-500 text-xs mt-1">Please enter the 'Phone Number'</p>}
+//             {errors.phoneNumber && <p className="text-red-500 type-meta mt-1">Please enter the 'Phone Number'</p>}
 //           </div>
 
 //           {/* Password Field */}
 //           <div>
-//             <label htmlFor="password" className="block text-xs font-medium text-foreground mb-1">
+//             <label htmlFor="password" className="block type-meta font-medium text-foreground mb-1">
 //               Password <span className="text-red-500">*</span>
 //             </label>
 //             <div className="relative">
@@ -184,7 +184,7 @@
 //                   errors.password
 //                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
 //                     : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-//                 } focus:outline-none focus:ring-1 transition-colors text-sm`}
+//                 } focus:outline-none focus:ring-1 transition-colors type-body-sm`}
 //                 placeholder=""
 //               />
 //               <button
@@ -195,12 +195,12 @@
 //                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 //               </button>
 //             </div>
-//             {errors.password && <p className="text-red-500 text-xs mt-1">Please enter your password</p>}
+//             {errors.password && <p className="text-red-500 type-meta mt-1">Please enter your password</p>}
 //           </div>
 
 //           {/* Confirm Password Field */}
 //           <div>
-//             <label htmlFor="confirmPassword" className="block text-xs font-medium text-foreground mb-1">
+//             <label htmlFor="confirmPassword" className="block type-meta font-medium text-foreground mb-1">
 //               Confirm Password <span className="text-red-500">*</span>
 //             </label>
 //             <div className="relative">
@@ -213,7 +213,7 @@
 //                   errors.confirmPassword
 //                     ? 'border-red-500 focus:border-red-500 focus:ring-red-500'
 //                     : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
-//                 } focus:outline-none focus:ring-1 transition-colors text-sm`}
+//                 } focus:outline-none focus:ring-1 transition-colors type-body-sm`}
 //                 placeholder=""
 //               />
 //               <button
@@ -224,13 +224,13 @@
 //                 {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
 //               </button>
 //             </div>
-//             {errors.confirmPassword && <p className="text-red-500 text-xs mt-1">Please enter the confirm password</p>}
+//             {errors.confirmPassword && <p className="text-red-500 type-meta mt-1">Please enter the confirm password</p>}
 //           </div>
 
 //           {/* Submit Button */}
 //           <button
 //             type="submit"
-//             className="w-full bg-[#ff8c00] hover:bg-[#e67e00] text-white font-medium py-2 rounded transition-colors text-sm"
+//             className="w-full bg-[#ff8c00] hover:bg-[#e67e00] text-white font-medium py-2 rounded transition-colors type-body-sm"
 //           >
 //             Submit
 //           </button>
@@ -283,18 +283,18 @@
 
 //         {/* Login Section */}
 //         <div className="text-center mb-3">
-//           <p className="text-sm text-foreground mb-2">Already have an account?</p>
+//           <p className="type-body-sm text-foreground mb-2">Already have an account?</p>
 //           <button
 //             type="button"
 //             onClick={() => router.push('/login')}
-//             className="w-full bg-[#00a7e1] hover:bg-[#0095ca] text-white font-medium py-2 rounded transition-colors text-sm"
+//             className="w-full bg-[#00a7e1] hover:bg-[#0095ca] text-white font-medium py-2 rounded transition-colors type-body-sm"
 //           >
 //             Log in
 //           </button>
 //         </div>
 
 //         {/* Terms */}
-//         <p className="text-base text-center text-foreground">
+//         <p className="type-body text-center text-foreground">
 //           By continuing, you agree to our{" "}
 //           <Link href="/posting-rule" className="text-[#00a7e1] hover:underline">
 //             Posting Rule
@@ -369,7 +369,7 @@ export function RegisterForm() {
     <div className="container px-4 mx-auto my-6 pb-30">
       <div className="w-full max-w-[580px] mx-auto bg-card rounded-sm shadow-sm border border-border p-8">
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-center mb-4 text-foreground">
+          <h1 className="type-page-title text-center mb-4 text-foreground">
             Register to post free ad
           </h1>
           <FieldSeparator />

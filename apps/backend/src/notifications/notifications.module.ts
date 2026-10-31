@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { ChatPubSubModule } from '../chat/chat-pubsub.module';
 import { InAppNotificationChannel } from './channels/in-app-notification.channel';
+import { RealtimeNotificationChannel } from './channels/realtime-notification.channel';
 import { NOTIFICATION_CHANNELS } from './notification-channel.interface';
 
 /**
@@ -12,16 +14,24 @@ import { NOTIFICATION_CHANNELS } from './notification-channel.interface';
  * real choice (it now sends notifications).
  */
 @Module({
+  // The pubsub leaf provides the socket push transport for the realtime
+  // channel without importing the chat feature (which imports AuthModule).
+  imports: [ChatPubSubModule],
   controllers: [NotificationsController],
   providers: [
     NotificationsService,
     InAppNotificationChannel,
+    RealtimeNotificationChannel,
     {
       provide: NOTIFICATION_CHANNELS,
       // Add a future channel (e.g. EmailNotificationChannel) to this array —
-      // nothing else in the module needs to change.
-      inject: [InAppNotificationChannel],
-      useFactory: (inApp: InAppNotificationChannel) => [inApp],
+      // nothing else in the module needs to change. In-app stays first: it
+      // is the durable record, the realtime push is best-effort.
+      inject: [InAppNotificationChannel, RealtimeNotificationChannel],
+      useFactory: (
+        inApp: InAppNotificationChannel,
+        realtime: RealtimeNotificationChannel,
+      ) => [inApp, realtime],
     },
   ],
   exports: [NotificationsService],

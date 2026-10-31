@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import { TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ export function FeedResults({
   initialCursor,
   query,
   locale,
-  gridClassName = "grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4",
+  gridClassName = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4",
   gridLead,
   listLead,
 }: FeedResultsProps) {
@@ -68,14 +68,19 @@ export function FeedResults({
     <>
       <TabsContent value="grid" className="mt-4">
         <div className={gridClassName}>
-          {gridLead}
+          {/* The lead arrives as a prop element rather than a JSX child of
+              this component, so React's dev key check sees it sitting in the
+              same children array as the mapped posts and warns "Each child in
+              a list should have a unique key prop". The explicit key marks
+              this single static slot as intentional. */}
+          <Fragment key="grid-lead">{gridLead}</Fragment>
           {posts.map((post) => (
             <GridCardPost key={post.postId} post={post} />
           ))}
         </div>
       </TabsContent>
       <TabsContent value="list" className="mt-4">
-        {listLead}
+        <Fragment key="list-lead">{listLead}</Fragment>
         {posts.map((post) => (
           <ListCardPost key={post.postId} post={post} />
         ))}
@@ -84,7 +89,7 @@ export function FeedResults({
       {cursor && (
         <div className="flex flex-col items-center gap-2 py-6">
           {failed && (
-            <p className="text-sm text-destructive" role="alert">
+            <p className="type-body-sm text-destructive" role="alert">
               {t("loadMoreError")}
             </p>
           )}

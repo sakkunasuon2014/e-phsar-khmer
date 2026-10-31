@@ -276,7 +276,7 @@ const SettingsScreen = () => {
             Version: 2026.09.28
           </Text>
           <Text className="text-neutral-text-muted text-xs mt-1">
-            PsaKhmer Platform
+            PhsarKhmer Platform
           </Text>
         </View>
       </ScrollView>
@@ -416,7 +416,7 @@ const SettingsScreen = () => {
                 {
                   key: "pushEnabled",
                   title: "Push Notifications",
-                  subtitle: "Enable all push alerts from PsaKhmer",
+                  subtitle: "Enable all push alerts from PhsarKhmer",
                   icon: "notifications",
                 },
                 {

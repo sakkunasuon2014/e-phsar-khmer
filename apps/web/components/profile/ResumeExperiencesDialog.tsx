@@ -192,13 +192,13 @@ export function ResumeExperiencesDialog({
               <IconArrowLeft size={20} />
             </button>
           )}
-          <DialogTitle className="text-2xl font-semibold">
+          <DialogTitle>
             {mode === "edit"
               ? t("form.titles.experiencesEdit")
               : t("form.titles.experiencesWizard")}
           </DialogTitle>
           {mode === "wizard" ? (
-            <span className="ml-auto text-lg font-semibold text-[#00a0e9]">
+            <span className="ml-auto type-nav text-[#00a0e9]">
               {t("form.step", { current: 3, total: 8 })}
             </span>
           ) : (
@@ -223,7 +223,7 @@ export function ResumeExperiencesDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {mode === "wizard" && (
-            <p className="text-base text-muted-foreground">
+            <p className="type-body text-muted-foreground">
               {t("sections.work.desc")}
             </p>
           )}
@@ -280,7 +280,7 @@ export function ResumeExperiencesDialog({
                     setLocationSession((session) => session + 1);
                     setLocationOpen(true);
                   }}
-                  className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] md:text-sm"
+                  className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9]"
                 >
                   <span
                     className={place.province ? "" : "text-muted-foreground"}
@@ -326,7 +326,7 @@ export function ResumeExperiencesDialog({
                         type="button"
                         id="rex-start"
                         data-invalid={startError}
-                        className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] data-[invalid=true]:border-destructive data-[invalid=true]:ring-3 data-[invalid=true]:ring-destructive/20 md:text-sm"
+                        className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] data-[invalid=true]:border-destructive data-[invalid=true]:ring-3 data-[invalid=true]:ring-destructive/20"
                       >
                         <span
                           className={startDate ? "" : "text-muted-foreground"}
@@ -385,7 +385,7 @@ export function ResumeExperiencesDialog({
                         id="rex-end"
                         disabled={current}
                         data-invalid={endError || dateOrderError}
-                        className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left text-base outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 data-[invalid=true]:border-destructive data-[invalid=true]:ring-3 data-[invalid=true]:ring-destructive/20 md:text-sm"
+                        className="flex h-11 w-full cursor-pointer items-center rounded-sm border border-input bg-transparent px-2.5 pr-10 text-left type-body outline-none transition-colors focus-visible:border-[#00a0e9] focus-visible:ring-1 focus-visible:ring-[#00a0e9] disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 data-[invalid=true]:border-destructive data-[invalid=true]:ring-3 data-[invalid=true]:ring-destructive/20"
                       >
                         <span
                           className={
@@ -448,7 +448,7 @@ export function ResumeExperiencesDialog({
               />
               <label
                 htmlFor="rex-current"
-                className="cursor-pointer text-base text-foreground"
+                className="cursor-pointer type-body text-foreground"
               >
                 {t("form.currentlyWork")}
               </label>
@@ -473,7 +473,7 @@ export function ResumeExperiencesDialog({
             <button
               type="button"
               onClick={onSkip}
-              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 text-base font-medium text-white transition-colors hover:bg-gray-600"
+              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 type-nav text-white transition-colors hover:bg-gray-600"
             >
               {t("form.skip")}
             </button>
@@ -481,7 +481,7 @@ export function ResumeExperiencesDialog({
               type="button"
               onClick={handleNext}
               disabled={saving}
-              className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] type-nav text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.nextEducations")}
             </button>
@@ -492,7 +492,7 @@ export function ResumeExperiencesDialog({
               type="button"
               onClick={handleNext}
               disabled={saving}
-              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 type-nav text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.save")}
             </button>

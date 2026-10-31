@@ -1,6 +1,6 @@
 import "@/styles/globals.css";
 import type { Metadata } from "next";
-import { kantumruyPro } from "@/lib/fonts";
+import { kohSantepheap } from "@/lib/fonts";
 import { NextIntlClientProvider } from "next-intl";
 import { Toaster } from "@/components/ui/sonner";
 import NextTopLoader from "nextjs-toploader";
@@ -9,7 +9,7 @@ import { Providers } from "@/app/providers";
 import { resolveAdminLocale } from "@/lib/auth/admin-locale";
 
 export const metadata: Metadata = {
-  title: { default: "Admin — Psakhmer", template: "%s — Admin" },
+  title: { default: "Admin — PhsarKhmer", template: "%s — Admin" },
   description: "Admin dashboard",
 };
 
@@ -30,7 +30,7 @@ export default async function WandererRootLayout({
   return (
     <html
       lang={locale}
-      className={kantumruyPro.variable}
+      className={`${kohSantepheap.variable}`}
       suppressHydrationWarning
     >
       <body>

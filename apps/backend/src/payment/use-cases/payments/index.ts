@@ -15,7 +15,6 @@ export * from './transaction/record-payment-status-history.use-case';
 export * from './attempt/find-payment-attempt.use-case';
 export * from './attempt/find-payment-attempt-by-provider-attempt-id.use-case';
 export * from './attempt/update-payment-attempt.use-case';
-export * from './attempt/enqueue-payment-attempt-poll.use-case';
 
 // payment_provider_events
 // create-payment-provider-event, enqueue-payment-provider-event,
@@ -35,7 +34,9 @@ export * from './processing/check-owned-payment-transaction.use-case';
 export * from './processing/list-owned-payment-attempts.use-case';
 export * from './processing/process-payment-attempt.use-case';
 export * from './processing/process-provider-event.use-case';
-export * from './processing/poll-payment-attempt.use-case';
+export * from './processing/settle-reconciled-attempt.use-case';
+export * from './processing/reconcile-payment-attempt.use-case';
 export * from './processing/fail-payment-attempt.use-case';
+export * from './processing/expire-payment-attempt.use-case';
 export * from './processing/fail-abandoned-payment-job.use-case';
 export * from './processing/enqueue-payment-settled-event.use-case';

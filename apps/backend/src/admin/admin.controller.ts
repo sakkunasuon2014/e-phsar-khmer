@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -93,7 +94,10 @@ export class AdminController {
 
   @Delete('users/:id')
   @ApiOperation({ summary: 'Soft-delete a user' })
-  deleteUser(@Param('id') id: string) {
-    return this.adminService.deleteUser(id);
+  deleteUser(
+    @CurrentUser() requester: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.adminService.deleteUser(id, requester);
   }
 }

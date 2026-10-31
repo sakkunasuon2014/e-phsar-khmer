@@ -8,6 +8,7 @@ import { useReactions } from "@/components/reactions/reactions-provider";
 import ShareModal from "@/components/share/ShareModel";
 import type { Post } from "@/lib/posts";
 import { toSlug } from "@/lib/utils";
+import { SITE_URL } from "@/lib/site";
 
 /**
  * The like counter and the share button, as one unit — they render together in
@@ -41,7 +42,7 @@ export function PostSocialActions({
             toggleLike(listingId);
           }}
           disabled={isPending(listingId)}
-          className="bg-card text-sm font-medium px-2 py-1.5 h-10 w-26 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
+          className="bg-card type-nav px-2 py-1.5 h-10 min-w-26 rounded-sm flex items-center shadow-sm hover:bg-white/80 transition-colors cursor-pointer"
         >
           <IconHeartPlus
             className={`scale-145 ${
@@ -69,7 +70,7 @@ export function PostSocialActions({
       <ShareModal
         open={shareOpen}
         onOpenChange={setShareOpen}
-        url={`https://psakhmer.online/${toSlug(post.title)}-adid-${post.postId}`}
+        url={`${SITE_URL}/${toSlug(post.title)}-adid-${post.postId}`}
       />
     </>
   );

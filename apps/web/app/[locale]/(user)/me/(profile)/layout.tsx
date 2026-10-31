@@ -18,9 +18,7 @@ function toProfileUser(
     [me.firstName, me.lastName].filter(Boolean).join(" ").trim() ||
     me.username ||
     fallbackName;
-  const avatar =
-    me.profilePhotoUrl ??
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00a0e9&color=fff`;
+  const avatar = me.profilePhotoUrl ?? "";
   const created = new Date(me.createdAt);
   const month =
     (MONTH_LABELS[locale] ?? MONTH_LABELS.en)[created.getMonth()] ?? "";
@@ -35,6 +33,7 @@ function toProfileUser(
     following: counts?.following ?? 0,
     follower: counts?.followers ?? 0,
     joinDate,
+    verifiedAccount: me.verifiedAccount ?? false,
   };
 }
 

@@ -14,6 +14,8 @@ export interface UpdatePaymentAttemptInput {
   providerAttemptId?: string;
   failureCode?: string;
   failureMessage?: string;
+  /** Null the failure columns — an attempt recovered after being failed. */
+  clearFailure?: boolean;
 }
 
 type UpdatePaymentAttemptError = PaymentPersistenceError;
@@ -41,6 +43,9 @@ export const updatePaymentAttempt = Effect.fn('updatePaymentAttempt')(
             respondedAt: new Date(),
             ...(input.providerAttemptId !== undefined
               ? { providerAttemptId: input.providerAttemptId }
+              : {}),
+            ...(input.clearFailure
+              ? { failureCode: null, failureMessage: null }
               : {}),
             ...(input.failureCode !== undefined
               ? { failureCode: input.failureCode }

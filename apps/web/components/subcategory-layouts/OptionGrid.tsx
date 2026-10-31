@@ -60,6 +60,9 @@ export default function OptionGrid({
     const params = new URLSearchParams(searchParams.toString());
 
     if (paramKey === "brand") {
+      // A brand pick drills INTO the brand (grid steps aside, models appear) —
+      // it is not a toggle. The applied brand is shown by the More Filters
+      // dialog and the breadcrumb (captain, 2026-10-27).
       params.set("ad_field", slug);
       params.delete("ad_model");
     }
@@ -83,7 +86,7 @@ export default function OptionGrid({
 
   return (
     <div className="bg-card rounded px-6 py-4 mb-2">
-      {title && <h2 className="text-base font-bold mb-4">{title}</h2>}
+      {title && <h2 className="type-card-heading mb-4">{title}</h2>}
       <div
         className={
           textTiles
@@ -109,7 +112,7 @@ export default function OptionGrid({
               onClick={(e) => handleClick(e, opt.slug)}
               className={
                 textTiles
-                  ? `border py-2 px-1 text-xs text-center transition-colors flex items-center justify-center min-h-[40px] ${
+                  ? `border py-2 px-1 type-body-sm text-center transition-colors flex items-center justify-center min-h-[40px] ${
                       isSelected
                         ? "text-blue-500 bg-blue-50 border-blue-100 font-medium"
                         : "hover:bg-muted bg-card"
@@ -132,7 +135,7 @@ export default function OptionGrid({
                       />
                     ) : null}
                   </div>
-                  <span className="text-xs mt-2 block">{opt.name}</span>
+                  <span className="type-body-sm mt-2 block">{opt.name}</span>
                 </>
               )}
             </a>
@@ -143,7 +146,7 @@ export default function OptionGrid({
         <div className="mt-4 flex justify-center">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="w-full border rounded py-2 text-sm bg-muted hover:bg-gray-200"
+            className="w-full border rounded py-2 type-nav bg-muted hover:bg-gray-200"
           >
             {showAll ? t("Common.showLess") : t("Common.showMore")}
           </button>

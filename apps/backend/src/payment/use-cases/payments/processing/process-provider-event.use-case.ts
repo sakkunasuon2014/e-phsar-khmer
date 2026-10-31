@@ -7,6 +7,7 @@ import {
   type paymentTransactionStatusEnum,
 } from '../../../entity';
 import { PaymentGatewayRegistryTag } from '../../../providers/payment-gateway-registry.provider';
+import type { ChargeResult } from '../../../providers/payment-gateway.types';
 import type { ProcessProviderEventJobData } from '../../../queue/payment-queue.types';
 import {
   PaymentGatewayCallError,
@@ -23,6 +24,7 @@ import { recordPaymentStatusHistory } from '../transaction/record-payment-status
 import { upsertPayment } from '../transaction/upsert-payment.use-case';
 import { postPaymentSettlementLedger } from '../../ledgers';
 import { enqueuePaymentSettledEvent } from './enqueue-payment-settled-event.use-case';
+import { resolveProviderEventFailure } from './provider-event-failure';
 
 export type ProcessProviderEventOutcome =
   | 'skipped'
@@ -49,9 +51,9 @@ function nextTransactionStatus(
  * Applies a received payment_provider_event to the attempt/transaction it
  * correlates to. The event row is whatever a `@Public()` webhook route
  * received, so before acting on it the gateway is asked directly what it
- * currently knows (`reconcile()`) — mitigation for a provider whose webhook
- * carries no signature. A gateway with no `reconcile()` trusts the
- * re-parsed payload directly.
+ * currently knows (`reconcile()`) — defense in depth for a signed webhook,
+ * and the only check for a provider whose webhook carries no signature. A
+ * gateway with no `reconcile()` trusts the re-parsed payload directly.
  */
 export const processProviderEvent = Effect.fn('processProviderEvent')(
   function* (
@@ -124,15 +126,16 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
     let outcome: 'pending' | 'succeeded' | 'failed' =
       parsed.status === 'unknown' ? 'pending' : parsed.status;
     let rawResponse: unknown = event.payload;
+    let reconciledResult: ChargeResult | undefined;
 
-    if (provider.reconcile && reconcileRef) {
-      const reconciled = yield* Effect.tryPromise({
+    if (provider.reconcile && reconcileRef && !provider.trustsVerifiedWebhook) {
+      reconciledResult = yield* Effect.tryPromise({
         try: () => provider.reconcile!(reconcileRef),
         catch: (cause) => new PaymentGatewayCallError({ cause }),
       });
-      // Authoritative — overrides whatever the (unsigned) webhook claimed.
-      outcome = reconciled.status;
-      rawResponse = reconciled.rawResponse ?? rawResponse;
+      // Authoritative — overrides whatever the webhook claimed, signed or not.
+      outcome = reconciledResult.status;
+      rawResponse = reconciledResult.rawResponse ?? rawResponse;
     }
 
     if (outcome === 'pending') {
@@ -144,6 +147,11 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
 
     const redactedRaw = provider.redact(rawResponse);
     const toStatus = nextTransactionStatus(outcome);
+    const failure = resolveProviderEventFailure(
+      outcome,
+      parsed,
+      reconciledResult,
+    );
     const now = new Date();
 
     yield* runInTransaction(
@@ -156,8 +164,8 @@ export const processProviderEvent = Effect.fn('processProviderEvent')(
         yield* updatePaymentAttempt({
           id: attempt.id,
           status: outcome,
-          failureCode: parsed.failureCode,
-          failureMessage: parsed.failureMessage,
+          failureCode: failure.failureCode,
+          failureMessage: failure.failureMessage,
         });
         yield* upsertPayment({
           id: transaction.id,

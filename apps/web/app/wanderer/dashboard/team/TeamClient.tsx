@@ -1,23 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -26,34 +12,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { SelectItem } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  MoreVertical,
-  Plus,
-  Eye,
-  Pencil,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  Search,
-  XIcon,
-} from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getAdminUsers, type AdminUsersResult } from "@/actions/admin-users";
+import { getTeamUsers, type AdminUsersResult } from "@/actions/admin-users";
 import { User } from "@/types/user";
 import { z } from "zod";
 import Image from "next/image";
-import { USER_ROLES, usersSchema, editUserSchema } from "@/schemas/user";
+import { usersSchema, editUserSchema } from "@/schemas/user";
 import { toast } from "@/components/ui/sonner";
 import {
   FieldGroup,
@@ -73,8 +41,32 @@ import {
   InputGroupAddon,
   InputGroupButton,
 } from "@/components/ui/input-group";
+import { AdminPage } from "@/components/dashboard/admin-page";
+import {
+  AdminSearch,
+  AdminTable,
+  DateCell,
+  PrimaryCell,
+  RowActions,
+  formatCount,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 type AddUserFormData = z.infer<typeof usersSchema>;
 type EditUserFormData = z.infer<typeof editUserSchema>;
+
+/** Stored numbers are already E.164 ("+855…") — never prefix a second "+". */
+function formatPhone(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  return trimmed.startsWith("+") ? trimmed : `+${trimmed}`;
+}
+
+/** Team page manages staff only; customers register on the marketplace. */
+const TEAM_ROLES = ["admin", "super_admin"] as const;
+
+function roleLabel(role: (typeof TEAM_ROLES)[number]): string {
+  return role === "super_admin" ? "Super Admin" : "Admin";
+}
 
 // ─── Add User Form ─────────────────────────────────────────────────────────────
 
@@ -93,7 +85,7 @@ function AddUserForm({
       profile: "",
       password: "",
       phones: [{ phone: "" }],
-      role: "admin" as (typeof USER_ROLES)[number],
+      role: "admin" as AddUserFormData["role"],
     },
     validators: {
       onChange: usersSchema,
@@ -117,9 +109,8 @@ function AddUserForm({
         e.preventDefault();
         form.handleSubmit();
       }}
-      className="flex flex-col h-full max-h-[85vh]"
     >
-      <div className="flex-1 overflow-y-auto px-1 pr-3 max-h-[80vh] scrollbar-thin">
+      <div className="px-1 pr-3">
         <FieldGroup className="py-4">
           <form.AppField name="name">
             {(field) => <field.Input label="Name" required />}
@@ -258,9 +249,9 @@ function AddUserForm({
           <form.AppField name="role">
             {(field) => (
               <field.Select label="Role" required>
-                {USER_ROLES.map((role) => (
+                {TEAM_ROLES.map((role) => (
                   <SelectItem key={role} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                    {roleLabel(role)}
                   </SelectItem>
                 ))}
               </field.Select>
@@ -273,7 +264,7 @@ function AddUserForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -311,9 +302,9 @@ function EditUserForm({
         user.networks.length > 0
           ? user.networks.map((n) => ({ phone: n }))
           : [{ phone: "" }],
-      role: (USER_ROLES.includes(user.role as (typeof USER_ROLES)[number])
+      role: ((TEAM_ROLES as readonly string[]).includes(user.role)
         ? user.role
-        : "user") as (typeof USER_ROLES)[number],
+        : "admin") as EditUserFormData["role"],
     } satisfies EditUserFormData,
     validators: {
       onChange: editUserSchema,
@@ -336,9 +327,8 @@ function EditUserForm({
         e.preventDefault();
         form.handleSubmit();
       }}
-      className="flex flex-col h-full max-h-[85vh]"
     >
-      <div className="flex-1 overflow-y-auto px-1 pr-3 max-h-[80vh] scrollbar-thin">
+      <div className="px-1 pr-3">
         <FieldGroup className="py-4">
           <form.AppField name="name">
             {(field) => <field.Input label="Name" required />}
@@ -481,9 +471,9 @@ function EditUserForm({
           <form.AppField name="role">
             {(field) => (
               <field.Select label="Role" required>
-                {USER_ROLES.map((role) => (
+                {TEAM_ROLES.map((role) => (
                   <SelectItem key={role} value={role}>
-                    {role.charAt(0).toUpperCase() + role.slice(1)}
+                    {roleLabel(role)}
                   </SelectItem>
                 ))}
               </field.Select>
@@ -496,7 +486,7 @@ function EditUserForm({
         <Button
           type="button"
           variant="outline"
-          className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
         >
           Cancel
@@ -558,7 +548,7 @@ function DeleteUserForm({
       </DialogHeader>
       <DialogFooter>
         <Button
-          className="h-9 bg-sky-500 text-white rounded-sm hover:bg-sky-600 hover:text-white cursor-pointer"
+          className="h-9 rounded-sm cursor-pointer"
           onClick={onCancel}
           disabled={isDeleting}
         >
@@ -578,6 +568,20 @@ function DeleteUserForm({
 
 // ─── Main TeamPage ─────────────────────────────────────────────────────────────
 
+/** Online/offline reads the same on the row and in the detail dialog. */
+function StatusBadge({ status }: { status: User["status"] }) {
+  return (
+    <Badge variant="outline">
+      <span
+        className={`size-1.5 rounded-full ${
+          status === "Online" ? "bg-emerald-500" : "bg-rose-500"
+        }`}
+      />
+      {status}
+    </Badge>
+  );
+}
+
 export default function TeamPage({
   initialData,
 }: {
@@ -586,68 +590,52 @@ export default function TeamPage({
   const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ["admin", "team"],
-    queryFn: () => getAdminUsers({ role: "super_admin" }),
+    queryFn: () => getTeamUsers(),
     initialData,
   });
-  const users = data?.users ?? [];
+  const users = data?.users;
 
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [viewUser, setViewUser] = useState<User | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState("all");
 
-  // Filter: hide plain "user" role — this page shows team members (admins etc.)
-  const filteredUsers = users.filter((user) => {
-    const query = searchQuery.toLowerCase();
-
-    if (user.role.toLowerCase() === "user") return false;
-
-    const matchesSearch =
-      user.userId.toLowerCase().includes(query) ||
-      user.name.toLowerCase().includes(query) ||
-      user.username.toLowerCase().includes(query) ||
-      user.email.toLowerCase().includes(query) ||
-      user.networks.join(",").toLowerCase().includes(query) ||
-      user.status.toLowerCase().includes(query);
-
-    const matchesTab =
-      tab === "all" ||
-      (tab === "online" && user.status === "Online") ||
-      (tab === "offline" && user.status === "Offline");
-
-    return matchesSearch && matchesTab;
-  });
-
-  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedUsers = filteredUsers.slice(
-    startIndex,
-    startIndex + rowsPerPage,
+  // Belt-and-braces: the feed only asks for staff roles, so a customer row can
+  // never reach this table.
+  const teamUsers = useMemo(
+    () => (users ?? []).filter((user) => user.role.toLowerCase() !== "user"),
+    [users],
   );
+  const onlineCount = teamUsers.filter(
+    (user) => user.status === "Online",
+  ).length;
+  const offlineCount = teamUsers.filter(
+    (user) => user.status === "Offline",
+  ).length;
 
-  const getStatusBadge = (status: User["status"]) => {
-    switch (status) {
-      case "Online":
-        return (
-          <Badge variant="outline">
-            <span className="size-1.5 rounded-full bg-emerald-500" />
-            Online
-          </Badge>
-        );
-      case "Offline":
-        return (
-          <Badge variant="outline">
-            <span className="size-1.5 rounded-full bg-rose-500" />
-            Offline
-          </Badge>
-        );
-    }
-  };
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return teamUsers.filter((user) => {
+      if (tab === "online" && user.status !== "Online") return false;
+      if (tab === "offline" && user.status !== "Offline") return false;
+      if (!query) return true;
+      return [
+        user.userId,
+        user.name,
+        user.username,
+        user.email,
+        ...user.networks.map(formatPhone),
+        user.role,
+        user.status,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [teamUsers, searchQuery, tab]);
 
   const refreshTeam = () =>
     queryClient.invalidateQueries({ queryKey: ["admin", "team"] });
@@ -673,299 +661,175 @@ export default function TeamPage({
     setSelectedUser(null);
   };
 
+  const columns = useMemo<AdminColumn<User>[]>(
+    () => [
+      {
+        key: "member",
+        header: "Member",
+        sortValue: (user) => user.name,
+        cell: (user) => (
+          <PrimaryCell
+            shape="round"
+            image={user.profileImage}
+            alt={user.name}
+            title={user.name}
+            subtitle={user.email || "No email"}
+          />
+        ),
+      },
+      {
+        key: "username",
+        header: "Username",
+        sortValue: (user) => user.username,
+        cell: (user) =>
+          user.username ? (
+            <span className="text-muted-foreground">@{user.username}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: "phone",
+        header: "Phone",
+        sortValue: (user) => formatPhone(user.networks[0] ?? ""),
+        cell: (user) => {
+          const phones = user.networks
+            .filter((value) => value !== "")
+            .map(formatPhone);
+          if (phones.length === 0) {
+            return <span className="text-muted-foreground">—</span>;
+          }
+          return (
+            <div className="flex flex-col gap-0.5">
+              <span>{phones[0]}</span>
+              {phones.length > 1 ? (
+                <span
+                  className="type-meta text-muted-foreground"
+                  title={phones.slice(1).join(", ")}
+                >
+                  +{phones.length - 1} more
+                </span>
+              ) : null}
+            </div>
+          );
+        },
+      },
+      {
+        key: "role",
+        header: "Role",
+        sortValue: (user) => user.role,
+        cell: (user) => (
+          <Badge variant="secondary">
+            {user.role === "super_admin" ? "Super Admin" : "Admin"}
+          </Badge>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status",
+        sortValue: (user) => user.status,
+        cell: (user) => <StatusBadge status={user.status} />,
+      },
+      {
+        key: "joined",
+        header: "Joined",
+        sortValue: (user) => user.createdAt,
+        cell: (user) => <DateCell value={user.createdAt} />,
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (user) => (
+          <RowActions
+            id={user.userId}
+            actions={[
+              {
+                label: "View",
+                icon: <Eye className="mr-2 size-4" />,
+                onSelect: () => setViewUser(user),
+              },
+              {
+                label: "Edit",
+                icon: <Pencil className="mr-2 size-4" />,
+                tone: "warning",
+                onSelect: () => {
+                  setSelectedUser(user);
+                  setIsEditDialogOpen(true);
+                },
+              },
+              {
+                label: "Delete",
+                icon: <Trash2 className="mr-2 size-4" />,
+                tone: "danger",
+                onSelect: () => {
+                  setSelectedUser(user);
+                  setIsDeleteDialogOpen(true);
+                },
+              },
+            ]}
+          />
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <>
-      <main className="flex-1 overflow-auto p-6 min-w-0">
-        <div className="flex flex-col gap-6">
-          {/* Header */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-[#00a0e9] text-2xl font-semibold tracking-tight">
-                Team
-              </h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Manage your team and roles
-              </p>
-            </div>
-            <Button
-              className="h-9 bg-sky-500 text-white rounded-sm hover:bg-sky-600 hover:text-white cursor-pointer"
-              onClick={() => setIsAddDialogOpen(true)}
-            >
-              <Plus className="mr-2 size-4" />
-              Add User
-            </Button>
-          </div>
-
-          {/* Search */}
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name, email, ID..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-9"
-            />
-          </div>
-
-          {/* Tabs */}
-          <Tabs
-            value={tab}
-            onValueChange={(value) => {
-              setTab(value);
-              setCurrentPage(1);
-            }}
+      <AdminPage
+        title="Team"
+        description="Manage your team and roles"
+        action={
+          <Button
+            className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+            onClick={() => setIsAddDialogOpen(true)}
           >
-            <TabsList>
-              <TabsTrigger value="all" className="cursor-pointer">
-                All Users
-              </TabsTrigger>
-              <TabsTrigger value="online" className="cursor-pointer">
-                Online
-                <Badge className="bg-green-500 hover:bg-green-600 text-white ml-1.5 px-1.5 py-0.5 text-xs">
-                  {
-                    users.filter(
-                      (u) =>
-                        u.status === "Online" &&
-                        u.role.toLowerCase() !== "user",
-                    ).length
-                  }
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="offline" className="cursor-pointer">
-                Offline
-                <Badge className="bg-red-500 hover:bg-red-600 text-white ml-1.5 px-1.5 py-0.5 text-xs">
-                  {
-                    users.filter(
-                      (u) =>
-                        u.status === "Offline" &&
-                        u.role.toLowerCase() !== "user",
-                    ).length
-                  }
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            <Plus className="mr-2 size-4" />
+            Add Member
+          </Button>
+        }
+        toolbar={
+          <AdminSearch
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search name, username, email, phone, role..."
+          />
+        }
+      >
+        {/* Tabs */}
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="all" className="cursor-pointer">
+              All Users
+            </TabsTrigger>
+            <TabsTrigger value="online" className="cursor-pointer">
+              Online
+              <Badge className="bg-green-500 hover:bg-green-600 text-white ml-1.5 px-1.5 py-0.5 type-meta">
+                {formatCount(onlineCount)}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger value="offline" className="cursor-pointer">
+              Offline
+              <Badge className="bg-red-500 hover:bg-red-600 text-white ml-1.5 px-1.5 py-0.5 type-meta">
+                {formatCount(offlineCount)}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-          {/* Table */}
-          <div className="rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-center">ID</TableHead>
-                  <TableHead>Profile</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created At</TableHead>
-                  <TableHead>Updated At</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedUsers.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="h-32 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Search className="size-8" />
-                        <p>Not found</p>
-                        {searchQuery && (
-                          <p className="text-sm">
-                            No results for &quot;{searchQuery}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-                {paginatedUsers.map((user) => (
-                  <TableRow key={user.userId}>
-                    {/* ID */}
-                    <TableCell className="text-sm text-center text-foreground">
-                      {user.userId}
-                    </TableCell>
-                    {/* Avatar */}
-                    <TableCell>
-                      <Avatar className="size-8">
-                        <AvatarImage src={user.profileImage} alt={user.name} />
-                        <AvatarFallback className="text-xs">
-                          {user.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TableCell>
-                    {/* Name + Email */}
-                    <TableCell>
-                      <div className="font-medium">{user.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {user.email}
-                      </div>
-                    </TableCell>
-                    {/* Username */}
-                    <TableCell>
-                      <div className="text-sm text-muted-foreground">
-                        {user.username}
-                      </div>
-                    </TableCell>
-                    {/* Phone */}
-                    <TableCell>
-                      <div className="grid grid-rows-2 grid-flow-col gap-x-4 gap-y-1 text-sm">
-                        {user.networks
-                          .filter((n) => n !== "")
-                          .map((network, index) => (
-                            <span key={index}>+{network}</span>
-                          ))}
-                      </div>
-                    </TableCell>
-                    {/* Role */}
-                    <TableCell>
-                      <span className="rounded-lg bg-sky-200 text-sm text-muted-foreground px-2 py-1">
-                        {user.role}
-                      </span>
-                    </TableCell>
-                    {/* Status */}
-                    <TableCell>{getStatusBadge(user.status)}</TableCell>
-                    {/* Created */}
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(user.createdAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </TableCell>
-                    {/* Updated */}
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(user.updatedAt).toLocaleDateString("en-US", {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </TableCell>
-                    {/* Actions */}
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="rounded-full cursor-pointer"
-                          >
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center">
-                          <DropdownMenuItem
-                            className="text-blue-500 cursor-pointer"
-                            onClick={() => setViewUser(user)}
-                          >
-                            <Eye className="mr-2 size-4" />
-                            View
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-yellow-500 cursor-pointer"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setIsEditDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="mr-2 size-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="cursor-pointer text-destructive"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            <Trash2 className="mr-2 size-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {/* Pagination */}
-            <div className="flex items-center justify-between border-t px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                Rows per page
-                <Select
-                  value={rowsPerPage.toString()}
-                  onValueChange={(value) => {
-                    setRowsPerPage(Number(value));
-                    setCurrentPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-8 w-[70px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">
-                  Page {currentPage} of {totalPages || 1}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronsLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={currentPage === totalPages || totalPages === 0}
-                  >
-                    <ChevronRight className="size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="size-8"
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                  >
-                    <ChevronsRight className="size-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
+        <AdminTable
+          columns={columns}
+          rows={filteredUsers}
+          rowKey={(user) => user.userId}
+          pageSize={20}
+          resetKey={`${searchQuery}:${tab}`}
+          emptyTitle="Not found"
+          emptyHint={
+            searchQuery ? `No results for "${searchQuery}"` : undefined
+          }
+        />
+      </AdminPage>
 
       {/* ── View User Dialog ──────────────────────────────────────────────── */}
       <Dialog open={!!viewUser} onOpenChange={() => setViewUser(null)}>
@@ -990,37 +854,41 @@ export default function TeamPage({
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h3 className="font-semibold text-lg">{viewUser.name}</h3>
-                  <div className="text-sm text-muted-foreground">
+                  <h3 className="type-card-heading">{viewUser.name}</h3>
+                  <div className="type-body-sm text-muted-foreground">
                     {viewUser.username}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="type-body-sm text-muted-foreground">
                     {viewUser.email}
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                 <div>
-                  <p className="text-sm text-muted-foreground">User ID</p>
-                  <p className="font-mono text-sm">{viewUser.userId}</p>
+                  <p className="type-body-sm text-muted-foreground">User ID</p>
+                  <p className="font-mono type-body-sm">{viewUser.userId}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Role</p>
+                  <p className="type-body-sm text-muted-foreground">Role</p>
                   <div className="mt-1">{viewUser.role}</div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <div className="mt-1">{getStatusBadge(viewUser.status)}</div>
+                  <p className="type-body-sm text-muted-foreground">Status</p>
+                  <div className="mt-1">
+                    <StatusBadge status={viewUser.status} />
+                  </div>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Phone(s)</p>
-                  <div className="text-sm mt-1">
+                  <p className="type-body-sm text-muted-foreground">Phone(s)</p>
+                  <div className="type-body-sm mt-1">
                     {viewUser.networks.filter(Boolean).join(", ") || "—"}
                   </div>
                 </div>
                 <div className="col-span-2 flex items-center gap-20">
                   <div>
-                    <p className="text-sm text-muted-foreground">Created At:</p>
+                    <p className="type-body-sm text-muted-foreground">
+                      Created At:
+                    </p>
                     <p>
                       {new Date(viewUser.createdAt).toLocaleDateString(
                         "en-US",
@@ -1033,7 +901,9 @@ export default function TeamPage({
                     </p>
                   </div>
                   <div className="text-left">
-                    <p className="text-sm text-muted-foreground">Updated At:</p>
+                    <p className="type-body-sm text-muted-foreground">
+                      Updated At:
+                    </p>
                     <p>
                       {new Date(viewUser.updatedAt).toLocaleDateString(
                         "en-US",
@@ -1056,9 +926,9 @@ export default function TeamPage({
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="text-sky-500">Add New User</DialogTitle>
+            <DialogTitle className="text-sky-500">Add Team Member</DialogTitle>
             <DialogDescription>
-              Create a new user account for team management.
+              Create a new staff account for team management.
             </DialogDescription>
           </DialogHeader>
           <AddUserForm

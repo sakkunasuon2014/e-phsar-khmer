@@ -600,7 +600,7 @@ const NotificationScreen = () => {
                 {
                   key: "pushEnabled",
                   title: "Push Notifications",
-                  subtitle: "Enable all mobile push alerts from PsaKhmer",
+                  subtitle: "Enable all mobile push alerts from PhsarKhmer",
                   icon: "notifications",
                 },
                 {

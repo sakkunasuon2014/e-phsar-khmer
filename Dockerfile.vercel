@@ -1,6 +1,6 @@
 # Backend image. Lives at the REPO ROOT because the build context must be the
 # directory holding pnpm-lock.yaml / pnpm-workspace.yaml:
-#   docker build -f Dockerfile.vercel -t psa-backend .
+#   docker build -f Dockerfile.vercel -t phsarkhmer-backend .
 #
 # Node 22 (>= 22.12) is required, not just preferred: `effect` v4 and several
 # other deps are ESM-only, and the CommonJS build loads them through Node's

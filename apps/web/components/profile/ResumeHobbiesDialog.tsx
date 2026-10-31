@@ -87,13 +87,13 @@ export function ResumeHobbiesDialog({
               <IconArrowLeft size={20} />
             </button>
           )}
-          <DialogTitle className="text-2xl font-semibold">
+          <DialogTitle>
             {mode === "edit"
               ? t("form.titles.hobbiesEdit")
               : t("form.titles.hobbiesWizard")}
           </DialogTitle>
           {mode === "wizard" ? (
-            <span className="ml-auto text-lg font-semibold text-[#00a0e9]">
+            <span className="ml-auto type-nav text-[#00a0e9]">
               {t("form.step", { current: 7, total: 8 })}
             </span>
           ) : (
@@ -118,7 +118,7 @@ export function ResumeHobbiesDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {mode === "wizard" && (
-            <p className="text-base text-muted-foreground">
+            <p className="type-body text-muted-foreground">
               {t("sections.hobbies.desc")}
             </p>
           )}
@@ -137,7 +137,7 @@ export function ResumeHobbiesDialog({
             <button
               type="button"
               onClick={onSkip}
-              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 text-base font-medium text-white transition-colors hover:bg-gray-600"
+              className="h-12 w-[165px] cursor-pointer rounded-sm bg-gray-500 type-nav text-white transition-colors hover:bg-gray-600"
             >
               {t("form.skip")}
             </button>
@@ -145,7 +145,7 @@ export function ResumeHobbiesDialog({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] text-base font-medium text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 flex-1 cursor-pointer rounded-sm bg-[#00a0e9] type-nav text-white transition-colors hover:bg-[#00a0e9]/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.nextReferences")}
             </button>
@@ -156,7 +156,7 @@ export function ResumeHobbiesDialog({
               type="button"
               onClick={handleSubmit}
               disabled={saving}
-              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 text-base font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-12 w-full cursor-pointer rounded-sm bg-orange-500 type-nav text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {t("form.save")}
             </button>

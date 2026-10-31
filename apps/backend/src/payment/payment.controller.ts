@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,6 +15,8 @@ import type { RequestUser } from '../common/types/api-response.types';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PaymentEffectRunner } from './payment-effect-runner.service';
+import { PaymentGatewayRegistry } from './providers';
+import { PaymentOnDemandReconciler } from './reconciler/payment-on-demand-reconciler.service';
 import {
   checkOwnedPaymentTransaction,
   createPaymentTransaction,
@@ -24,12 +27,6 @@ import {
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { ListPaymentsQueryDto } from './dto/list-payments-query.dto';
 import { UpdatePaymentDto } from './dto/update-payment.dto';
-
-/**
- * No tenants table exists yet (see ../tenant/README.md) — every transaction
- * is created under this fixed placeholder until real tenant scoping lands.
- */
-const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 
 /**
  * Every route here does exactly one thing: adapt its DTO/params into a
@@ -43,7 +40,11 @@ const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000000';
 @ApiBearerAuth()
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly effectRunner: PaymentEffectRunner) {}
+  constructor(
+    private readonly effectRunner: PaymentEffectRunner,
+    private readonly gateways: PaymentGatewayRegistry,
+    private readonly onDemand: PaymentOnDemandReconciler,
+  ) {}
 
   @Post()
   @ApiOperation({
@@ -55,7 +56,6 @@ export class PaymentsController {
   create(@CurrentUser() user: RequestUser, @Body() dto: CreatePaymentDto) {
     return this.effectRunner.runDurably((outbox) =>
       createPaymentTransaction(outbox, {
-        tenantId: DEFAULT_TENANT_ID,
         reference: dto.reference,
         idempotencyKey: dto.idempotencyKey,
         amount: dto.amount.toString(),
@@ -84,6 +84,19 @@ export class PaymentsController {
     );
   }
 
+  // Declared before `:id` so Express doesn't route "providers" as an id.
+  // Reads in-memory registry state only — no use-case, nothing to run.
+  @Get('providers')
+  @ApiOperation({
+    summary:
+      'List the registered payment providers for a checkout picker. ' +
+      '`available: false` means the provider is registered but missing ' +
+      'credentials — show it, but do not let the payer pick it.',
+  })
+  providers() {
+    return this.gateways.list();
+  }
+
   @Get(':id')
   @ApiOperation({
     summary:
@@ -94,10 +107,26 @@ export class PaymentsController {
       'that just POSTed should poll this endpoint rather than expect the ' +
       'artifact in the creation response itself.',
   })
-  check(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    return this.effectRunner.run(
-      checkOwnedPaymentTransaction({ id, customerId: user.id }),
-    );
+  async check(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    // The owner check runs first and is the only authorization: a non-owner
+    // gets the same 404 as a missing id and never reaches the provider call.
+    const read = () =>
+      this.effectRunner.run(
+        checkOwnedPaymentTransaction({ id, customerId: user.id }),
+      );
+    const transaction = await read();
+
+    // While a checkout is open, let this read nudge a settle along (at most
+    // one provider call per attempt per 5 s). The answer still comes from the
+    // database; re-read only if the check actually resolved something.
+    if (
+      transaction.status !== 'pending' &&
+      transaction.status !== 'processing'
+    ) {
+      return transaction;
+    }
+    const refreshed = await this.onDemand.refresh(transaction.id);
+    return refreshed === 'changed' ? read() : transaction;
   }
 
   @Get(':id/attempts')
@@ -114,7 +143,7 @@ export class PaymentsController {
   }
 
   @Patch(':id')
-  @Roles('admin', 'super_admin')
+  @Roles('admin')
   @UseGuards(RolesGuard)
   @ApiOperation({
     summary:
@@ -123,6 +152,10 @@ export class PaymentsController {
       '(see payment_status_history.actorType) — never customer-initiated.',
   })
   update(@Param('id') id: string, @Body() dto: UpdatePaymentDto) {
+    // Every purchase is final — there is no refund path, not even for admins.
+    if (dto.status === 'refund_pending' || dto.status === 'refunded') {
+      throw new BadRequestException('Refunds are not supported');
+    }
     return this.effectRunner.run(
       upsertPayment({
         id,

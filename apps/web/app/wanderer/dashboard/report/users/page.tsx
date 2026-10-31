@@ -1,485 +1,277 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useMemo, useState } from "react";
+import { Eye, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
-import {
-  IconLoader,
-  IconCircleCheckFilled,
-  IconCircleXFilled,
-} from "@tabler/icons-react";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
-import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLocale } from "next-intl";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getUserReports,
   updateUserReportStatus,
+  type UserReportView,
 } from "@/actions/admin-reports";
-import { ReportUser } from "@/types/reportuser";
 import { toast } from "@/components/ui/sonner";
+import DbImage from "@/components/common/DbImage";
+import { AdminPage } from "@/components/dashboard/admin-page";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import DbImage, { NoImageCell } from "@/components/common/DbImage";
+  AdminSearch,
+  AdminTable,
+  DateCell,
+  PrimaryCell,
+  RowActions,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
+import { ReportStatusBadge } from "@/components/dashboard/report-status-badge";
 
-type ReportUserRow = ReportUser & {
-  _reporterName: string;
-  _targetName: string;
-  _targetUsername: string | null;
-};
+function EvidenceThumbs({ urls }: { urls: string[] }) {
+  if (urls.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1">
+      {urls.slice(0, 3).map((url, index) => (
+        <a
+          key={`${url}-${index}`}
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          title="Open evidence image"
+          className="block size-7 overflow-hidden rounded border border-border"
+        >
+          <DbImage
+            src={url}
+            alt={`Evidence ${index + 1}`}
+            width={28}
+            height={28}
+            className="size-7 object-cover"
+            fallback={
+              <span className="type-meta text-muted-foreground">—</span>
+            }
+          />
+        </a>
+      ))}
+      {urls.length > 3 ? (
+        <span
+          className="type-meta text-muted-foreground"
+          title={`${urls.length} images`}
+        >
+          +{urls.length - 3}
+        </span>
+      ) : null}
+    </div>
+  );
+}
 
 export default function ReportUsersPage() {
   const queryClient = useQueryClient();
-  const {
-    data: reports = [],
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
+  const { data: reports = [], isLoading } = useQuery({
     queryKey: ["admin", "reports", "users"],
-    queryFn: async (): Promise<ReportUserRow[]> => {
-      const rows = await getUserReports();
-      return rows.map((r) => ({
-        ReportUserID: r.id,
-        TargetUserID: r.targetUserId,
-        ReportedByUserID: r.reporterId,
-        ReportImage: r.imagePaths ?? [],
-        ReportReasonID: r.reasonText ?? "",
-        ReportUserDescription: r.description ?? "",
-        Status: (r.status.charAt(0).toUpperCase() +
-          r.status.slice(1)) as ReportUser["Status"],
-        CreatedAt: r.createdAt,
-        ReviewedBy: r.reviewerName ?? undefined,
-        _reporterName: r.reporterName,
-        _targetName: r.targetName,
-        _targetUsername: r.targetUsername,
-      }));
-    },
+    queryFn: getUserReports,
   });
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: ["admin", "reports", "users"] });
 
-  const statusMutation = useMutation({
-    mutationFn: (input: { id: string; status: "approved" | "rejected" }) =>
-      updateUserReportStatus(input.id, input.status),
-    onSuccess: (res, input) => {
-      if (!res.success) {
-        toast.error(res.error ?? "Update failed");
-        return;
-      }
-      void queryClient.invalidateQueries({
-        queryKey: ["admin", "reports", "users"],
-      });
-      toast.success(`Report ${input.status}`);
-    },
-  });
-
-  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(50);
   const [tab, setTab] = useState("all");
   const router = useRouter();
   const locale = useLocale();
 
-  // ✅ SEARCH & FILTER
-  const filteredReports = (reports as Array<ReportUserRow>).filter((r) => {
-    const query = searchQuery.toLowerCase().trim();
+  const updateStatus = async (id: string, status: "approved" | "rejected") => {
+    if (
+      status === "approved" &&
+      !window.confirm("Approving suspends this account. Continue?")
+    )
+      return;
+    const res = await updateUserReportStatus(id, status);
+    if (res.success) {
+      refresh();
+      toast.success(`Report ${status}`);
+    } else {
+      toast.error(res.error ?? "Update failed");
+    }
+  };
 
-    const matchesSearch =
-      r.ReportUserID.toLowerCase().includes(query) ||
-      r.ReportedByUserID.toLowerCase().includes(query) ||
-      (r.TargetUserID || "").toLowerCase().includes(query) ||
-      (r._reporterName || "").toLowerCase().includes(query) ||
-      (r._targetName || "").toLowerCase().includes(query) ||
-      (r.ReportReasonID || "").toLowerCase().includes(query) ||
-      (r.ReportUserDescription || "").toLowerCase().includes(query);
+  const counts = useMemo(
+    () => ({
+      pending: reports.filter((report) => report.status === "pending").length,
+      approved: reports.filter((report) => report.status === "approved").length,
+      rejected: reports.filter((report) => report.status === "rejected").length,
+    }),
+    [reports],
+  );
 
-    const matchesTab =
-      tab === "all" ||
-      (tab === "pending" && r.Status === "Pending") ||
-      (tab === "approved" && r.Status === "Approved") ||
-      (tab === "rejected" && r.Status === "Rejected");
+  const filteredReports = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return reports.filter((report) => {
+      if (tab !== "all" && report.status !== tab) return false;
+      if (!query) return true;
+      return [
+        report.id,
+        report.reporterName,
+        report.targetName,
+        report.targetUsername ?? "",
+        report.reasonText ?? "",
+        report.description ?? "",
+        report.status,
+        report.reviewerName ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [reports, searchQuery, tab]);
 
-    return matchesSearch && matchesTab;
-  });
-
-  // ✅ PAGINATION (AFTER FILTER)
-  const totalPages = Math.ceil(filteredReports.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-
-  const paginatedReports = filteredReports.slice(
-    startIndex,
-    startIndex + rowsPerPage,
+  const columns = useMemo<AdminColumn<UserReportView>[]>(
+    () => [
+      {
+        key: "target",
+        header: "Target User",
+        sortValue: (report) => report.targetName,
+        cell: (report) => (
+          <PrimaryCell
+            shape="round"
+            alt={report.targetName}
+            title={report.targetName}
+            subtitle={
+              report.targetUsername
+                ? `@${report.targetUsername}`
+                : "No username"
+            }
+          />
+        ),
+      },
+      {
+        key: "reporter",
+        header: "Reported By",
+        sortValue: (report) => report.reporterName,
+        cell: (report) => <span>{report.reporterName || "—"}</span>,
+      },
+      {
+        key: "reason",
+        header: "Reason",
+        sortValue: (report) => report.reasonText ?? "",
+        cell: (report) => <span>{report.reasonText || "—"}</span>,
+      },
+      {
+        key: "detail",
+        header: "Detail",
+        cell: (report) => (
+          <div className="flex flex-col gap-1">
+            <span
+              className="line-clamp-2 max-w-[280px] whitespace-normal text-muted-foreground"
+              title={report.description ?? undefined}
+            >
+              {report.description || "—"}
+            </span>
+            <EvidenceThumbs urls={report.imageUrls ?? []} />
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status",
+        sortValue: (report) => report.status,
+        cell: (report) => (
+          <ReportStatusBadge
+            status={report.status}
+            reviewerName={report.reviewerName}
+          />
+        ),
+      },
+      {
+        key: "created",
+        header: "Created",
+        sortValue: (report) => report.createdAt,
+        cell: (report) => <DateCell value={report.createdAt} />,
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (report) => (
+          <RowActions
+            id={report.id}
+            actions={[
+              {
+                label: "View profile",
+                icon: <Eye className="mr-2 size-4" />,
+                disabled: !report.targetUsername,
+                onSelect: () => {
+                  if (!report.targetUsername) return;
+                  router.push(`/${locale}/${report.targetUsername}`);
+                },
+              },
+              {
+                label: "Approve",
+                icon: <ThumbsUp className="mr-2 size-4" />,
+                tone: "success",
+                disabled: report.status === "approved",
+                onSelect: () => void updateStatus(report.id, "approved"),
+              },
+              {
+                label: "Reject",
+                icon: <ThumbsDown className="mr-2 size-4" />,
+                tone: "danger",
+                disabled: report.status === "rejected",
+                onSelect: () => void updateStatus(report.id, "rejected"),
+              },
+            ]}
+          />
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- updateStatus only calls stable setters + the action
+    [locale, router],
   );
 
   return (
-    <div className="p-6">
-      {/* HEADER */}
-      <div className="flex flex-col gap-1 mb-4">
-        <h1 className="text-2xl text-sky-500 font-semibold">Report Users</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage and review user reports
-        </p>
+    <AdminPage
+      title="Report Users"
+      description="Manage and review user reports"
+      toolbar={
+        <AdminSearch
+          value={searchQuery}
+          onChange={setSearchQuery}
+          placeholder="Search reporter, target, reason, description..."
+        />
+      }
+    >
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList className="rounded-sm">
+          <TabsTrigger value="all" className="cursor-pointer rounded-sm">
+            All Reports
+          </TabsTrigger>
+          <TabsTrigger value="pending" className="cursor-pointer rounded-sm">
+            Pending
+            <Badge className="ml-1 bg-blue-500 text-white">
+              {counts.pending}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="approved" className="cursor-pointer rounded-sm">
+            Approved
+            <Badge className="ml-1 bg-green-500 text-white">
+              {counts.approved}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="rejected" className="cursor-pointer rounded-sm">
+            Rejected
+            <Badge className="ml-1 bg-red-500 text-white">
+              {counts.rejected}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <div className="relative max-w-sm mt-2">
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-
-          <Input
-            placeholder="Search for reports..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9"
-          />
-        </div>
-        <div className="mt-4">
-          <Tabs
-            value={tab}
-            onValueChange={(value) => {
-              setTab(value);
-              setCurrentPage(1);
-            }}
-          >
-            <TabsList className="rounded-sm">
-              <TabsTrigger value="all" className="rounded-sm cursor-pointer">
-                All Reports{" "}
-              </TabsTrigger>
-              <TabsTrigger
-                value="pending"
-                className="rounded-sm cursor-pointer"
-              >
-                Pending
-                <Badge className="bg-blue-500 ml-1 text-xs text-white">
-                  {reports.filter((r) => r.Status === "Pending").length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger
-                value="approved"
-                className="rounded-sm cursor-pointer"
-              >
-                Approved
-                <Badge className="bg-green-500  ml-1 text-xs text-white">
-                  {reports.filter((r) => r.Status === "Approved").length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger
-                value="rejected"
-                className="rounded-sm cursor-pointer"
-              >
-                Rejected
-                <Badge className="bg-red-500 ml-1 text-xs text-white">
-                  {reports.filter((r) => r.Status === "Rejected").length}
-                </Badge>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
-
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="text-center">Report ID</TableHead>
-              <TableHead className="text-center">Reported By</TableHead>
-              <TableHead className="text-center">Target User</TableHead>
-              <TableHead>Image</TableHead>
-              <TableHead>Reason</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created At</TableHead>
-              <TableHead>ReviewedBy</TableHead>
-              <TableHead className="text-center">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={10}
-                  className="h-32 text-center text-muted-foreground"
-                >
-                  Loading reports…
-                </TableCell>
-              </TableRow>
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center">
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <p>Could not load reports.</p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void refetch()}
-                    >
-                      Retry
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : paginatedReports.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-6">
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground py-6">
-                    <p>No reports found</p>
-                    {searchQuery && (
-                      <p className="text-sm">
-                        No results for &quot;{searchQuery}&quot;
-                      </p>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : null}
-            {(paginatedReports as Array<ReportUserRow>).map((report) => {
-              const reporterName =
-                (report as ReportUserRow)._reporterName || "—";
-              const targetName = (report as ReportUserRow)._targetName || "—";
-              return (
-                <TableRow key={report.ReportUserID}>
-                  <TableCell className="text-center">
-                    {report.ReportUserID}
-                  </TableCell>
-                  <TableCell className="text-center">{reporterName}</TableCell>
-                  <TableCell className="text-center">{targetName}</TableCell>
-                  <TableCell className="text-center max-w-[200px]">
-                    {report.ReportImage && report.ReportImage.length > 0 ? (
-                      <div className="flex flex-wrap gap-1 justify-center max-h-[90px] overflow-y-auto p-0.5">
-                        {report.ReportImage.slice(0, 24).map((image, index) => (
-                          <DbImage
-                            key={index}
-                            src={image}
-                            alt={`Report attachment ${index + 1}`}
-                            width={40}
-                            height={40}
-                            className="w-10 h-10 rounded object-cover border border-muted cursor-pointer"
-                            onClick={() => window.open(image, "_blank")}
-                            fallback={<NoImageCell />}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{report.ReportReasonID || "—"}</TableCell>
-                  <TableCell>{report.ReportUserDescription}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        report.Status === "Approved"
-                          ? "outline"
-                          : report.Status === "Rejected"
-                            ? "outline"
-                            : "outline"
-                      }
-                      className="flex items-center"
-                    >
-                      {report.Status === "Pending" && (
-                        <IconLoader
-                          strokeWidth={1}
-                          className="w-3 h-3 animate-spin"
-                        />
-                      )}
-                      {report.Status === "Approved" && (
-                        <IconCircleCheckFilled
-                          strokeWidth={1}
-                          className="w-3 h-3 text-green-500"
-                        />
-                      )}
-                      {report.Status === "Rejected" && (
-                        <IconCircleXFilled
-                          strokeWidth={1}
-                          className="w-3 h-3 text-red-500 rounded-full"
-                        />
-                      )}
-                      {report.Status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {new Date(report.CreatedAt).toLocaleString()}
-                  </TableCell>
-                  <TableCell>{report.ReviewedBy ?? "-"}</TableCell>
-                  <TableCell className="flex gap-2 justify-center">
-                    <Button
-                      size="sm"
-                      disabled={!report._targetUsername}
-                      onClick={() => {
-                        if (!report._targetUsername) return;
-                        router.push(`/${locale}/${report._targetUsername}`);
-                      }}
-                      className="text-white bg-yellow-500 rounded-sm hover:bg-yellow-600 hover:text-white cursor-pointer"
-                    >
-                      View Profile
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => setConfirmId(report.ReportUserID)}
-                      disabled={
-                        report.Status === "Approved" || statusMutation.isPending
-                      }
-                      className="text-white bg-green-500 rounded-sm hover:bg-green-600 hover:text-white cursor-pointer"
-                    >
-                      Approve
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        statusMutation.mutate({
-                          id: report.ReportUserID,
-                          status: "rejected",
-                        })
-                      }
-                      disabled={
-                        report.Status === "Rejected" || statusMutation.isPending
-                      }
-                      className="text-white bg-red-500 rounded-sm hover:bg-red-600 hover:text-white cursor-pointer"
-                    >
-                      Reject
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-
-        {/* PAGINATION */}
-        <div className="flex items-center justify-between border-t px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            Rows per page
-            <Select
-              value={rowsPerPage.toString()}
-              onValueChange={(value) => {
-                setRowsPerPage(Number(value));
-                setCurrentPage(1);
-              }}
-            >
-              <SelectTrigger className="h-8 w-[80px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-              >
-                <ChevronsLeft className="size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronsRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <Dialog
-        open={confirmId !== null}
-        onOpenChange={(open) => {
-          if (!open) setConfirmId(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Approve this report?</DialogTitle>
-            <DialogDescription>
-              The account is suspended immediately, all of its active listings
-              are removed from the marketplace, and every phone number on it is
-              banned from registering again. This is permanent — rejecting the
-              report later will not restore the account, its listings or the
-              numbers.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex flex-row justify-end gap-2">
-            <Button variant="outline" onClick={() => setConfirmId(null)}>
-              Cancel
-            </Button>
-            <Button
-              className="bg-green-500 text-white hover:bg-green-600"
-              onClick={() => {
-                if (confirmId)
-                  statusMutation.mutate({
-                    id: confirmId,
-                    status: "approved",
-                  });
-                setConfirmId(null);
-              }}
-            >
-              Approve and suspend
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+      <AdminTable
+        columns={columns}
+        rows={filteredReports}
+        rowKey={(report) => report.id}
+        isLoading={isLoading}
+        pageSize={20}
+        resetKey={`${searchQuery}:${tab}`}
+        emptyTitle="No reports found"
+        emptyHint={searchQuery ? `No results for "${searchQuery}"` : undefined}
+      />
+    </AdminPage>
   );
 }

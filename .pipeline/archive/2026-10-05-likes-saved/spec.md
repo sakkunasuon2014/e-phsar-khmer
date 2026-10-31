@@ -105,7 +105,7 @@ House patterns to mirror (all verified):
    `status != 'deleted'` (a removed ad must not appear in "my likes"); the
    id-set call is unfiltered (it only lights up buttons for rendered cards).
 4. **`likeCount` is computed, never denormalized.** A `count()` on the indexed
-   `listing_id`; no counter column to drift (psa-npic has no counter columns;
+   `listing_id`; no counter column to drift (Phsar has no counter columns;
    the follow counts are computed the same way, `users.service.ts:641-656`).
 5. **One batched hydration call.** `GET /users/me/reactions` returns both id
    arrays; cards read a client context seeded server-side. This is the

@@ -8,6 +8,8 @@ import { ConfigService } from '@nestjs/config';
 import { OutboxService } from './outbox.service';
 
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+/** The first sweep waits this long (plus up to a minute of jitter) after boot. */
+const FIRST_SWEEP_MIN_DELAY_MS = 60_000;
 const SWEEP_BATCH_SIZE = 1000;
 /** Caps one sweep's work so a huge first backlog can't hog the pool; the next hour continues. */
 const MAX_BATCHES_PER_SWEEP = 50;
@@ -29,6 +31,7 @@ export class OutboxRetention
 {
   private readonly logger = new Logger(OutboxRetention.name);
   private readonly retentionDays: number;
+  private bootTimer: NodeJS.Timeout | undefined;
   private timer: NodeJS.Timeout | undefined;
   private sweeping = false;
 
@@ -49,12 +52,20 @@ export class OutboxRetention
       return;
     }
 
-    this.timer = setInterval(() => void this.sweep(), SWEEP_INTERVAL_MS);
-    this.timer.unref();
-    void this.sweep();
+    // Not at boot: an instance that restarts often (or scales out) would turn
+    // every start into a delete query. Retention is housekeeping with a
+    // days-long horizon, so the first sweep waits a jittered 1-2 minutes.
+    const firstSweepMs = FIRST_SWEEP_MIN_DELAY_MS + Math.random() * 60_000;
+    this.bootTimer = setTimeout(() => {
+      void this.sweep();
+      this.timer = setInterval(() => void this.sweep(), SWEEP_INTERVAL_MS);
+      this.timer.unref();
+    }, firstSweepMs);
+    this.bootTimer.unref();
   }
 
   onModuleDestroy(): void {
+    if (this.bootTimer) clearTimeout(this.bootTimer);
     if (this.timer) clearInterval(this.timer);
   }
 

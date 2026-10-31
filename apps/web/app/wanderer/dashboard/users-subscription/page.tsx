@@ -1,26 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
+import { useMemo, useState } from "react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MoreVertical, Search } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -28,13 +12,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/sonner";
 import {
@@ -50,15 +27,27 @@ import { Plus } from "lucide-react";
 import {
   getUserSubscriptions,
   grantSubscription,
-  deleteUserSubscription,
+  revokeUserSubscription,
+  type UserSubscriptionRow,
 } from "@/actions/admin-user-subscriptions";
+import type { SupersededReason } from "@/types/subscription";
 import { getAdminUsers } from "@/actions/admin-users";
 import {
   getSubCategories,
-  getSubPlans,
   getSubPackages,
   getSubTerms,
 } from "@/actions/admin-subscriptions";
+import { AdminPage } from "@/components/dashboard/admin-page";
+import {
+  AdminSearch,
+  AdminTable,
+  DateCell,
+  EntityChip,
+  PrimaryCell,
+  RowActions,
+  formatCount,
+  type AdminColumn,
+} from "@/components/dashboard/admin-table";
 
 type Subscription = {
   id: string;
@@ -66,38 +55,73 @@ type Subscription = {
   name: string;
   email: string;
   phone: string;
-  category: string;
+  /** Subscription-category id — the tab key (names are free text like "Auto 8137"). */
+  categoryId: string | null;
+  group: string;
   totalAds: number;
   totalRenew: number;
   autoRenew: number;
-  plan: string;
+  term: string;
   price: number;
   paymentMethod: string;
   subscribedAt: string;
   expiredAt: string;
+  status: UserSubscriptionRow["status"];
+  supersededReason: SupersededReason | null;
 };
+
+// A superseded row is history, not a second subscription: label it by why it
+// was retired so it never reads as another active plan.
+function statusBadge(sub: Subscription): { label: string; className: string } {
+  const muted = "text-muted-foreground border-border bg-muted";
+  const red = "text-red-700 border-red-500 bg-red-50";
+  switch (sub.status) {
+    case "active":
+      return {
+        label: "Active",
+        className: "text-emerald-700 border-emerald-500 bg-emerald-50",
+      };
+    case "expired":
+      return { label: "Expired", className: red };
+    case "revoked":
+      return { label: "Revoked", className: red };
+    case "superseded":
+      return {
+        label: sub.supersededReason === "upgrade" ? "Upgraded" : "Replaced",
+        className: muted,
+      };
+  }
+}
 
 export default function SubscriptionPage() {
   const queryClient = useQueryClient();
-  const { data: subscription = [] } = useQuery({
-    queryKey: ["admin", "user-subscriptions"],
+  const [view, setView] = useState<"current" | "history">("current");
+  const {
+    data: subscription = [],
+    isError,
+    error,
+  } = useQuery({
+    queryKey: ["admin", "user-subscriptions", view],
     queryFn: async (): Promise<Subscription[]> => {
-      const rows = await getUserSubscriptions();
+      const rows = await getUserSubscriptions(view === "history");
       return rows.map((r) => ({
         id: r.id,
         accountId: r.accountId,
         name: r.name,
         email: r.email ?? "",
         phone: r.phone ?? "",
-        category: r.category ?? "—",
+        categoryId: r.subscriptionCategoryId ?? null,
+        group: r.group ?? "—",
         totalAds: r.totalAds,
         totalRenew: r.totalRenew,
         autoRenew: r.autoRenew,
-        plan: r.plan ?? "—",
+        term: r.term ?? "—",
         price: Number(r.price),
         paymentMethod: r.paymentMethod ?? "—",
         subscribedAt: r.subscribedAt.slice(0, 10),
         expiredAt: r.expiresAt,
+        status: r.status,
+        supersededReason: r.supersededReason,
       }));
     },
   });
@@ -106,8 +130,6 @@ export default function SubscriptionPage() {
       queryKey: ["admin", "user-subscriptions"],
     });
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
   const [tab, setTab] = useState("all");
 
@@ -117,7 +139,6 @@ export default function SubscriptionPage() {
   const [grant, setGrant] = useState({
     userId: "",
     categoryId: "",
-    planId: "",
     packageId: "",
     termId: "",
     paymentMethod: "Bank",
@@ -129,20 +150,17 @@ export default function SubscriptionPage() {
     queryFn: () => getAdminUsers({ q: userQuery, pageSize: 8 }),
     enabled: isGrantOpen,
   });
+  // Always loaded: the category tabs are built from the real subscription
+  // categories, so adding a sixth group needs no code change. Same key the
+  // grant dialog uses, so the dialog and the tabs share one fetch.
   const { data: grantCategories = [] } = useQuery({
     queryKey: ["admin", "sub", "categories"],
-    queryFn: getSubCategories,
-    enabled: isGrantOpen,
-  });
-  const { data: grantPlans = [] } = useQuery({
-    queryKey: ["admin", "sub", "plans", grant.categoryId],
-    queryFn: () => getSubPlans(grant.categoryId),
-    enabled: isGrantOpen && !!grant.categoryId,
+    queryFn: () => getSubCategories(),
   });
   const { data: grantPackages = [] } = useQuery({
-    queryKey: ["admin", "sub", "packages", grant.planId],
-    queryFn: () => getSubPackages(grant.planId),
-    enabled: isGrantOpen && !!grant.planId,
+    queryKey: ["admin", "sub", "packages", grant.categoryId],
+    queryFn: () => getSubPackages(grant.categoryId),
+    enabled: isGrantOpen && !!grant.categoryId,
   });
   const { data: grantTerms = [] } = useQuery({
     queryKey: ["admin", "sub", "terms", grant.packageId],
@@ -165,7 +183,6 @@ export default function SubscriptionPage() {
       setGrant({
         userId: "",
         categoryId: "",
-        planId: "",
         packageId: "",
         termId: "",
         paymentMethod: "Bank",
@@ -176,324 +193,241 @@ export default function SubscriptionPage() {
     }
   };
 
-  const filteredSubscriptions = subscription.filter((sub) => {
-    const q = searchQuery.toLowerCase();
-
-    const matchesSearch =
-      sub.id.toLowerCase().includes(q) ||
-      sub.accountId.toLowerCase().includes(q) ||
-      sub.name.toLowerCase().includes(q) ||
-      sub.email.toLowerCase().includes(q) ||
-      sub.category.toLowerCase().includes(q);
-
-    const matchesTab =
-      tab === "all"
-        ? true
-        : tab === "auto"
-          ? sub.category === "Auto"
-          : tab === "food"
-            ? sub.category === "Food"
-            : tab === "general"
-              ? sub.category === "General"
-              : tab === "property"
-                ? sub.category === "Property"
-                : tab === "services"
-                  ? sub.category === "Services"
-                  : true;
-
-    return matchesSearch && matchesTab;
-  });
-
-  const totalPages = Math.ceil(filteredSubscriptions.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const paginatedSubscriptions = filteredSubscriptions.slice(
-    startIndex,
-    startIndex + rowsPerPage,
-  );
-  const handleDelete = async (id: string) => {
-    const res = await deleteUserSubscription(id);
+  const filteredSubscriptions = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return subscription.filter((sub) => {
+      if (tab !== "all" && sub.categoryId !== tab) return false;
+      if (!q) return true;
+      return [
+        sub.id,
+        sub.accountId,
+        sub.name,
+        sub.email,
+        sub.phone,
+        sub.group,
+        sub.term,
+        sub.status,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [subscription, searchQuery, tab]);
+  const [revokeTarget, setRevokeTarget] = useState<Subscription | null>(null);
+  const [revoking, setRevoking] = useState(false);
+  const handleRevoke = async () => {
+    if (!revokeTarget) return;
+    setRevoking(true);
+    const res = await revokeUserSubscription(revokeTarget.id);
+    setRevoking(false);
     if (res.success) {
       refresh();
-      toast.success("Subscription removed");
+      setRevokeTarget(null);
+      toast.success("Subscription revoked");
     } else {
       toast.error(res.error);
     }
   };
 
+  const columns = useMemo<AdminColumn<Subscription>[]>(
+    () => [
+      {
+        key: "subscriber",
+        header: "Subscriber",
+        sortValue: (sub) => sub.name,
+        cell: (sub) => (
+          <PrimaryCell
+            shape="round"
+            alt={sub.name}
+            title={sub.name}
+            subtitle={sub.email || "No email"}
+          />
+        ),
+      },
+      {
+        key: "phone",
+        header: "Phone",
+        sortValue: (sub) => sub.phone,
+        cell: (sub) =>
+          sub.phone ? (
+            <span>{sub.phone}</span>
+          ) : (
+            <span className="text-muted-foreground">—</span>
+          ),
+      },
+      {
+        key: "term",
+        header: "Term",
+        sortValue: (sub) => sub.term,
+        cell: (sub) => (
+          <div className="flex flex-col gap-0.5">
+            <span className="font-medium">{sub.term}</span>
+            <span className="type-meta text-muted-foreground">
+              ${sub.price} · {sub.paymentMethod}
+            </span>
+          </div>
+        ),
+      },
+      {
+        key: "group",
+        header: "Category",
+        sortValue: (sub) => sub.group,
+        cell: (sub) => <EntityChip tone="category">{sub.group}</EntityChip>,
+      },
+      {
+        key: "usage",
+        header: "Usage",
+        sortValue: (sub) => sub.totalAds,
+        cell: (sub) => (
+          <div className="flex flex-col gap-0.5 type-meta">
+            <span>
+              {sub.totalAds} ads · {sub.totalRenew} renews
+            </span>
+            <span className="text-muted-foreground">
+              Auto renew {sub.autoRenew}
+            </span>
+          </div>
+        ),
+      },
+      {
+        key: "period",
+        header: "Period",
+        sortValue: (sub) => sub.expiredAt,
+        cell: (sub) => (
+          <div className="flex items-center gap-1.5 type-meta text-muted-foreground">
+            <DateCell value={sub.subscribedAt} />
+            <span>→</span>
+            <DateCell value={sub.expiredAt} />
+          </div>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status",
+        sortValue: (sub) => sub.status,
+        cell: (sub) => {
+          const badge = statusBadge(sub);
+          return <Badge className={badge.className}>{badge.label}</Badge>;
+        },
+      },
+      {
+        key: "action",
+        header: "Action",
+        align: "center",
+        cell: (sub) => (
+          <RowActions
+            id={sub.id}
+            actions={
+              sub.status === "active"
+                ? [
+                    {
+                      label: "Revoke",
+                      tone: "danger",
+                      onSelect: () => setRevokeTarget(sub),
+                    },
+                  ]
+                : []
+            }
+          />
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
-    <main className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl text-sky-500 font-semibold">
-            Users Subscription
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage subscription plans and users
-          </p>
-          <div className="pt-3">
-            <Button
-              onClick={() => setIsGrantOpen(true)}
-              className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
-            >
-              <Plus className="mr-2 size-4" />
-              Grant Subscription
-            </Button>
-          </div>
-          <div className="relative w-80 pt-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground mt-2" />
-            <Input
-              placeholder="Search..."
+    <>
+      <AdminPage
+        title="Users Subscription"
+        description="Manage subscription plans and users"
+        action={
+          <Button
+            onClick={() => setIsGrantOpen(true)}
+            className="h-9 rounded-sm bg-sky-500 text-white hover:bg-sky-600 hover:text-white cursor-pointer"
+          >
+            <Plus className="mr-2 size-4" />
+            Grant Subscription
+          </Button>
+        }
+        toolbar={
+          <>
+            <AdminSearch
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="pl-9"
+              onChange={setSearchQuery}
+              placeholder="Search name, email, phone, category, term..."
             />
-          </div>
-          <div className="mt-6">
-            <Tabs
-              value={tab}
-              onValueChange={(value) => {
-                setTab(value);
-                setCurrentPage(1);
-              }}
-            >
-              <TabsList className="gap-1">
-                <TabsTrigger value="all" className="cursor-pointer">
-                  All Subscription
-                </TabsTrigger>
-                <TabsTrigger value="auto" className="cursor-pointer">
-                  Auto
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {subscription.filter((s) => s.category === "Auto").length}
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="food" className="cursor-pointer">
-                  Food
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {subscription.filter((s) => s.category === "Food").length}
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="general" className="cursor-pointer">
-                  General
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "General")
-                        .length
-                    }
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="property" className="cursor-pointer">
-                  Property
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "Property")
-                        .length
-                    }
-                  </Badge>
-                </TabsTrigger>
-                <TabsTrigger value="services" className="cursor-pointer">
-                  Services
-                  <Badge className="ml-1.5 px-1.5 py-0.5 text-xs">
-                    {
-                      subscription.filter((s) => s.category === "Services")
-                        .length
-                    }
-                  </Badge>
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </div>
-      </div>
-      {/* Table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Account ID</TableHead>
-              <TableHead>Name / Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Total Ads</TableHead>
-              <TableHead>Total Renew</TableHead>
-              <TableHead>Auto Renew</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Payment</TableHead>
-              <TableHead>Subscribed</TableHead>
-              <TableHead>Expired</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Action</TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {paginatedSubscriptions.map((sub) => {
-              const isExpired = new Date(sub.expiredAt) < new Date();
-              return (
-                <TableRow key={sub.id}>
-                  <TableCell>{sub.id}</TableCell>
-                  <TableCell>{sub.accountId}</TableCell>
-
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{sub.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {sub.email}
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>{sub.phone}</TableCell>
-
-                  <TableCell>
-                    <Badge variant="outline">{sub.category}</Badge>
-                  </TableCell>
-
-                  <TableCell>{sub.totalAds}</TableCell>
-                  <TableCell>{sub.totalRenew}</TableCell>
-                  <TableCell>{sub.autoRenew}</TableCell>
-
-                  <TableCell>{sub.plan}</TableCell>
-
-                  <TableCell>${sub.price}</TableCell>
-
-                  <TableCell>
-                    <Badge variant="secondary">{sub.paymentMethod}</Badge>
-                  </TableCell>
-
-                  <TableCell>
-                    {new Date(sub.subscribedAt).toLocaleDateString()}
-                  </TableCell>
-
-                  <TableCell>
-                    {new Date(sub.expiredAt).toLocaleDateString()}
-                  </TableCell>
-
-                  {/* Status */}
-                  <TableCell>
-                    <Badge
-                      className={
-                        isExpired
-                          ? "text-red-500 border-red-500/30 bg-red-500/10"
-                          : "text-emerald-500 border-emerald-500/30 bg-emerald-500/10"
-                      }
-                    >
-                      {isExpired ? "Expired" : "Active"}
-                    </Badge>
-                  </TableCell>
-
-                  {/* Actions */}
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="icon" variant="outline">
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem
-                          className="text-destructive cursor-pointer"
-                          onClick={() => handleDelete(sub.id)}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        <div className="flex items-center justify-between border-t px-4 py-3">
-          {/* Rows per page */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            Rows per page
             <Select
-              value={rowsPerPage.toString()}
-              onValueChange={(value) => {
-                setRowsPerPage(Number(value));
-                setCurrentPage(1);
-              }}
+              value={view}
+              onValueChange={(value) => setView(value as "current" | "history")}
             >
-              <SelectTrigger className="h-8 w-[70px]">
+              <SelectTrigger className="h-9 w-full rounded-sm border-border bg-card text-foreground sm:w-[200px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="5">5</SelectItem>
-                <SelectItem value="10">10</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="current">Current subscriptions</SelectItem>
+                <SelectItem value="history">Full history</SelectItem>
               </SelectContent>
             </Select>
+          </>
+        }
+      >
+        {isError ? (
+          <div className="rounded-lg border border-border bg-card p-8 text-center">
+            <p className="font-medium">Couldn&apos;t load subscriptions</p>
+            <p className="mt-1 type-body-sm text-muted-foreground">
+              {error instanceof Error
+                ? error.message
+                : "Reload the page to try again."}
+            </p>
           </div>
+        ) : (
+          <>
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList className="h-auto flex-wrap gap-1">
+                <TabsTrigger value="all" className="cursor-pointer">
+                  All Subscription
+                </TabsTrigger>
+                {grantCategories.map((category) => (
+                  <TabsTrigger
+                    key={category.id}
+                    value={category.id}
+                    className="cursor-pointer"
+                  >
+                    {category.name}
+                    <Badge className="ml-1.5 px-1.5 py-0.5 type-meta">
+                      {formatCount(
+                        subscription.filter(
+                          (sub) => sub.categoryId === category.id,
+                        ).length,
+                      )}
+                    </Badge>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
 
-          {/* Pagination Controls */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-            </span>
-
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-              >
-                <ChevronsLeft className="size-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="size-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="size-4" />
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                className="size-8"
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronsRight className="size-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-        {filteredSubscriptions.length === 0 && (
-          <div className="text-center py-10 text-muted-foreground">
-            No subscriptions found
-          </div>
+            <AdminTable
+              columns={columns}
+              rows={filteredSubscriptions}
+              rowKey={(sub) => sub.id}
+              pageSize={20}
+              resetKey={`${searchQuery}:${tab}:${view}`}
+              emptyTitle="No subscriptions found"
+              emptyHint={
+                searchQuery
+                  ? `No results for "${searchQuery}"`
+                  : view === "current"
+                    ? "No current subscriptions — switch to Full history to see revoked, superseded and expired ones."
+                    : undefined
+              }
+            />
+          </>
         )}
-      </div>
+      </AdminPage>
 
       {/* Grant Subscription dialog */}
       <Dialog open={isGrantOpen} onOpenChange={setIsGrantOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Grant Subscription</DialogTitle>
             <DialogDescription>
@@ -533,7 +467,6 @@ export default function SubscriptionPage() {
                   setGrant({
                     ...grant,
                     categoryId: v,
-                    planId: "",
                     packageId: "",
                     termId: "",
                   })
@@ -552,44 +485,25 @@ export default function SubscriptionPage() {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Plan</Label>
-              <Select
-                value={grant.planId}
-                onValueChange={(v) =>
-                  setGrant({ ...grant, planId: v, packageId: "", termId: "" })
-                }
-                disabled={!grant.categoryId}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a plan" />
-                </SelectTrigger>
-                <SelectContent>
-                  {grantPlans.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Package</Label>
+              <Label>Tier</Label>
               <Select
                 value={grant.packageId}
                 onValueChange={(v) =>
                   setGrant({ ...grant, packageId: v, termId: "" })
                 }
-                disabled={!grant.planId}
+                disabled={!grant.categoryId}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a package" />
+                  <SelectValue placeholder="Select a tier" />
                 </SelectTrigger>
                 <SelectContent>
-                  {grantPackages.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
+                  {grantPackages
+                    .filter((p) => p.isActive)
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -604,11 +518,13 @@ export default function SubscriptionPage() {
                   <SelectValue placeholder="Select a term" />
                 </SelectTrigger>
                 <SelectContent>
-                  {grantTerms.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name} — ${t.price}
-                    </SelectItem>
-                  ))}
+                  {grantTerms
+                    .filter((t) => t.isActive)
+                    .map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name} — ${t.price}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -632,7 +548,7 @@ export default function SubscriptionPage() {
           <DialogFooter>
             <Button
               variant="outline"
-              className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+              className="h-9 rounded-sm cursor-pointer"
               onClick={() => setIsGrantOpen(false)}
             >
               Cancel
@@ -647,6 +563,36 @@ export default function SubscriptionPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+      <Dialog
+        open={!!revokeTarget}
+        onOpenChange={(open) => !open && setRevokeTarget(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Revoke subscription?</DialogTitle>
+            <DialogDescription>
+              {revokeTarget?.name}&apos;s {revokeTarget?.term} subscription ends
+              now. The record stays in the history.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="h-9 rounded-sm cursor-pointer"
+              onClick={() => setRevokeTarget(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="h-9 rounded-sm bg-red-500 text-white hover:bg-red-600 hover:text-white cursor-pointer"
+              disabled={revoking}
+              onClick={handleRevoke}
+            >
+              Revoke
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -1,6 +1,6 @@
 import "@/styles/globals.css";
 import type { Metadata } from "next";
-import { kantumruyPro } from "@/lib/fonts";
+import { kohSantepheap } from "@/lib/fonts";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -12,10 +12,10 @@ import { Providers } from "@/app/providers";
 
 export const metadata: Metadata = {
   title: {
-    default: "Psakhmer, Buy and Sell Everything In Cambodia",
-    template: "%s - Psakhmer",
+    default: "PhsarKhmer, Buy and Sell Everything In Cambodia",
+    template: "%s - PhsarKhmer",
   },
-  description: "Psakhmer, Buy and Sell Everything In Cambodia",
+  description: "PhsarKhmer, Buy and Sell Everything In Cambodia",
 };
 
 export default async function RootLayout({
@@ -36,7 +36,7 @@ export default async function RootLayout({
   return (
     <html
       lang={locale}
-      className={kantumruyPro.variable}
+      className={`${kohSantepheap.variable}`}
       suppressHydrationWarning
     >
       <body>

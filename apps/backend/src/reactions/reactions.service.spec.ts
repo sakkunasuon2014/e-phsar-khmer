@@ -301,8 +301,10 @@ describe('ReactionsService', () => {
       await service.listLikedListings('u1', {});
 
       const where = compile(sink.wheres);
-      expect(where.sql).toContain('"status" <>');
-      expect(where.params).toContain('deleted');
+      expect(where.sql).toContain('"status" not in');
+      expect(where.params).toEqual(
+        expect.arrayContaining(['deleted', 'restricted']),
+      );
       const order = compile(sink.orderBys);
       expect(order.sql).toContain('"created_at" desc');
       expect(order.sql).toContain('"id" desc');
@@ -314,8 +316,10 @@ describe('ReactionsService', () => {
       await service.listSavedListings('u1', {});
 
       const where = compile(sink.wheres);
-      expect(where.sql).toContain('"status" <>');
-      expect(where.params).toContain('deleted');
+      expect(where.sql).toContain('"status" not in');
+      expect(where.params).toEqual(
+        expect.arrayContaining(['deleted', 'restricted']),
+      );
       const order = compile(sink.orderBys);
       expect(order.sql).toContain('"created_at" desc');
       expect(order.sql).toContain('"id" desc');

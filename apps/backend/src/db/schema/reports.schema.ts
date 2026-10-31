@@ -11,6 +11,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { users } from './users.schema';
 import { listings } from './listings.schema';
 
@@ -78,6 +79,11 @@ export const userReports = pgTable(
   (t) => [
     index('user_reports_status_idx').on(t.status),
     index('user_reports_target_user_id_idx').on(t.targetUserId),
+    // One open report per reporter and target: re-submitting while the first
+    // is still pending would only pad the moderation queue.
+    uniqueIndex('user_reports_pending_uq')
+      .on(t.reporterId, t.targetUserId)
+      .where(sql`status = 'pending'`),
   ],
 );
 
@@ -111,6 +117,9 @@ export const listingReports = pgTable(
   (t) => [
     index('listing_reports_status_idx').on(t.status),
     index('listing_reports_listing_id_idx').on(t.listingId),
+    uniqueIndex('listing_reports_pending_uq')
+      .on(t.reporterId, t.listingId)
+      .where(sql`status = 'pending'`),
   ],
 );
 

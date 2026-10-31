@@ -1,14 +1,9 @@
-/**
- * ABA docs call `return_url` "encrypted with Base64" — despite the wording
- * this is plain base64 *encoding* (reversible, no key); the only key
- * involved anywhere in the purchase request is the HMAC `apiKey` used for
- * `hash` (see `aba-payway.signing.ts`).
- */
+/** ABA's "encrypted with Base64" `return_url` is plain base64 (no key). */
 export function base64EncodeAbaPaywayUrl(url: string): string {
   return Buffer.from(url, 'utf-8').toString('base64');
 }
 
-/** ABA's `req_time` wire format: a 14-digit UTC timestamp (`YYYYMMDDHHmmss`), not epoch milliseconds — per ABA's developer docs. */
+/** ABA's `req_time`: 14-digit UTC `YYYYMMDDHHmmss`, not epoch millis. */
 export function formatAbaPaywayReqTime(date: Date): string {
   const pad = (n: number, width = 2): string => String(n).padStart(width, '0');
   return (

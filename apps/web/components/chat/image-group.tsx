@@ -70,7 +70,7 @@ export function ImageGroup({
             isMine ? "flex-row-reverse" : "flex-row",
           )}
         >
-          <span className="text-[10px] text-muted-foreground">
+          <span className="type-meta text-muted-foreground">
             {new Date(
               messages[messages.length - 1].createdAt,
             ).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}

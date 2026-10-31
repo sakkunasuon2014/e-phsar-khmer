@@ -12,7 +12,7 @@ export function DashboardHeader({ user }: { user: CurrentUser | null }) {
     <header className="flex items-center justify-between border-b px-6 py-4">
       <div className="flex items-center gap-4">
         <SidebarTrigger className="-ml-2" />
-        <h1 className="text-xl font-semibold">DashBoard</h1>
+        <h1 className="type-page-title">DashBoard</h1>
       </div>
 
       <div className="ml-auto flex items-center gap-4">

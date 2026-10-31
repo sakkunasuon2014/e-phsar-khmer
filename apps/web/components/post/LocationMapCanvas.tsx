@@ -31,7 +31,9 @@ const redPinIcon = L.divIcon({
  *  - **pick** (`readOnly` unset) — a centre pin: the marker is drawn in the
  *    middle of the frame and the map moves under it, so the chosen point is
  *    always the map's centre (drag or click the map to move it). Emits the
- *    centre on every `moveend`.
+ *    centre on every `moveend`. Can also be recentred from outside via
+ *    `flyTo` (e.g. a "use current location" button living outside this
+ *    component) without rebuilding the map.
  *  - **view** (`readOnly`) — an anchored marker at `value`, for the post form's
  *    preview strip and the listing detail page.
  */
@@ -42,6 +44,7 @@ export default function LocationMapCanvas({
   defaultZoom = 12,
   readOnly = false,
   className,
+  flyTo,
 }: {
   value: MapCoords | null;
   onChange?: (value: MapCoords) => void;
@@ -49,9 +52,17 @@ export default function LocationMapCanvas({
   defaultZoom?: number;
   readOnly?: boolean;
   className?: string;
+  /**
+   * Pick mode only. Each distinct `nonce` pans the already-mounted map to
+   * `{ lat, lng }` (optionally re-zooming) without tearing it down. The
+   * existing `moveend` listener fires `onChange` once the pan settles, so
+   * callers read the new centre the same way a drag or click would report it.
+   */
+  flyTo?: { lat: number; lng: number; zoom?: number; nonce: number };
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
   // Kept in a ref so parent re-renders never rebuild the map.
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -95,9 +106,12 @@ export default function LocationMapCanvas({
     // The dialog mounts just before the map, so the box is sized a frame later.
     const raf = requestAnimationFrame(() => map.invalidateSize());
 
+    mapRef.current = map;
+
     return () => {
       cancelAnimationFrame(raf);
       map.remove();
+      mapRef.current = null;
       markerRef.current = null;
     };
     // Deliberately once: coordinate changes are handled by the effect below.
@@ -113,6 +127,19 @@ export default function LocationMapCanvas({
       marker.setLatLng(value);
     }
   }, [value]);
+
+  // Pick mode only: a caller (e.g. "use current location") recentres the
+  // already-mounted map. `moveend` (wired above) reports the new centre back
+  // through `onChange`, same as a drag or click — no extra emit needed here.
+  useEffect(() => {
+    if (readOnly || !flyTo) return;
+    const map = mapRef.current;
+    if (!map) return;
+    map.flyTo([flyTo.lat, flyTo.lng], flyTo.zoom ?? map.getZoom());
+    // Keyed on `nonce` so the same coordinates can be re-applied (e.g. the
+    // sender taps "use current location" twice in a row at the same spot).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flyTo?.nonce]);
 
   return (
     <div className={`relative ${className ?? ""}`}>

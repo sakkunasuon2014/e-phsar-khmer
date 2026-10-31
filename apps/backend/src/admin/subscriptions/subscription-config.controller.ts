@@ -4,8 +4,10 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -16,17 +18,17 @@ import { SubscriptionConfigService } from './subscription-config.service';
 import {
   CreateSubCategoryDto,
   UpdateSubCategoryDto,
-  CreateSubPlanDto,
-  UpdateSubPlanDto,
   CreateSubPackageDto,
   UpdateSubPackageDto,
   CreateSubTermDto,
   UpdateSubTermDto,
+  UpdateFreePlanDto,
+  UpdateSubCategoryScopeDto,
 } from './dto/subscription-config.dto';
 
 @ApiTags('admin')
 @ApiBearerAuth()
-@Roles('admin', 'super_admin')
+@Roles('admin')
 @UseGuards(RolesGuard)
 @Controller('admin/subscriptions')
 export class SubscriptionConfigController {
@@ -49,29 +51,28 @@ export class SubscriptionConfigController {
   removeCategory(@Param('id') id: string) {
     return this.service.removeCategory(id);
   }
-
-  // Plans
-  @Get('plans')
-  listPlans(@Query('categoryId') categoryId?: string) {
-    return this.service.listPlans(categoryId);
-  }
-  @Post('plans')
-  createPlan(@Body() dto: CreateSubPlanDto) {
-    return this.service.createPlan(dto);
-  }
-  @Patch('plans/:id')
-  updatePlan(@Param('id') id: string, @Body() dto: UpdateSubPlanDto) {
-    return this.service.updatePlan(id, dto);
-  }
-  @Delete('plans/:id')
-  removePlan(@Param('id') id: string) {
-    return this.service.removePlan(id);
+  @Put('categories/:id/scope')
+  updateCategoryScope(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateSubCategoryScopeDto,
+  ) {
+    return this.service.updateCategoryScope(id, dto);
   }
 
-  // Packages
+  // Free plan
+  @Get('free-plan')
+  getFreePlan() {
+    return this.service.getFreePlan();
+  }
+  @Put('free-plan')
+  updateFreePlan(@Body() dto: UpdateFreePlanDto) {
+    return this.service.updateFreePlan(dto);
+  }
+
+  // Packages (a group's fixed tiers)
   @Get('packages')
-  listPackages(@Query('planId') planId?: string) {
-    return this.service.listPackages(planId);
+  listPackages(@Query('categoryId') categoryId?: string) {
+    return this.service.listPackages(categoryId);
   }
   @Post('packages')
   createPackage(@Body() dto: CreateSubPackageDto) {

@@ -1,5 +1,6 @@
 import { Colors } from "@/constants/Colors";
 import SafeAreaView from "@/components/common/SafeAreaView";
+import { BrandWordmark } from "@/components/common/BrandWordmark";
 import { useAuth } from "@/contexts/AuthContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -39,9 +40,7 @@ const AuthLandingScreen = () => {
 
         {/* App Branding */}
         <View className="items-center">
-          <Text className="text-white text-5xl font-bold tracking-tight">
-            PsaKhmer
-          </Text>
+          <BrandWordmark tone="onPrimary" className="text-4xl" />
           <Text className="text-white/90 text-lg font-medium mt-2">
             Buy Faster, Sell Faster
           </Text>

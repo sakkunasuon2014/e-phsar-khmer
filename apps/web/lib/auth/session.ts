@@ -3,6 +3,7 @@ import {
   DEVICE_ID_COOKIE,
   DEVICE_ID_MAX_AGE,
   DEVICE_ID_PATTERN,
+  LEGACY_DEVICE_ID_COOKIE,
 } from "@/lib/device-id";
 
 export const ADMIN_ACCESS_TOKEN_COOKIE = "admin_access_token";
@@ -93,10 +94,15 @@ export async function setUserDeviceId(deviceId: string): Promise<void> {
     path: "/",
     maxAge: DEVICE_ID_MAX_AGE,
   });
+  store.delete(LEGACY_DEVICE_ID_COOKIE);
 }
 
 /** The mirrored device id, for forwarding as `x-device-id`. */
 export async function getUserDeviceId(): Promise<string | null> {
-  const value = (await cookies()).get(DEVICE_ID_COOKIE)?.value ?? null;
+  const store = await cookies();
+  const value =
+    store.get(DEVICE_ID_COOKIE)?.value ||
+    store.get(LEGACY_DEVICE_ID_COOKIE)?.value ||
+    null;
   return value && DEVICE_ID_PATTERN.test(value) ? value : null;
 }

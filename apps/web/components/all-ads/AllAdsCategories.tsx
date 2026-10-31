@@ -20,7 +20,7 @@ export default async function AllAdsCategories() {
 
   return (
     <div>
-      <ul className="bg-muted text-center grid grid-cols-6 text-md gap-2">
+      <ul className="bg-muted text-center grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
         {categories.map((category) => (
           <li key={category.slug}>
             <Link
@@ -46,7 +46,7 @@ export default async function AllAdsCategories() {
                   />
                 )}
               </div>
-              <p className="mt-3 text-sm ">{category.name}</p>
+              <p className="mt-3 type-body-sm ">{category.name}</p>
             </Link>
           </li>
         ))}

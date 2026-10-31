@@ -10,13 +10,13 @@ export function DocumentTabs() {
           <TabsTrigger value="outline">Outline</TabsTrigger>
           <TabsTrigger value="performance" className="gap-2">
             Past Performance
-            <Badge variant="secondary" className="rounded-full px-1.5 py-0.5 text-[10px]">
+            <Badge variant="secondary" className="rounded-full px-1.5 py-0.5 type-button-sm">
               3
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="personnel" className="gap-2">
             Key Personnel
-            <Badge variant="secondary" className="rounded-full px-1.5 py-0.5 text-[10px]">
+            <Badge variant="secondary" className="rounded-full px-1.5 py-0.5 type-button-sm">
               2
             </Badge>
           </TabsTrigger>
